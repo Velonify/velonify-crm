@@ -12,6 +12,7 @@ Ohne Google-Zugangsdaten startet die App im **Demo-Modus** mit erfundenen Beispi
 
 | Bereich | Was es kann |
 |---|---|
+| **Suche** | Überall mit `⌘K` / `Strg+K` oder über die Seitenleiste: Firmen, Kontakte und Deals nach Name, Domain, Kürzel, E-Mail, Telefon oder Ort. Umlaute egal („muenchen“ findet „München“), Pfeiltasten + Enter öffnen die Firmenakte. |
 | **Mein Tag** | Überfällige und heutige Wiedervorlagen und Deal-Schritte, nächste 7 Tage, Deals ohne nächsten Schritt, Kennzahlen (Pipeline-Wert, gewichtet, Angebote, gewonnen im Monat). Umschaltbar zwischen „Meine“ und „Alle“. |
 | **Pipeline** | Kanban nach Phase (Neu → Qualifiziert → Kontaktiert → Gespräch → Angebot → Gewonnen/Verloren), Drag & Drop, Summen je Spalte, Filter nach Zuständigem. |
 | **Firmen** | Liste mit Suche (auch nach Kontakten), Filtern, Deal-Phase; Anlegen, Bearbeiten, Archivieren. Doppelte Domains und Kürzel werden abgelehnt. |

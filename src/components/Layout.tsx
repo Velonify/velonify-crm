@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { isDemo } from '../config';
 import { useCrm } from '../data/CrmContext';
+import { Suche } from './Suche';
 
 const navClass = ({ isActive }: { isActive: boolean }) => `nav-item${isActive ? ' is-active' : ''}`;
 
@@ -18,6 +19,7 @@ export function Layout() {
           <span>Velonify CRM</span>
           {loading && db && <span className="sync-dot" title="Wird aktualisiert …" aria-label="Wird aktualisiert" />}
         </div>
+        <Suche />
         <nav className="nav">
           <NavLink to="/" end className={navClass}>
             Mein Tag
