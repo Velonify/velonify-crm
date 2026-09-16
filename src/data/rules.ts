@@ -43,7 +43,7 @@ function nameWords(name: string): string[] {
   return transliterate(name).replace(LEGAL_FORMS, ' ').split(/[^A-Za-z0-9]+/).filter(Boolean);
 }
 
-/** "artplants GmbH & Co. KG" → "artplants": lowercase, no legal form, no punctuation. */
+/** "Grünwerk Pflanzen GmbH & Co. KG" → "gruenwerk pflanzen": lowercase, no legal form, no punctuation. */
 export function normalizeFirmenname(name: string): string {
   return nameWords(name).join(' ').toLowerCase();
 }
