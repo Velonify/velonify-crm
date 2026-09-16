@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ErrorBox, Loading, PageHeader, PhaseBadge, StatusBadge, TierBadge } from '../components/ui';
 import { phaseIndex, STATUS, statusLabel, TIERS } from '../data/constants';
 import { useCrm } from '../data/CrmContext';
+import { dublettenIndex } from '../data/dubletten';
 import { kontaktName } from '../data/rules';
 import { fortschritt } from '../data/selectors';
 import type { Firma } from '../data/types';
@@ -47,6 +48,7 @@ export function FirmenListePage() {
     plattform: params.get('plattform') ?? '',
     zustaendig: params.get('zustaendig') ?? '',
     archiv: params.get('archiv') === '1',
+    dubletten: params.get('dubletten') === '1',
   };
   const setFilter = (key: keyof typeof filter, value: string) => {
     const next = new URLSearchParams(params);
@@ -71,6 +73,8 @@ export function FirmenListePage() {
     }));
   }, [db]);
 
+  const dubletten = useMemo(() => dublettenIndex(db?.firmen ?? []), [db]);
+
   const plattformen = useMemo(() => [...new Set(zeilen.map((z) => z.firma.plattform).filter(Boolean))].sort(), [zeilen]);
 
   const visible = useMemo(() => {
@@ -83,13 +87,14 @@ export function FirmenListePage() {
           (!filter.tier || f.tier === filter.tier) &&
           (!filter.plattform || f.plattform === filter.plattform) &&
           (!filter.zustaendig || f.zustaendig === filter.zustaendig) &&
+          (!filter.dubletten || dubletten.has(f.id)) &&
           (!q || suchtext.includes(q)),
       )
       .sort((a, b) => compare(a, b, sort.key) * (sort.desc ? -1 : 1));
-  }, [zeilen, filter.q, filter.status, filter.tier, filter.plattform, filter.zustaendig, filter.archiv, sort]);
+  }, [zeilen, filter.q, filter.status, filter.tier, filter.plattform, filter.zustaendig, filter.archiv, filter.dubletten, dubletten, sort]);
 
   const activeCount = zeilen.filter((z) => !z.firma.archiviert).length;
-  const hasFilter = Boolean(filter.q || filter.status || filter.tier || filter.plattform || filter.zustaendig || filter.archiv);
+  const hasFilter = Boolean(filter.q || filter.status || filter.tier || filter.plattform || filter.zustaendig || filter.archiv || filter.dubletten);
   const toggleSort = (key: SortKey) =>
     setSort((s) => (s.key === key ? { key, desc: !s.desc } : { key, desc: key === 'score' || key === 'geaendert_am' || key === 'phase' }));
 
@@ -151,6 +156,12 @@ export function FirmenListePage() {
             </option>
           ))}
         </select>
+        {(dubletten.size > 0 || filter.dubletten) && (
+          <label className="checkbox warn-text">
+            <input type="checkbox" checked={filter.dubletten} onChange={(e) => setFilter('dubletten', e.target.checked ? '1' : '')} />
+            Mögliche Dubletten ({dubletten.size})
+          </label>
+        )}
         <label className="checkbox">
           <input type="checkbox" checked={filter.archiv} onChange={(e) => setFilter('archiv', e.target.checked ? '1' : '')} />
           Archivierte zeigen
@@ -193,6 +204,11 @@ export function FirmenListePage() {
                       {f.kuerzel && <span className="kuerzel">{f.kuerzel}</span>}
                       {f.domain || <span className="muted">keine Domain</span>}
                       {f.archiviert && <span className="muted"> · archiviert</span>}
+                      {dubletten.has(f.id) && (
+                        <span className="badge dublette" title={dubletten.get(f.id)!.map((t) => `${t.firma.name}: ${t.gruende.join(', ')}`).join('\n')}>
+                          Dublette?
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td>

@@ -1,8 +1,9 @@
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { EOL, EOL_LABEL, STATUS, statusLabel, TIERS } from '../data/constants';
+import { findeDubletten, type DublettenTreffer } from '../data/dubletten';
 import { DuplicateError, ValidationError } from '../data/errors';
-import type { FirmaInput, Listen } from '../data/types';
+import type { Firma, FirmaInput, Listen } from '../data/types';
 import { errorMessage } from '../lib/errors';
 
 interface Props {
@@ -11,12 +12,17 @@ interface Props {
   submitLabel: string;
   onSubmit(values: FirmaInput): Promise<void>;
   onCancel(): void;
+  /** All firms, for the duplicate warning. */
+  alleFirmen: readonly Firma[];
+  /** The firm being edited; its own record and duplicates it already had are not warned about again. */
+  selfId?: string;
 }
 
 type TextField = Exclude<keyof FirmaInput, 'score'>;
 
-export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel }: Props) {
+export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel, alleFirmen, selfId }: Props) {
   const [values, setValues] = useState<FirmaInput>(initial);
+  const [dubletten, setDubletten] = useState<DublettenTreffer[]>([]);
   const [scoreText, setScoreText] = useState(initial.score === null ? '' : String(initial.score));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<unknown>();
@@ -25,14 +31,23 @@ export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel }: 
   const set = (field: TextField) => (event: { target: { value: string } }) =>
     setValues((v) => ({ ...v, [field]: event.target.value }));
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
+  const speichern = async (dublettenBestaetigt: boolean) => {
     const trimmedScore = scoreText.trim().replace(',', '.');
     const score = trimmedScore === '' ? null : Number(trimmedScore);
     if (score !== null && !Number.isFinite(score)) {
       setError(new ValidationError('score', 'Score muss eine Zahl sein.'));
       return;
     }
+    if (!dublettenBestaetigt) {
+      // Warn only about matches this change creates, not ones the firm already had when the form opened.
+      const vorher = new Set(selfId ? findeDubletten({ ...initial, id: selfId }, alleFirmen).map((t) => t.firma.id) : []);
+      const treffer = findeDubletten({ ...values, id: selfId }, alleFirmen).filter((t) => !vorher.has(t.firma.id) && !t.firma.archiviert);
+      if (treffer.length > 0) {
+        setDubletten(treffer);
+        return;
+      }
+    }
+    setDubletten([]);
     setSaving(true);
     setError(undefined);
     try {
@@ -41,6 +56,11 @@ export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel }: 
       setError(err);
       setSaving(false);
     }
+  };
+
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    void speichern(false);
   };
 
   const invalidField = error instanceof ValidationError || error instanceof DuplicateError ? error.field : undefined;
@@ -138,6 +158,31 @@ export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel }: 
               </>
             )}
           </span>
+        </div>
+      )}
+
+      {dubletten.length > 0 && (
+        <div className="hint-box warn" role="alert">
+          <strong>Mögliche Dublette.</strong> Diese Firma sieht aus wie:
+          <ul className="dubletten-liste">
+            {dubletten.map((t) => (
+              <li key={t.firma.id}>
+                <Link to={`/firmen/${t.firma.id}`} target="_blank" rel="noopener">
+                  {t.firma.name}
+                  {t.firma.domain && ` (${t.firma.domain})`}
+                </Link>{' '}
+                – {t.gruende.join(', ')}
+              </li>
+            ))}
+          </ul>
+          <div className="form-actions">
+            <button type="button" className="button" onClick={() => setDubletten([])}>
+              Zurück zum Formular
+            </button>
+            <button type="button" className="button primary" onClick={() => void speichern(true)} disabled={saving}>
+              Trotzdem speichern
+            </button>
+          </div>
         </div>
       )}
 

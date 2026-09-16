@@ -1,6 +1,7 @@
 import { TIERS } from './constants';
+import { dublettenText, findeDubletten } from './dubletten';
 import { normalizeDomain, splitName } from './rules';
-import type { Database, FirmaInput, KontaktInput } from './types';
+import type { Database, Firma, FirmaInput, KontaktInput } from './types';
 import { EMPTY_FIRMA_INPUT, EMPTY_KONTAKT_INPUT } from './types';
 
 /** RFC 4180 CSV with auto-detected delimiter (Excel in German uses ";"). */
@@ -46,7 +47,7 @@ export function parseCsv(text: string): string[][] {
   return rows.filter((r) => r.some((c) => c.trim() !== ''));
 }
 
-export type ImportAktion = 'neu' | 'ergaenzen' | 'unveraendert' | 'uebersprungen' | 'fehler';
+export type ImportAktion = 'neu' | 'ergaenzen' | 'dublette' | 'unveraendert' | 'uebersprungen' | 'fehler';
 
 export interface ImportZeile {
   zeile: number;
@@ -62,6 +63,8 @@ export interface ImportZeile {
   aenderungen?: Partial<FirmaInput>;
   /** A contact to create (new firm, or existing firm without a contact of that name). */
   kontakt?: KontaktInput;
+  /** Existing firm (or earlier row) this one probably duplicates, e.g. same VAT ID under another domain. */
+  dubletteVon?: { firmaId?: string; name: string };
 }
 
 export interface ImportOptionen {
@@ -69,6 +72,8 @@ export interface ImportOptionen {
   zustaendig: string;
   dealAnlegen: boolean;
   dealTitel: string;
+  /** Import rows flagged as possible duplicates anyway. */
+  dublettenImportieren?: boolean;
 }
 
 export interface ImportPlan {
@@ -152,6 +157,8 @@ export function planeImport(rows: string[][], db: Database, optionen: ImportOpti
 
   const firmenNachDomain = new Map(db.firmen.map((f) => [normalizeDomain(f.domain), f]));
   const gesehen = new Set<string>();
+  // New firms planned by earlier rows, so two rows of one company in the same file are caught too.
+  const geplant: Firma[] = [];
   const tiers = new Set(optionen.tiers);
 
   const zeilen = daten.map((row, i): ImportZeile => {
@@ -175,7 +182,17 @@ export function planeImport(rows: string[][], db: Database, optionen: ImportOpti
 
     const vorhanden = firmenNachDomain.get(firma.domain);
     if (!vorhanden) {
-      return { ...basis, aktion: 'neu', hinweis: kontakt ? 'mit Ansprechpartner' : '', firma: { ...firma, zustaendig: optionen.zustaendig }, kontakt };
+      const neu = { ...firma, zustaendig: optionen.zustaendig };
+      const [dublette] = findeDubletten(neu, [...db.firmen, ...geplant]);
+      const zeile: ImportZeile = { ...basis, aktion: 'neu', hinweis: kontakt ? 'mit Ansprechpartner' : '', firma: neu, kontakt };
+      if (dublette) {
+        const planZeile = dublette.firma.id.startsWith('import-');
+        zeile.dubletteVon = { firmaId: planZeile ? undefined : dublette.firma.id, name: dublette.firma.name };
+        zeile.hinweis = `Mögliche Dublette von ${dublettenText(dublette)}${planZeile ? ' (weiter oben in der Datei)' : ''}`;
+        if (!optionen.dublettenImportieren) zeile.aktion = 'dublette';
+      }
+      if (zeile.aktion === 'neu') geplant.push({ ...neu, id: `import-${i}`, archiviert: false } as Firma);
+      return zeile;
     }
 
     const aenderungen: Partial<FirmaInput> = {};

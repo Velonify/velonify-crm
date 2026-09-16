@@ -19,7 +19,8 @@ Ohne Google-Zugangsdaten startet die App im **Demo-Modus** mit erfundenen Beispi
 | **Firmenakte** | Deals mit Angebotswert und nächstem Schritt, Kontakte, Wiedervorlagen, Verlauf (Notiz/Anruf/Mail/Meeting), Google-Drive-Ordner, Termine. |
 | **Automatik beim Phasenwechsel** | *Qualifiziert*: Kürzel vorschlagen und Lead-Ordner in `02_Sales/01_Leads` anlegen · *Angebot*: Ordner nach `01_Clients` verschieben und Unterordner aus der Vorlage ergänzen · *Gewonnen*: Firma wird Kunde · *Verloren*: Grund wird abgefragt. Jeder Wechsel landet im Verlauf. |
 | **Termine** | Termin mit Google-Meet-Link direkt beim Kontakt planen, Einladung optional per Mail; Termine mit Kontakten der Firma aus dem eigenen Kalender. |
-| **Import** | CSV aus dem Magento-Lead-Qualifier: Vorschau, Tier-Filter, Dubletten per Domain. Neue Firmen bekommen Kontakt und Deal; vorhandene werden nie überschrieben, nur leere Felder ergänzt. |
+| **Dubletten-Warnung** | Gleiche USt-ID, Handelsregisternummer (gleiches Amtsgericht), gleicher Name ohne Rechtsform oder gleiche E-Mail-/Web-Domain (ohne Freemailer) gelten als mögliche Dublette: Warnung vor dem Speichern, Hinweis in der Firmenakte, Filter „Mögliche Dubletten“ in der Firmenliste. |
+| **Import** | CSV aus dem Magento-Lead-Qualifier: Vorschau, Tier-Filter, Dubletten per Domain; mögliche Dubletten unter anderer Domain werden markiert und standardmäßig nicht importiert. Neue Firmen bekommen Kontakt und Deal; vorhandene werden nie überschrieben, nur leere Felder ergänzt. |
 
 ## Einrichtung (einmalig)
 

@@ -11,6 +11,7 @@ import { useIch } from '../lib/useIch';
 const AKTION_LABEL: Record<ImportAktion, string> = {
   neu: 'Neu',
   ergaenzen: 'Ergänzen',
+  dublette: 'Mögliche Dublette',
   unveraendert: 'Vorhanden',
   uebersprungen: 'Übersprungen',
   fehler: 'Fehler',
@@ -25,7 +26,7 @@ export function ImportPage() {
   const [dateiname, setDateiname] = useState('');
   const [rows, setRows] = useState<string[][] | null>(null);
   const [leseFehler, setLeseFehler] = useState('');
-  const [optionen, setOptionen] = useState<ImportOptionen>({ tiers: ['A', 'B'], zustaendig: '', dealAnlegen: true, dealTitel: '' });
+  const [optionen, setOptionen] = useState<ImportOptionen>({ tiers: ['A', 'B'], zustaendig: '', dealAnlegen: true, dealTitel: '', dublettenImportieren: false });
   const [filterAktion, setFilterAktion] = useState<ImportAktion | ''>('');
   const [busy, setBusy] = useState(false);
   const [importFehler, setImportFehler] = useState<unknown>();
@@ -35,7 +36,7 @@ export function ImportPage() {
 
   const plan = useMemo(() => (rows && db ? planeImport(rows, db, { ...optionen, zustaendig: optionen.zustaendig }) : null), [rows, db, optionen]);
   const zaehler = useMemo(() => {
-    const counts: Record<ImportAktion, number> = { neu: 0, ergaenzen: 0, unveraendert: 0, uebersprungen: 0, fehler: 0 };
+    const counts: Record<ImportAktion, number> = { neu: 0, ergaenzen: 0, dublette: 0, unveraendert: 0, uebersprungen: 0, fehler: 0 };
     for (const z of plan?.zeilen ?? []) counts[z.aktion]++;
     return counts;
   }, [plan]);
@@ -160,6 +161,14 @@ export function ImportPage() {
                     aria-label="Deal-Titel"
                   />
                 )}
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(optionen.dublettenImportieren)}
+                    onChange={(e) => setOptionen((o) => ({ ...o, dublettenImportieren: e.target.checked }))}
+                  />
+                  Mögliche Dubletten trotzdem importieren
+                </label>
               </div>
             </div>
           </Card>
@@ -209,7 +218,16 @@ export function ImportPage() {
                         <div className="row-sub">{z.domain}</div>
                       </td>
                       <td className="hide-sm">{z.tier || '–'}</td>
-                      <td className="muted">{z.hinweis}</td>
+                      <td className={z.dubletteVon ? 'warn-text' : 'muted'}>
+                        {z.dubletteVon && '⚠ '}
+                        {z.hinweis}
+                        {z.dubletteVon?.firmaId && (
+                          <>
+                            {' '}
+                            <Link to={`/firmen/${z.dubletteVon.firmaId}`}>Ansehen</Link>
+                          </>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

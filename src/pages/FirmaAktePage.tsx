@@ -7,6 +7,7 @@ import { FirmaForm } from '../components/FirmaForm';
 import { useToast } from '../components/Toasts';
 import { Card, ErrorBox, Loading, PageHeader, StatusBadge, TierBadge } from '../components/ui';
 import { EOL_LABEL } from '../data/constants';
+import { findeDubletten } from '../data/dubletten';
 import { useCrm } from '../data/CrmContext';
 import type { Firma, FirmaInput } from '../data/types';
 import { formatDateTime, shortUser, websiteUrl } from '../lib/format';
@@ -22,6 +23,29 @@ function Item({ label, children }: { label: string; children: ReactNode }) {
     <div className="item">
       <dt>{label}</dt>
       <dd>{empty ? <span className="muted">–</span> : children}</dd>
+    </div>
+  );
+}
+
+function DublettenHinweis({ firma, alle }: { firma: Firma; alle: readonly Firma[] }) {
+  if (firma.archiviert) return null;
+  const treffer = findeDubletten(firma, alle).filter((t) => !t.firma.archiviert);
+  if (treffer.length === 0) return null;
+  return (
+    <div className="hint-box warn">
+      <strong>Mögliche Dublette:</strong>
+      <ul className="dubletten-liste">
+        {treffer.map((t) => (
+          <li key={t.firma.id}>
+            <Link to={`/firmen/${t.firma.id}`}>
+              {t.firma.name}
+              {t.firma.domain && ` (${t.firma.domain})`}
+            </Link>{' '}
+            – {t.gruende.join(', ')}
+          </li>
+        ))}
+      </ul>
+      <p className="small">Ist es dieselbe Firma, eine davon archivieren und die zweite Domain in der Notiz vermerken. Der Hinweis verschwindet dann.</p>
     </div>
   );
 }
@@ -57,6 +81,8 @@ export function FirmaAktePage() {
         <FirmaForm
           initial={toInput(f)}
           listen={db.listen}
+          alleFirmen={db.firmen}
+          selfId={f.id}
           submitLabel="Speichern"
           onCancel={() => setEditing(false)}
           onSubmit={async (values) => {
@@ -109,6 +135,8 @@ export function FirmaAktePage() {
           </>
         }
       />
+
+      <DublettenHinweis firma={f} alle={db.firmen} />
 
       <div className="akte">
         <div className="akte-main">

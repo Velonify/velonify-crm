@@ -43,6 +43,11 @@ function nameWords(name: string): string[] {
   return transliterate(name).replace(LEGAL_FORMS, ' ').split(/[^A-Za-z0-9]+/).filter(Boolean);
 }
 
+/** "artplants GmbH & Co. KG" → "artplants": lowercase, no legal form, no punctuation. */
+export function normalizeFirmenname(name: string): string {
+  return nameWords(name).join(' ').toLowerCase();
+}
+
 /** Proposes a free three-letter Kürzel: initials first, then letters from the name. */
 export function suggestKuerzel(name: string, vergeben: Iterable<string>): string {
   const taken = new Set([...vergeben].map((k) => k.toUpperCase()));

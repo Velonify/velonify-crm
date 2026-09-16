@@ -19,6 +19,7 @@ export function FirmaNeuPage() {
         <FirmaForm
           initial={{ ...EMPTY_FIRMA_INPUT, zustaendig: ich ?? '' }}
           listen={db.listen}
+          alleFirmen={db.firmen}
           submitLabel="Firma anlegen"
           onCancel={() => navigate('/firmen')}
           onSubmit={async (values) => {
