@@ -1,0 +1,164 @@
+import { useId, useState, type FormEvent, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { AuthExpiredError, ConflictError, DuplicateError, ValidationError } from '../data/errors';
+import type { FirmaInput, Listen } from '../data/types';
+import { useAuth } from '../auth/AuthContext';
+import { errorMessage } from '../lib/errors';
+import { EOL_LABEL, statusLabel } from '../lib/format';
+
+interface Props {
+  initial: FirmaInput;
+  listen: Listen;
+  submitLabel: string;
+  onSubmit(values: FirmaInput): Promise<void>;
+  onCancel(): void;
+  /** Offered when saving hits a conflict. */
+  onReload?: () => void;
+}
+
+type TextField = Exclude<keyof FirmaInput, 'score'>;
+
+export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel, onReload }: Props) {
+  const { expire } = useAuth();
+  const [values, setValues] = useState<FirmaInput>(initial);
+  const [scoreText, setScoreText] = useState(initial.score === null ? '' : String(initial.score));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<unknown>();
+  const formId = useId();
+
+  const set = (field: TextField) => (event: { target: { value: string } }) =>
+    setValues((v) => ({ ...v, [field]: event.target.value }));
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    const trimmedScore = scoreText.trim().replace(',', '.');
+    const score = trimmedScore === '' ? null : Number(trimmedScore);
+    if (score !== null && !Number.isFinite(score)) {
+      setError(new ValidationError('score', 'Score muss eine Zahl sein.'));
+      return;
+    }
+    setSaving(true);
+    setError(undefined);
+    try {
+      await onSubmit({ ...values, score });
+    } catch (err) {
+      if (err instanceof AuthExpiredError) expire();
+      setError(err);
+      setSaving(false);
+    }
+  };
+
+  const invalidField = error instanceof ValidationError || error instanceof DuplicateError ? error.field : undefined;
+
+  const field = (name: keyof FirmaInput, label: string, input: ReactNode, hint?: string, wide = false) => (
+    <div className={`field${wide ? ' wide' : ''}${invalidField === name ? ' invalid' : ''}`}>
+      <label htmlFor={`${formId}-${name}`}>{label}</label>
+      {input}
+      {hint && <small className="field-hint">{hint}</small>}
+    </div>
+  );
+
+  const text = (name: TextField, props: { type?: string; placeholder?: string; required?: boolean } = {}) => (
+    <input id={`${formId}-${name}`} value={values[name]} onChange={set(name)} {...props} />
+  );
+
+  const select = (name: TextField, options: string[], labels: (value: string) => string = (v) => v) => {
+    // Keep a value that is no longer in the list selectable, so editing never silently drops it.
+    const all = values[name] && !options.includes(values[name]) ? [...options, values[name]] : options;
+    return (
+      <select id={`${formId}-${name}`} value={values[name]} onChange={set(name)}>
+        <option value="">–</option>
+        {all.map((option) => (
+          <option key={option} value={option}>
+            {labels(option)}
+          </option>
+        ))}
+      </select>
+    );
+  };
+
+  return (
+    <form className="form" onSubmit={handleSubmit} noValidate>
+      <fieldset>
+        <legend>Grunddaten</legend>
+        <div className="grid">
+          {field('name', 'Name *', text('name', { required: true, placeholder: 'Firmenname' }), undefined, true)}
+          {field('domain', 'Domain', text('domain', { placeholder: 'shop.de' }), 'Eindeutig – daran erkennt der Import Dubletten.')}
+          {field('kuerzel', 'Kürzel', text('kuerzel', { placeholder: 'ABC' }), 'Neue Kürzel: 3 Buchstaben. Wie in Drive, Slack, Trello.')}
+          {field('status', 'Status', select('status', listen.status ?? [], statusLabel))}
+          {field('zustaendig', 'Zuständig', select('zustaendig', listen.team ?? []))}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Einordnung</legend>
+        <div className="grid">
+          {field('tier', 'Tier', select('tier', listen.tier ?? []))}
+          {field(
+            'score',
+            'Score',
+            <input id={`${formId}-score`} inputMode="numeric" value={scoreText} onChange={(e) => setScoreText(e.target.value)} placeholder="0–100" />,
+          )}
+          {field('quelle', 'Quelle', text('quelle', { placeholder: 'z. B. Magento Lauf 1, Empfehlung' }))}
+          {field('plattform', 'Plattform', text('plattform', { placeholder: 'magento2' }))}
+          {field('version', 'Version', text('version', { placeholder: '2.4.6' }))}
+          {field('eol', 'Support-Status', select('eol', listen.eol ?? [], (v) => EOL_LABEL[v] ?? v))}
+          {field('tech_info', 'Technik', <textarea id={`${formId}-tech_info`} rows={2} value={values.tech_info} onChange={set('tech_info')} placeholder="Tracking, Payment, Katalogumfang …" />, undefined, true)}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Firmendaten</legend>
+        <div className="grid">
+          {field('email_allgemein', 'E-Mail allgemein', text('email_allgemein', { type: 'email', placeholder: 'info@shop.de' }))}
+          {field('telefon_allgemein', 'Telefon allgemein', text('telefon_allgemein', { type: 'tel' }))}
+          {field('ort', 'Ort', text('ort'))}
+          {field('register', 'Handelsregister', text('register', { placeholder: 'HRB 12345 (AG Hamburg)' }))}
+          {field('ust_id', 'USt-ID', text('ust_id', { placeholder: 'DE123456789' }))}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Verknüpfungen</legend>
+        <div className="grid">
+          {field('drive_ordner_id', 'Drive-Ordner', text('drive_ordner_id', { placeholder: 'Link oder Ordner-ID' }), 'Den Link aus der Adresszeile einfügen reicht.')}
+          {field('slack_channel', 'Slack-Channel', text('slack_channel', { placeholder: 'client-abc-general' }))}
+          {field('trello_url', 'Trello-Board', text('trello_url', { type: 'url', placeholder: 'https://trello.com/b/…' }))}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Notiz</legend>
+        <textarea aria-label="Notiz" rows={4} value={values.notiz} onChange={set('notiz')} />
+      </fieldset>
+
+      {error !== undefined && (
+        <div className="alert error" role="alert">
+          <span>
+            {errorMessage(error)}
+            {error instanceof DuplicateError && (
+              <>
+                {' '}
+                <Link to={`/firmen/${error.existingId}`}>Zur Firma</Link>
+              </>
+            )}
+          </span>
+          {error instanceof ConflictError && onReload && (
+            <button type="button" className="button small" onClick={onReload}>
+              Neu laden
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="form-actions">
+        <button type="button" className="button" onClick={onCancel} disabled={saving}>
+          Abbrechen
+        </button>
+        <button type="submit" className="button primary" disabled={saving}>
+          {saving ? 'Speichert …' : submitLabel}
+        </button>
+      </div>
+    </form>
+  );
+}
