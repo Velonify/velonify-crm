@@ -255,6 +255,27 @@ describe('CrmService', () => {
     expect(nochmal.zeilen.filter((z) => z.aktion === 'neu')).toHaveLength(0);
   });
 
+  it('imports the qualifier output format directly, including extra columns and old English headers', async () => {
+    const neu = [
+      'tier,score,domain,firma,plattform,version,eol,register,ust_id,ansprechpartner,email,telefon,ort,katalog_urls,payments,marketing,lauf,konfidenz,rechtsform,ansprechpartner_rolle,letztes_deploy,score_gruende,url',
+      'A,82,alpha-shop.example,Alpha Shop GmbH,magento2,2.4.6,eol,HRB 1 (AG Essen),DE000000009,Max Beispiel,info@alpha-shop.example,0201 0,Essen,800,"klarna, paypal",ga4,Lauf 5,94,GmbH,Geschäftsführung,2024-01-15,Magento 2 ohne Support (+26) | HRB (+14),https://alpha-shop.example/',
+      'D,22,delta-shop.example,,magento2,,unknown,,,,,,,0,,,Lauf 5,70,,,,,https://delta-shop.example/',
+    ].join('\n');
+    const db = await crm.load();
+    const plan = planeImport(parseCsv(neu), db, { tiers: ['A', 'B'], zustaendig: '', dealAnlegen: false, dealTitel: '' });
+    expect(plan.zeilen.map((z) => [z.aktion, z.hinweis])).toEqual([['neu', 'mit Ansprechpartner'], ['uebersprungen', 'Tier D nicht ausgewählt']]);
+    expect(plan.zeilen[0].firma).toMatchObject({
+      name: 'Alpha Shop GmbH', plattform: 'magento2', version: '2.4.6', eol: 'eol', ust_id: 'DE000000009', telefon_allgemein: '0201 0', ort: 'Essen',
+      tech_info: 'ga4, klarna, paypal · 800 Katalog-URLs · letztes Deploy 2024-01-15', quelle: 'Magento Lauf 5',
+      notiz: 'Lead-Scoring: Magento 2 ohne Support (+26) | HRB (+14)',
+    });
+    expect(plan.zeilen[0].kontakt).toMatchObject({ vorname: 'Max', nachname: 'Beispiel', rolle: 'Geschäftsführung' });
+
+    const alt = 'tier,score,domain,company,platform,magento_version,eol_state,vat_id,contact_person,phone,city\nB,55,beta-shop.example,Beta GmbH,magento1,,eol,DE1,Eva Muster,030 1,Berlin';
+    const altPlan = planeImport(parseCsv(alt), db, { tiers: ['B'], zustaendig: '', dealAnlegen: false, dealTitel: '' });
+    expect(altPlan.zeilen[0].firma).toMatchObject({ name: 'Beta GmbH', plattform: 'magento1', eol: 'eol', ust_id: 'DE1', telefon_allgemein: '030 1', ort: 'Berlin' });
+  });
+
   it('parses semicolon CSV with quotes and line breaks', () => {
     expect(parseCsv('﻿a;b\r\n"x; y";"mit ""Zitat""\nund Umbruch"\r\n')).toEqual([['a', 'b'], ['x; y', 'mit "Zitat"\nund Umbruch']]);
   });

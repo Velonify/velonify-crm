@@ -79,14 +79,38 @@ export interface ImportPlan {
 
 export const PFLICHTSPALTEN = ['domain'];
 
+/**
+ * The import format, identical to the flat output of the Magento lead qualifier (CRM_COLUMNS in src/qualify.py there).
+ * Also read when present: ansprechpartner_rolle, letztes_deploy (into Technik) and score_gruende (into Notiz).
+ */
+export const IMPORT_SPALTEN = [
+  'tier', 'score', 'domain', 'firma', 'plattform', 'version', 'eol', 'register', 'ust_id',
+  'ansprechpartner', 'email', 'telefon', 'ort', 'katalog_urls', 'payments', 'marketing', 'lauf',
+] as const;
+
+/** Older qualifier exports used English column names; they still import. */
+const ALIASE: Record<string, string> = {
+  company: 'firma',
+  platform: 'plattform',
+  magento_version: 'version',
+  eol_state: 'eol',
+  vat_id: 'ust_id',
+  contact_person: 'ansprechpartner',
+  phone: 'telefon',
+  city: 'ort',
+  score_reasons: 'score_gruende',
+};
+
 /** Fields filled from the CSV. Everything else in a firm stays untouched on import. */
 const IMPORT_FELDER: (keyof FirmaInput)[] = [
-  'name', 'tier', 'score', 'plattform', 'version', 'eol', 'register', 'ust_id', 'email_allgemein', 'telefon_allgemein', 'ort', 'tech_info', 'quelle',
+  'name', 'tier', 'score', 'plattform', 'version', 'eol', 'register', 'ust_id', 'email_allgemein', 'telefon_allgemein', 'ort', 'tech_info', 'quelle', 'notiz',
 ];
 
 function firmaAusZeile(get: (column: string) => string): FirmaInput {
   const katalog = get('katalog_urls');
   const technik = [get('marketing'), get('payments')].filter(Boolean).join(', ');
+  const deploy = get('letztes_deploy');
+  const gruende = get('score_gruende');
   const scoreText = get('score').replace(',', '.');
   const score = scoreText === '' ? null : Number(scoreText);
   const lauf = get('lauf');
@@ -104,8 +128,12 @@ function firmaAusZeile(get: (column: string) => string): FirmaInput {
     email_allgemein: get('email'),
     telefon_allgemein: get('telefon'),
     ort: get('ort'),
-    tech_info: [technik, katalog && katalog !== '0' ? `${katalog} Katalog-URLs` : ''].filter(Boolean).join(' · '),
+    tech_info: [technik, katalog && katalog !== '0' ? `${katalog} Katalog-URLs` : '', deploy ? `letztes Deploy ${deploy}` : '']
+      .filter(Boolean)
+      .join(' · '),
     quelle: lauf ? `Magento ${lauf}` : 'CSV-Import',
+    // Why the qualifier rated the lead – useful context before the first call.
+    notiz: gruende ? `Lead-Scoring: ${gruende}` : '',
   };
 }
 
@@ -115,7 +143,10 @@ function firmaAusZeile(get: (column: string) => string): FirmaInput {
  */
 export function planeImport(rows: string[][], db: Database, optionen: ImportOptionen): ImportPlan {
   const [headerRow = [], ...daten] = rows;
-  const header = headerRow.map((h) => h.trim().toLowerCase());
+  const header = headerRow.map((h) => {
+    const name = h.trim().toLowerCase();
+    return ALIASE[name] ?? name;
+  });
   const fehlendeSpalten = PFLICHTSPALTEN.filter((column) => !header.includes(column));
   if (fehlendeSpalten.length > 0) return { zeilen: [], fehlendeSpalten, optionen };
 
@@ -131,7 +162,9 @@ export function planeImport(rows: string[][], db: Database, optionen: ImportOpti
     const firma = firmaAusZeile(get);
     const basis = { zeile: i + 2, domain: firma.domain, name: firma.name, tier: firma.tier };
     const ansprechpartner = get('ansprechpartner');
-    const kontakt: KontaktInput | undefined = ansprechpartner ? { ...EMPTY_KONTAKT_INPUT, ...splitName(ansprechpartner), hauptkontakt: true } : undefined;
+    const kontakt: KontaktInput | undefined = ansprechpartner
+      ? { ...EMPTY_KONTAKT_INPUT, ...splitName(ansprechpartner), rolle: get('ansprechpartner_rolle'), hauptkontakt: true }
+      : undefined;
 
     if (!firma.domain) return { ...basis, aktion: 'fehler', hinweis: 'Keine Domain' };
     if (gesehen.has(firma.domain)) return { ...basis, aktion: 'uebersprungen', hinweis: 'Doppelt in der Datei' };

@@ -70,6 +70,26 @@ Wer Ordner nach `01_Clients` verschieben soll, braucht in der Shared Drive minde
 2. Repo → **Settings → Pages → Custom domain:** `crm.velonify.de` eintragen, nach der Prüfung **Enforce HTTPS** aktivieren.
 3. Empfohlen: Organisation → **Settings → Pages → Add a domain** und `velonify.de` verifizieren, damit niemand sonst die Subdomain auf GitHub nutzen kann.
 
+## Import-Format
+
+Der Import liest genau die flache Ausgabe des Magento-Lead-Qualifiers – CSV direkt hochladen, nichts umbenennen:
+
+`tier, score, domain, firma, plattform, version, eol, register, ust_id, ansprechpartner, email, telefon, ort, katalog_urls, payments, marketing, lauf`
+
+Pflicht ist nur `domain`. Zusätzlich gelesen, wenn vorhanden: `ansprechpartner_rolle`, `letztes_deploy` (→ Technik) und `score_gruende` (→ Notiz). Andere Spalten werden ignoriert, Trennzeichen Komma oder Semikolon. Ältere Exporte mit englischen Spaltennamen (`company`, `platform`, `city` …) funktionieren weiterhin.
+
+| CSV | Im CRM |
+|---|---|
+| `firma` (leer → Domain) | Firmenname |
+| `tier`, `score`, `plattform`, `version`, `eol`, `register`, `ust_id`, `ort` | gleichnamige Felder |
+| `email`, `telefon` | allgemeine E-Mail / Telefon der Firma |
+| `ansprechpartner` (+ `ansprechpartner_rolle`) | Hauptkontakt |
+| `marketing`, `payments`, `katalog_urls`, `letztes_deploy` | Technik |
+| `lauf` | Quelle „Magento <lauf>“ |
+| `score_gruende` | Notiz „Lead-Scoring: …“ |
+
+Das Format ist in beiden Projekten festgelegt (`IMPORT_SPALTEN` hier, `CRM_COLUMNS` im Qualifier) – Änderungen immer auf beiden Seiten.
+
 ## Regeln für das Sheet
 
 - Jede Zeile hat eine feste `id`. Die App findet Zeilen nur darüber – Sortieren oder Filtern im Sheet ist unkritisch.

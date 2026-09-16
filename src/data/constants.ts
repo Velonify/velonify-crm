@@ -32,10 +32,16 @@ export const STATUS = ['lead', 'kunde', 'ehemalig'] as const;
 export const STATUS_LABEL: Record<string, string> = { lead: 'Lead', kunde: 'Kunde', ehemalig: 'Ehemalig' };
 export const statusLabel = (status: string) => STATUS_LABEL[status] ?? (status || '–');
 
-export const TIERS = ['A', 'B', 'C'] as const;
+// Same tiers as the Magento lead qualifier: A ≥ 68, B ≥ 48, C ≥ 30, D below.
+export const TIERS = ['A', 'B', 'C', 'D'] as const;
 
-export const EOL = ['eol', 'unknown', 'supported'] as const;
-export const EOL_LABEL: Record<string, string> = { eol: 'Kein Support mehr', unknown: 'Unbekannt', supported: 'Noch unterstützt' };
+export const EOL = ['eol', 'eol_soon', 'supported', 'unknown'] as const;
+export const EOL_LABEL: Record<string, string> = {
+  eol: 'Kein Support mehr',
+  eol_soon: 'Support endet in < 12 Monaten',
+  supported: 'Noch unterstützt',
+  unknown: 'Unbekannt',
+};
 
 /** Types a person can log by hand. */
 export const AKTIVITAET_TYPEN = ['notiz', 'anruf', 'mail', 'meeting'] as const;

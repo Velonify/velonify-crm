@@ -5,7 +5,7 @@ import { Card, ErrorBox, FormError, Loading, PageHeader } from '../components/ui
 import { DEFAULT_DEAL_TITEL, EINSTELLUNG, TIERS } from '../data/constants';
 import { useCrm } from '../data/CrmContext';
 import type { ImportErgebnis } from '../data/crm';
-import { parseCsv, planeImport, type ImportAktion, type ImportOptionen } from '../data/importCsv';
+import { IMPORT_SPALTEN, parseCsv, planeImport, type ImportAktion, type ImportOptionen } from '../data/importCsv';
 import { useIch } from '../lib/useIch';
 
 const AKTION_LABEL: Record<ImportAktion, string> = {
@@ -104,10 +104,16 @@ export function ImportPage() {
         <details className="muted small">
           <summary>Welche Spalten werden gelesen?</summary>
           <p>
-            <code>domain</code> (Pflicht), <code>firma</code>, <code>tier</code>, <code>score</code>, <code>plattform</code>, <code>version</code>, <code>eol</code>,{' '}
-            <code>register</code>, <code>ust_id</code>, <code>ansprechpartner</code>, <code>email</code>, <code>telefon</code>, <code>ort</code>,{' '}
-            <code>katalog_urls</code>, <code>payments</code>, <code>marketing</code>, <code>lauf</code>. Andere Spalten werden ignoriert. Trennzeichen Komma oder
-            Semikolon.
+            Genau das Format, das der Magento-Lead-Qualifier ausgibt:{' '}
+            {IMPORT_SPALTEN.map((spalte, i) => (
+              <span key={spalte}>
+                {i > 0 && ', '}
+                <code>{spalte}</code>
+                {spalte === 'domain' && ' (Pflicht)'}
+              </span>
+            ))}
+            . Zusätzlich gelesen: <code>ansprechpartner_rolle</code>, <code>letztes_deploy</code> (landet bei Technik) und <code>score_gruende</code> (als Notiz). Andere Spalten werden ignoriert,
+            Trennzeichen Komma oder Semikolon.
           </p>
           <p>Vorhandene Firmen (gleiche Domain) werden nie überschrieben – nur leere Felder werden ergänzt.</p>
         </details>
