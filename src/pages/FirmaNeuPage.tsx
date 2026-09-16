@@ -1,26 +1,29 @@
 import { useNavigate } from 'react-router-dom';
 import { FirmaForm } from '../components/FirmaForm';
+import { useToast } from '../components/Toasts';
 import { Loading, PageHeader } from '../components/ui';
-import { useRepository } from '../data/RepositoryContext';
+import { useCrm } from '../data/CrmContext';
 import { EMPTY_FIRMA_INPUT } from '../data/types';
-import { useLoad } from '../lib/useLoad';
+import { useIch } from '../lib/useIch';
 
 export function FirmaNeuPage() {
-  const { repository } = useRepository();
+  const { db, mutate } = useCrm();
   const navigate = useNavigate();
-  const listen = useLoad(() => repository.getListen(), [repository]);
+  const toast = useToast();
+  const [ich] = useIch(db?.listen.team ?? []);
 
   return (
     <div className="page narrow">
       <PageHeader title="Neue Firma" />
-      {listen.data ? (
+      {db ? (
         <FirmaForm
-          initial={EMPTY_FIRMA_INPUT}
-          listen={listen.data}
+          initial={{ ...EMPTY_FIRMA_INPUT, zustaendig: ich ?? '' }}
+          listen={db.listen}
           submitLabel="Firma anlegen"
           onCancel={() => navigate('/firmen')}
           onSubmit={async (values) => {
-            const firma = await repository.createFirma(values);
+            const firma = await mutate((s) => s.createFirma(values));
+            toast.show(`${firma.name} angelegt`);
             navigate(`/firmen/${firma.id}`, { replace: true });
           }}
         />

@@ -5,6 +5,8 @@ export interface Meta {
   geaendert_von: string;
 }
 
+type MetaKeys = keyof Meta;
+
 export interface Firma extends Meta {
   id: string;
   name: string;
@@ -30,32 +32,104 @@ export interface Firma extends Meta {
   notiz: string;
   archiviert: boolean;
 }
+export type FirmaInput = Omit<Firma, 'id' | 'archiviert' | MetaKeys>;
 
-/** Fields a person edits. id, archiviert and the meta columns are set by the repository. */
-export type FirmaInput = Omit<Firma, 'id' | 'archiviert' | keyof Meta>;
+export interface Kontakt extends Meta {
+  id: string;
+  firma_id: string;
+  vorname: string;
+  nachname: string;
+  rolle: string;
+  email: string;
+  telefon: string;
+  linkedin: string;
+  hauptkontakt: boolean;
+  notiz: string;
+  archiviert: boolean;
+}
+export type KontaktInput = Omit<Kontakt, 'id' | 'firma_id' | 'archiviert' | MetaKeys>;
+
+export interface Deal extends Meta {
+  id: string;
+  firma_id: string;
+  kontakt_id: string;
+  titel: string;
+  phase: string;
+  wert_eur: number | null;
+  wahrscheinlichkeit: number | null;
+  zustaendig: string;
+  naechster_schritt: string;
+  naechster_schritt_am: string;
+  verlustgrund: string;
+  abgeschlossen_am: string;
+  archiviert: boolean;
+}
+export type DealInput = Pick<
+  Deal,
+  'titel' | 'kontakt_id' | 'wert_eur' | 'wahrscheinlichkeit' | 'zustaendig' | 'naechster_schritt' | 'naechster_schritt_am'
+>;
+
+export interface Aktivitaet {
+  id: string;
+  firma_id: string;
+  kontakt_id: string;
+  deal_id: string;
+  typ: string;
+  /** ISO timestamp */
+  datum: string;
+  text: string;
+  von: string;
+  kalender_termin_id: string;
+}
+export type AktivitaetInput = Pick<Aktivitaet, 'firma_id' | 'kontakt_id' | 'deal_id' | 'typ' | 'datum' | 'text'>;
+
+export interface Wiedervorlage {
+  id: string;
+  firma_id: string;
+  deal_id: string;
+  titel: string;
+  /** YYYY-MM-DD */
+  faellig_am: string;
+  zustaendig: string;
+  erledigt_am: string;
+  erledigt_von: string;
+  erstellt_von: string;
+  erstellt_am: string;
+}
+export type WiedervorlageInput = Pick<Wiedervorlage, 'firma_id' | 'deal_id' | 'titel' | 'faellig_am' | 'zustaendig'>;
 
 export type Listen = Record<string, string[]>;
+export type Einstellungen = Record<string, string>;
+
+export interface EntityMap {
+  firmen: Firma;
+  kontakte: Kontakt;
+  deals: Deal;
+  aktivitaeten: Aktivitaet;
+  wiedervorlagen: Wiedervorlage;
+}
+
+/** Everything the app knows, loaded in one go. */
+export interface Database {
+  firmen: Firma[];
+  kontakte: Kontakt[];
+  deals: Deal[];
+  aktivitaeten: Aktivitaet[];
+  wiedervorlagen: Wiedervorlage[];
+  listen: Listen;
+  einstellungen: Einstellungen;
+}
 
 export const EMPTY_FIRMA_INPUT: FirmaInput = {
-  name: '',
-  domain: '',
-  kuerzel: '',
-  status: 'lead',
-  tier: '',
-  score: null,
-  plattform: '',
-  version: '',
-  eol: '',
-  ort: '',
-  register: '',
-  ust_id: '',
-  email_allgemein: '',
-  telefon_allgemein: '',
-  tech_info: '',
-  quelle: '',
-  zustaendig: '',
-  drive_ordner_id: '',
-  slack_channel: '',
-  trello_url: '',
-  notiz: '',
+  name: '', domain: '', kuerzel: '', status: 'lead', tier: '', score: null, plattform: '', version: '', eol: '',
+  ort: '', register: '', ust_id: '', email_allgemein: '', telefon_allgemein: '', tech_info: '', quelle: '',
+  zustaendig: '', drive_ordner_id: '', slack_channel: '', trello_url: '', notiz: '',
+};
+
+export const EMPTY_KONTAKT_INPUT: KontaktInput = {
+  vorname: '', nachname: '', rolle: '', email: '', telefon: '', linkedin: '', hauptkontakt: false, notiz: '',
+};
+
+export const EMPTY_DEAL_INPUT: DealInput = {
+  titel: '', kontakt_id: '', wert_eur: null, wahrscheinlichkeit: null, zustaendig: '', naechster_schritt: '', naechster_schritt_am: '',
 };

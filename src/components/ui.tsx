@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react';
-import { statusLabel } from '../lib/format';
+import { Link } from 'react-router-dom';
+import { phaseLabel, statusLabel } from '../data/constants';
+import { SchemaError } from '../data/errors';
+import { errorMessage } from '../lib/errors';
 
 export function StatusBadge({ status }: { status: string }) {
   return <span className={`badge status-${status || 'none'}`}>{statusLabel(status)}</span>;
@@ -8,6 +11,11 @@ export function StatusBadge({ status }: { status: string }) {
 export function TierBadge({ tier }: { tier: string }) {
   if (!tier) return <span className="muted">–</span>;
   return <span className={`badge tier tier-${tier.toLowerCase()}`}>{tier}</span>;
+}
+
+export function PhaseBadge({ phase }: { phase: string }) {
+  if (!phase) return <span className="muted">–</span>;
+  return <span className={`badge phase phase-${phase}`}>{phaseLabel(phase)}</span>;
 }
 
 export function Loading({ label = 'Lädt …' }: { label?: string }) {
@@ -20,10 +28,17 @@ export function Loading({ label = 'Lädt …' }: { label?: string }) {
 }
 
 export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
-  const message = error instanceof Error ? error.message : String(error);
   return (
     <div className="alert error" role="alert">
-      <span>{message}</span>
+      <span>
+        {errorMessage(error)}
+        {error instanceof SchemaError && (
+          <>
+            {' '}
+            <Link to="/einrichtung">Zur Einrichtung</Link>
+          </>
+        )}
+      </span>
       {onRetry && (
         <button type="button" className="button small" onClick={onRetry}>
           Erneut versuchen
@@ -43,4 +58,47 @@ export function PageHeader({ title, subtitle, actions }: { title: ReactNode; sub
       {actions && <div className="page-actions">{actions}</div>}
     </header>
   );
+}
+
+export function Card({ title, actions, children, className = '' }: { title: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
+  return (
+    <section className={`card ${className}`}>
+      <header className="card-header">
+        <h2>{title}</h2>
+        {actions && <div className="card-actions">{actions}</div>}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+export function Field({ label, hint, invalid, wide, children }: { label: string; hint?: string; invalid?: boolean; wide?: boolean; children: ReactNode }) {
+  return (
+    <label className={`field${wide ? ' wide' : ''}${invalid ? ' invalid' : ''}`}>
+      <span className="field-label">{label}</span>
+      {children}
+      {hint && <small className="field-hint">{hint}</small>}
+    </label>
+  );
+}
+
+export function FormError({ error }: { error: unknown }) {
+  if (error === undefined || error === null) return null;
+  return (
+    <p className="alert error" role="alert">
+      {errorMessage(error)}
+    </p>
+  );
+}
+
+/** Wraps the page body: shows the first-load spinner or error, then the content. */
+export function PageState({ loading, error, onRetry, children }: { loading: boolean; error: Error | null; onRetry(): void; children: ReactNode }) {
+  if (error && !loading) {
+    return (
+      <div className="page">
+        <ErrorBox error={error} onRetry={onRetry} />
+      </div>
+    );
+  }
+  return <>{children}</>;
 }

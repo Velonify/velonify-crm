@@ -5,25 +5,27 @@ export class AuthExpiredError extends Error {
   }
 }
 
-export class SheetsApiError extends Error {
+export class GoogleApiError extends Error {
   readonly status: number;
-  constructor(status: number, message: string) {
+  readonly googleMessage: string;
+  constructor(status: number, message: string, googleMessage = '') {
     super(message);
-    this.name = 'SheetsApiError';
+    this.name = 'GoogleApiError';
     this.status = status;
+    this.googleMessage = googleMessage;
   }
 }
 
 /** The sheet is missing a tab or column the app needs. Fixed via the Einrichtung page. */
 export class SchemaError extends Error {
-  constructor(message: string) {
+  constructor(message = 'Das CRM-Sheet ist noch nicht vollständig eingerichtet. Bitte unter „Einrichtung“ auf „Einrichten“ klicken.') {
     super(message);
     this.name = 'SchemaError';
   }
 }
 
 export class NotFoundError extends Error {
-  constructor(message = 'Eintrag nicht gefunden.') {
+  constructor(message = 'Eintrag nicht gefunden – vielleicht wurde er inzwischen im Sheet entfernt.') {
     super(message);
     this.name = 'NotFoundError';
   }
@@ -61,5 +63,13 @@ export class DuplicateError extends Error {
     this.field = field;
     this.existingId = existingId;
     this.existingName = existingName;
+  }
+}
+
+/** Drive folders are not configured on the Einrichtung page yet. */
+export class NotConfiguredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotConfiguredError';
   }
 }

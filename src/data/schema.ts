@@ -46,24 +46,27 @@ export const SCHEMA = {
   wiedervorlagen: {
     name: 'wiedervorlagen',
     columns: [
-      'id', 'firma_id', 'deal_id', 'titel', 'faellig_am', 'zustaendig', 'erledigt_am', 'erstellt_von', 'erstellt_am',
+      'id', 'firma_id', 'deal_id', 'titel', 'faellig_am', 'zustaendig', 'erledigt_am', 'erledigt_von',
+      'erstellt_von', 'erstellt_am',
     ],
   },
   listen: {
     name: 'listen',
     columns: ['liste', 'wert'],
   },
+  einstellungen: {
+    name: 'einstellungen',
+    columns: ['schluessel', 'wert'],
+  },
 } as const satisfies Record<string, TabSchema>;
 
 export type TabName = keyof typeof SCHEMA;
 
-/** Allowed values for select fields. Written to the "listen" tab on setup and editable there afterwards. */
+export const ENTITY_TABS = ['firmen', 'kontakte', 'deals', 'aktivitaeten', 'wiedervorlagen'] as const;
+export type EntityTab = (typeof ENTITY_TABS)[number];
+
+/** Editable select values, written to the "listen" tab on setup and maintained there afterwards. */
 export const LISTEN_DEFAULTS: Record<string, string[]> = {
-  status: ['lead', 'kunde', 'ehemalig'],
-  tier: ['A', 'B', 'C'],
-  eol: ['eol', 'unknown', 'supported'],
-  phase: ['neu', 'qualifiziert', 'kontaktiert', 'gespraech', 'angebot', 'gewonnen', 'verloren'],
   team: ['Lugge', 'Johannes', 'Julian'],
   verlustgrund: ['Kein Budget', 'Kein Bedarf', 'Timing', 'Wettbewerber', 'Keine Rückmeldung', 'Sonstiges'],
-  aktivitaetstyp: ['notiz', 'anruf', 'mail', 'meeting', 'phasenwechsel'],
 };

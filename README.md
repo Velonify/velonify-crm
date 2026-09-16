@@ -8,22 +8,24 @@ Internes CRM für Leads, Vertrieb, Angebote und Kundenakte.
 
 Ohne Google-Zugangsdaten startet die App im **Demo-Modus** mit erfundenen Beispieldaten.
 
-## Stand
+## Funktionen
 
-| Schritt | Inhalt | Status |
-|---|---|---|
-| 1 | Login, Datenzugriff aufs Sheet, Firmenliste, Firmenakte, Einrichtung | ✅ |
-| 2 | Kontakte, Deals, Pipeline | offen |
-| 3 | Aktivitäten, Wiedervorlagen, „Mein Tag“ | offen |
-| 4 | CSV-Import aus dem Lead-Qualifier | offen |
-| 5 | Google Drive (Lead-/Kundenordner) und Meet | offen |
+| Bereich | Was es kann |
+|---|---|
+| **Mein Tag** | Überfällige und heutige Wiedervorlagen und Deal-Schritte, nächste 7 Tage, Deals ohne nächsten Schritt, Kennzahlen (Pipeline-Wert, gewichtet, Angebote, gewonnen im Monat). Umschaltbar zwischen „Meine“ und „Alle“. |
+| **Pipeline** | Kanban nach Phase (Neu → Qualifiziert → Kontaktiert → Gespräch → Angebot → Gewonnen/Verloren), Drag & Drop, Summen je Spalte, Filter nach Zuständigem. |
+| **Firmen** | Liste mit Suche (auch nach Kontakten), Filtern, Deal-Phase; Anlegen, Bearbeiten, Archivieren. Doppelte Domains und Kürzel werden abgelehnt. |
+| **Firmenakte** | Deals mit Angebotswert und nächstem Schritt, Kontakte, Wiedervorlagen, Verlauf (Notiz/Anruf/Mail/Meeting), Google-Drive-Ordner, Termine. |
+| **Automatik beim Phasenwechsel** | *Qualifiziert*: Kürzel vorschlagen und Lead-Ordner in `02_Sales/01_Leads` anlegen · *Angebot*: Ordner nach `01_Clients` verschieben und Unterordner aus der Vorlage ergänzen · *Gewonnen*: Firma wird Kunde · *Verloren*: Grund wird abgefragt. Jeder Wechsel landet im Verlauf. |
+| **Termine** | Termin mit Google-Meet-Link direkt beim Kontakt planen, Einladung optional per Mail; Termine mit Kontakten der Firma aus dem eigenen Kalender. |
+| **Import** | CSV aus dem Magento-Lead-Qualifier: Vorschau, Tier-Filter, Dubletten per Domain. Neue Firmen bekommen Kontakt und Deal; vorhandene werden nie überschrieben, nur leere Felder ergänzt. |
 
 ## Einrichtung (einmalig)
 
 ### 1. Google Cloud: OAuth-Client anlegen
 
 1. [console.cloud.google.com](https://console.cloud.google.com) mit dem velonify.de-Konto öffnen und ein Projekt **velonify-crm** anlegen (Organisation: velonify.de).
-2. **APIs & Dienste → Bibliothek:** „Google Sheets API“ aktivieren.
+2. **APIs & Dienste → Bibliothek:** **Google Sheets API**, **Google Drive API** und **Google Calendar API** aktivieren.
 3. **Google Auth Platform → Branding / Zielgruppe:** App-Name „Velonify CRM“, Zielgruppe **Intern**. Damit können sich nur velonify.de-Konten anmelden, und Google muss die App nicht prüfen.
 4. **Google Auth Platform → Clients → Client erstellen:** Typ **Webanwendung**, Name „Velonify CRM“.
    Unter **Autorisierte JavaScript-Quellen** eintragen:
@@ -51,9 +53,15 @@ Repo → **Settings → Secrets and variables → Actions → Variables → New 
 
 Danach unter **Actions → „Tests & Veröffentlichung“ → Run workflow** neu veröffentlichen.
 
-### 4. Sheet einrichten
+### 4. Im CRM einrichten
 
-CRM öffnen, anmelden, links unten **Einrichtung → Einrichten**. Das legt alle Tabellenblätter und Spalten an, füllt die Auswahllisten und setzt einen Warnhinweis gegen versehentliches Bearbeiten von Hand. Kann gefahrlos mehrfach ausgeführt werden.
+CRM öffnen, anmelden (alle Berechtigungen erlauben: Sheets, Drive, Kalender), links unten **Einrichtung**:
+
+1. **Google Sheet → Einrichten.** Legt alle Tabellenblätter und Spalten an, füllt die Auswahllisten und setzt einen Warnhinweis gegen versehentliches Bearbeiten von Hand. Kann gefahrlos mehrfach ausgeführt werden.
+2. **Google Drive → Ordner automatisch suchen → Speichern.** Findet `01_Leads`, `01_Clients` und `01_Client-Folder-Template`. Bei mehreren Treffern den Ordner-Link von Hand einfügen.
+3. Team und Verlustgründe bei Bedarf im Blatt `listen` anpassen.
+
+Wer Ordner nach `01_Clients` verschieben soll, braucht in der Shared Drive mindestens die Rolle **Content-Manager**.
 
 ### 5. Eigene Adresse `crm.velonify.de` (optional)
 
@@ -66,7 +74,7 @@ CRM öffnen, anmelden, links unten **Einrichtung → Einrichten**. Das legt alle
 - Jede Zeile hat eine feste `id`. Die App findet Zeilen nur darüber – Sortieren oder Filtern im Sheet ist unkritisch.
 - **Nicht löschen**, sondern im CRM archivieren.
 - Spalten nicht umbenennen. Eigene Zusatzspalten sind erlaubt und bleiben erhalten.
-- Auswahlwerte (Team, Phasen, Verlustgründe …) im Blatt `listen` pflegen.
+- Team und Verlustgründe im Blatt `listen` pflegen. Phasen, Status und Tiers sind fest, weil Automatiken daran hängen.
 - Speichern zwei Personen denselben Eintrag, warnt die App die zweite, statt still zu überschreiben.
 
 ## Entwicklung
@@ -86,17 +94,25 @@ Für echte Daten lokal `.env.example` nach `.env.local` kopieren und ausfüllen.
 
 ```
 src/
-├── auth/             Google-Anmeldung (Token im Browser, kein Server)
+├── auth/                Google-Anmeldung (Token im Browser, kein Server)
 ├── data/
-│   ├── repository.ts Schnittstelle – der einzige Weg, wie die Oberfläche an Daten kommt
-│   ├── schema.ts     Tabellenblätter, Spalten, Standard-Auswahllisten
-│   ├── firmen.ts     Regeln für Firmen (Domain normalisieren, Dubletten, Kürzel)
-│   ├── sheets/       Google-Sheets-Umsetzung inkl. Einrichtung
-│   └── demo/         Beispieldaten für den Demo-Modus
-├── pages/            Firmenliste, Firmenakte, Neue Firma, Einrichtung, Login
-└── components/       Layout, Formular, Bausteine
+│   ├── crm.ts           Alle Geschäftsvorgänge: Validierung, Verlauf, Phasenwechsel, Drive, Termine, Import
+│   ├── store.ts         Speicher-Schnittstelle – einziger Punkt, der bei einem Datenbank-Wechsel ersetzt wird
+│   ├── sheets/          Google Sheets als Speicher (lädt alle Blätter mit einer Anfrage) und Einrichtung
+│   ├── google/          Drive- und Kalender-Anbindung
+│   ├── demo/            Sheet, Drive und Kalender im Speicher + erfundene Beispieldaten
+│   ├── selectors.ts     Auswertungen für „Mein Tag“, Pipeline, Kennzahlen
+│   ├── importCsv.ts     CSV lesen und Import-Vorschau berechnen
+│   ├── rules.ts         Regeln: Domain, Kürzel, Ordnernamen, Pflichtfelder
+│   └── schema.ts        Tabellenblätter und Spalten
+├── pages/               Mein Tag, Pipeline, Firmen, Firmenakte, Import, Einrichtung, Login
+└── components/          Layout, Dialoge, Karten der Firmenakte
 ```
 
-Ein späterer Umzug auf eine andere Datenbank (z. B. Supabase) bedeutet: eine neue Umsetzung von `Repository` schreiben, die Oberfläche bleibt unverändert.
+Der Demo-Modus nutzt dieselbe Geschäftslogik und Speicherschicht wie der echte Betrieb – nur Sheet, Drive und Kalender liegen als Nachbau im Speicher. Auch die Tests (`src/data/crm.test.ts`) laufen gegen diese Nachbauten. Die eigentlichen Aufrufe an Google (`sheets/sheetsClient.ts`, `google/`) lassen sich erst mit echten Zugangsdaten prüfen.
+
+Ein späterer Umzug auf eine andere Datenbank (z. B. Supabase) bedeutet: eine neue Umsetzung von `Store` schreiben. Geschäftslogik und Oberfläche bleiben unverändert.
+
+**Grenzen:** Termine zeigt die Firmenakte aus dem Kalender der angemeldeten Person – Termine von Kolleg:innen stehen im Verlauf. Das CRM verschickt selbst keine E-Mails außer Google-Kalender-Einladungen.
 
 **Dieses Repo ist öffentlich:** keine echten Firmen, Kontakte, Sheet-IDs oder Zugangsdaten in Code, Tests oder Beispielen.

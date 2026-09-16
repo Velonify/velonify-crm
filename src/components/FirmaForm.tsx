@@ -1,10 +1,9 @@
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { AuthExpiredError, ConflictError, DuplicateError, ValidationError } from '../data/errors';
+import { EOL, EOL_LABEL, STATUS, statusLabel, TIERS } from '../data/constants';
+import { DuplicateError, ValidationError } from '../data/errors';
 import type { FirmaInput, Listen } from '../data/types';
-import { useAuth } from '../auth/AuthContext';
 import { errorMessage } from '../lib/errors';
-import { EOL_LABEL, statusLabel } from '../lib/format';
 
 interface Props {
   initial: FirmaInput;
@@ -12,14 +11,11 @@ interface Props {
   submitLabel: string;
   onSubmit(values: FirmaInput): Promise<void>;
   onCancel(): void;
-  /** Offered when saving hits a conflict. */
-  onReload?: () => void;
 }
 
 type TextField = Exclude<keyof FirmaInput, 'score'>;
 
-export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel, onReload }: Props) {
-  const { expire } = useAuth();
+export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel }: Props) {
   const [values, setValues] = useState<FirmaInput>(initial);
   const [scoreText, setScoreText] = useState(initial.score === null ? '' : String(initial.score));
   const [saving, setSaving] = useState(false);
@@ -42,7 +38,6 @@ export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel, on
     try {
       await onSubmit({ ...values, score });
     } catch (err) {
-      if (err instanceof AuthExpiredError) expire();
       setError(err);
       setSaving(false);
     }
@@ -85,7 +80,7 @@ export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel, on
           {field('name', 'Name *', text('name', { required: true, placeholder: 'Firmenname' }), undefined, true)}
           {field('domain', 'Domain', text('domain', { placeholder: 'shop.de' }), 'Eindeutig – daran erkennt der Import Dubletten.')}
           {field('kuerzel', 'Kürzel', text('kuerzel', { placeholder: 'ABC' }), 'Neue Kürzel: 3 Buchstaben. Wie in Drive, Slack, Trello.')}
-          {field('status', 'Status', select('status', listen.status ?? [], statusLabel))}
+          {field('status', 'Status', select('status', [...STATUS], statusLabel))}
           {field('zustaendig', 'Zuständig', select('zustaendig', listen.team ?? []))}
         </div>
       </fieldset>
@@ -93,7 +88,7 @@ export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel, on
       <fieldset>
         <legend>Einordnung</legend>
         <div className="grid">
-          {field('tier', 'Tier', select('tier', listen.tier ?? []))}
+          {field('tier', 'Tier', select('tier', [...TIERS]))}
           {field(
             'score',
             'Score',
@@ -102,7 +97,7 @@ export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel, on
           {field('quelle', 'Quelle', text('quelle', { placeholder: 'z. B. Magento Lauf 1, Empfehlung' }))}
           {field('plattform', 'Plattform', text('plattform', { placeholder: 'magento2' }))}
           {field('version', 'Version', text('version', { placeholder: '2.4.6' }))}
-          {field('eol', 'Support-Status', select('eol', listen.eol ?? [], (v) => EOL_LABEL[v] ?? v))}
+          {field('eol', 'Support-Status', select('eol', [...EOL], (v) => EOL_LABEL[v] ?? v))}
           {field('tech_info', 'Technik', <textarea id={`${formId}-tech_info`} rows={2} value={values.tech_info} onChange={set('tech_info')} placeholder="Tracking, Payment, Katalogumfang …" />, undefined, true)}
         </div>
       </fieldset>
@@ -143,11 +138,6 @@ export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel, on
               </>
             )}
           </span>
-          {error instanceof ConflictError && onReload && (
-            <button type="button" className="button small" onClick={onReload}>
-              Neu laden
-            </button>
-          )}
         </div>
       )}
 
