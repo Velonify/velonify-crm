@@ -66,6 +66,7 @@ export class MemoryCalendar implements CalendarApi {
       teilnehmer: [...request.teilnehmer],
       meetLink: 'https://meet.google.com/demo-demo-demo',
       abgesagt: false,
+      ganztaegig: false,
     };
     this.events.push(event);
     return { ...event };
@@ -75,6 +76,14 @@ export class MemoryCalendar implements CalendarApi {
     const wanted = email.toLowerCase();
     return this.events
       .filter((e) => e.teilnehmer.some((t) => t.toLowerCase() === wanted) && e.start >= von && e.start <= bis)
+      .map((e) => ({ ...e }));
+  }
+
+  async listEvents(von: string, bis: string): Promise<CalendarEvent[]> {
+    const zeit = (wert: string) => new Date(wert.length === 10 ? `${wert}T00:00:00` : wert).getTime();
+    return this.events
+      .filter((e) => !e.abgesagt && zeit(e.ende) > zeit(von) && zeit(e.start) < zeit(bis))
+      .sort((a, b) => zeit(a.start) - zeit(b.start))
       .map((e) => ({ ...e }));
   }
 }

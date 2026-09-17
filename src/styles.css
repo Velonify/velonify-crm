@@ -517,6 +517,28 @@ input[type='checkbox']:indeterminate::before { transform: scale(1); height: 3px;
 .nowrap { white-space: nowrap; }
 .button.is-disabled { pointer-events: none; color: var(--ink-muted); background: transparent; border-color: var(--line); }
 
+/* ─── Kalender ────────────────────────────────────────────────────────────── */
+.kalender-woche { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.kalender-tag { background: var(--raised); min-height: 420px; padding: var(--space-2); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.kalender-tag.is-vergangen { background: var(--sunken); }
+.kalender-tag-kopf { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; padding-bottom: 8px; margin-bottom: 2px; border-bottom: var(--border-rule) solid var(--rule); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-muted); }
+.kalender-tag-kopf strong { font-size: 13px; letter-spacing: 0.04em; color: var(--ink); }
+.kalender-tag.is-heute .kalender-tag-kopf { color: var(--accent); border-bottom-color: var(--accent); }
+.kalender-tag.is-heute .kalender-tag-kopf strong { color: var(--accent); }
+.kalender-leer { margin: 4px 0 0; }
+.termin { border-left: var(--border-accent) solid var(--accent); background: var(--sunken); padding: 6px 8px 7px; font-size: 13px; line-height: 1.35; min-width: 0; overflow-wrap: break-word; hyphens: auto; }
+.kalender-tag.is-vergangen .termin { background: var(--raised); }
+.termin.is-ganztaegig { border-left-color: var(--highlight); }
+.termin.is-vorbei { opacity: 0.6; }
+.termin.is-abgelehnt { opacity: 0.5; }
+.termin.is-abgelehnt .termin-titel { text-decoration: line-through; }
+.termin-zeit { font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.termin-titel { font-weight: 600; }
+.termin-titel a { color: var(--ink); }
+.termin-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 3px; font-size: 12px; }
+.termin-meet { font-weight: 700; }
+.termin-liste { display: flex; flex-direction: column; gap: 6px; }
+
 /* ─── Contact Generator ─────────────────────────────────────────────────── */
 .contact-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: var(--space-4); align-items: start; }
 .contact-spalte { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
@@ -692,6 +714,10 @@ fieldset.plain.invalid legend { color: var(--danger); }
   .demo-banner { padding: 12px var(--space-5); }
   .hide-md { display: none; }
   .akte, .tag-grid, .start-grid, .angebot-layout, .contact-layout { grid-template-columns: 1fr; }
+  .kalender-woche { grid-template-columns: 1fr; }
+  .kalender-tag { min-height: 0; }
+  /* One column is long: past days without appointments are only noise. */
+  .kalender-tag.is-vergangen.is-leer { display: none; }
   .angebot-side { position: static; }
   .tools { grid-template-columns: 1fr; }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }

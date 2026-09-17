@@ -7,6 +7,7 @@ describe('werkzeugFuerPfad', () => {
     expect(werkzeugFuerPfad('/crm')?.id).toBe('crm');
     expect(werkzeugFuerPfad('/crm/firmen/F-123')?.id).toBe('crm');
     expect(werkzeugFuerPfad('/contact/gesendet')?.id).toBe('contact');
+    expect(werkzeugFuerPfad('/kalender')?.id).toBe('home');
   });
 
   it('leaves shared pages without a tool', () => {

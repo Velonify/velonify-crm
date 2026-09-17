@@ -701,6 +701,11 @@ export class CrmService {
     return termin;
   }
 
+  /** Everything in the signed-in person's primary calendar between two ISO timestamps. */
+  termine(von: string, bis: string): Promise<CalendarEvent[]> {
+    return this.calendar.listEvents(von, bis);
+  }
+
   /** Calendar events of the signed-in person with any (max. 5) contacts of the firm, from 6 months back to 3 months ahead. */
   async termineMitFirma(db: Database, firmaId: string): Promise<CalendarEvent[]> {
     const emails = db.kontakte

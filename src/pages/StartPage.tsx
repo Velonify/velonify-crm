@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { TerminEintrag, useTermine } from '../components/Termine';
 import { useToast } from '../components/Toasts';
 import { Card, ErrorBox, Loading, PageHeader, PhaseBadge, StatusBadge } from '../components/ui';
 import { isDemo } from '../config';
 import { useCrm } from '../data/CrmContext';
 import { driveFolderUrl } from '../data/google/drive';
-import { isoDate } from '../data/ids';
+import { addDays, isoDate } from '../data/ids';
+import { istVorbei, tagesBeginn, termineJeTag } from '../data/kalender';
 import { kennzahlen, meinTag } from '../data/selectors';
 import { firmenLinks, schnellzugriff, slackChannelUrl } from '../data/start';
 import type { Database } from '../data/types';
@@ -99,6 +101,53 @@ function HeuteDran({ db, ich, heute }: { db: Database; ich: string | null; heute
         <p className="hint">
           Und {aufgaben.length - MAX_AUFGABEN} weitere – <Link to="/crm">alle in Mein Tag</Link>
         </p>
+      )}
+    </Card>
+  );
+}
+
+function Kalender({ db, heute }: { db: Database; heute: string }) {
+  // Today and the next six days: enough to show the next appointment when today is free.
+  const termine = useTermine(tagesBeginn(heute), tagesBeginn(addDays(heute, 7)));
+  const jetzt = new Date();
+  const heuteListe = termineJeTag(termine.data ?? [], [heute]).get(heute) ?? [];
+  const offen = heuteListe.filter((e) => !istVorbei(e, jetzt));
+  const naechster = (termine.data ?? []).find((e) => !e.ganztaegig && new Date(e.start).getTime() > jetzt.getTime() && isoDate(new Date(e.start)) > heute);
+
+  return (
+    <Card
+      title={
+        <>
+          Kalender heute <span className="count">{heuteListe.length}</span>
+        </>
+      }
+      actions={
+        <Link to="/kalender" className="button small">
+          Woche
+        </Link>
+      }
+    >
+      {termine.error ? (
+        <ErrorBox error={termine.error} onRetry={termine.reload} />
+      ) : termine.loading && !termine.data ? (
+        <Loading label="Termine werden geladen …" />
+      ) : (
+        <>
+          {heuteListe.length === 0 ? (
+            <p className="muted">Heute keine Termine.</p>
+          ) : (
+            <div className="termin-liste">
+              {heuteListe.map((event) => (
+                <TerminEintrag key={event.id} event={event} tag={heute} db={db} jetzt={jetzt} kompakt />
+              ))}
+            </div>
+          )}
+          {naechster && offen.length === 0 && (
+            <p className="hint">
+              Nächster Termin: {new Date(naechster.start).toLocaleString('de-DE', { weekday: 'short', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })} · {naechster.titel}
+            </p>
+          )}
+        </>
       )}
     </Card>
   );
@@ -274,6 +323,7 @@ export function StartPage() {
           <Kunden db={db} />
         </div>
         <div className="start-side">
+          <Kalender db={db} heute={heute} />
           <Links db={db} />
           <Dateiname db={db} heute={heute} />
         </div>

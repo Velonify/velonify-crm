@@ -15,6 +15,7 @@ import { FirmaAktePage } from './pages/FirmaAktePage';
 import { FirmaNeuPage } from './pages/FirmaNeuPage';
 import { FirmenListePage } from './pages/FirmenListePage';
 import { ImportPage } from './pages/ImportPage';
+import { KalenderPage } from './pages/KalenderPage';
 import { LoginPage } from './pages/LoginPage';
 import { MeinTagPage } from './pages/MeinTagPage';
 import { PipelinePage } from './pages/PipelinePage';
@@ -38,6 +39,7 @@ export function App() {
           <Routes>
             <Route element={<Layout />}>
               <Route index element={<StartPage />} />
+              <Route path="kalender" element={<KalenderPage />} />
               <Route path="crm">
                 <Route index element={<MeinTagPage />} />
                 <Route path="pipeline" element={<PipelinePage />} />

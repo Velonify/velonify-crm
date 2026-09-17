@@ -4,6 +4,8 @@ export interface Werkzeug {
   beschreibung: string;
   /** Start path; all pages of the tool live below it. Missing while the tool is only planned. */
   pfad?: string;
+  /** Further path prefixes that belong to the tool, for tools whose start path is "/". */
+  bereiche?: string[];
   /** Sidebar entries shown while this tool is open. */
   navigation: { label: string; pfad: string; end?: boolean }[];
 }
@@ -15,7 +17,11 @@ export const WERKZEUGE: Werkzeug[] = [
     name: 'Home',
     beschreibung: 'Überblick, Kunden und Links',
     pfad: '/',
-    navigation: [{ label: 'Übersicht', pfad: '/', end: true }],
+    bereiche: ['/kalender'],
+    navigation: [
+      { label: 'Übersicht', pfad: '/', end: true },
+      { label: 'Kalender', pfad: '/kalender' },
+    ],
   },
   {
     id: 'crm',
@@ -60,7 +66,8 @@ export const istGeplant = (w: Werkzeug) => !w.pfad;
  * (like /einrichtung) return null, so the sidebar can stay on the tool that was open before.
  */
 export function werkzeugFuerPfad(pathname: string): Werkzeug | null {
-  const treffer = WERKZEUGE.filter((w) => w.pfad && w.pfad !== '/' && (pathname === w.pfad || pathname.startsWith(`${w.pfad}/`)));
-  if (treffer.length > 0) return treffer.sort((a, b) => b.pfad!.length - a.pfad!.length)[0];
+  const passt = (pfad: string) => pfad !== '/' && (pathname === pfad || pathname.startsWith(`${pfad}/`));
+  const treffer = WERKZEUGE.flatMap((w) => [w.pfad, ...(w.bereiche ?? [])].filter((p): p is string => Boolean(p) && passt(p!)).map((pfad) => ({ w, pfad })));
+  if (treffer.length > 0) return treffer.sort((a, b) => b.pfad.length - a.pfad.length)[0].w;
   return pathname === '/' ? WERKZEUGE[0] : null;
 }
