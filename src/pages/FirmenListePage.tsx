@@ -101,6 +101,7 @@ export function FirmenListePage() {
   return (
     <div className="page">
       <PageHeader
+        eyebrow="Leads & Kunden"
         title="Firmen"
         subtitle={db ? `${visible.length} von ${activeCount} aktiven Firmen` : undefined}
         actions={
@@ -109,7 +110,7 @@ export function FirmenListePage() {
               CSV importieren
             </Link>
             <Link to="/firmen/neu" className="button primary">
-              Neue Firma
+              Firma anlegen
             </Link>
           </>
         }

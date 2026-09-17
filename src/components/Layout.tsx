@@ -1,7 +1,8 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { isDemo } from '../config';
 import { useCrm } from '../data/CrmContext';
+import { useTheme } from '../lib/useTheme';
 import { Suche } from './Suche';
 
 const navClass = ({ isActive }: { isActive: boolean }) => `nav-item${isActive ? ' is-active' : ''}`;
@@ -9,14 +10,19 @@ const navClass = ({ isActive }: { isActive: boolean }) => `nav-item${isActive ? 
 export function Layout() {
   const { state, signOut } = useAuth();
   const { loading, db } = useCrm();
+  const [theme, setTheme] = useTheme();
   const user = state.status === 'signedOut' ? null : state.user;
 
   return (
     <div className="app">
-      <aside className="sidebar">
+      {/* The sidebar is always espresso ("Design & Intern"); the content follows the chosen theme. */}
+      <aside className="sidebar" data-theme="espresso">
         <div className="brand">
-          <img src="./favicon.svg" alt="" width={26} height={26} />
-          <span>Velonify CRM</span>
+          <Link to="/" className="lockup" aria-label="Velonify CRM – Mein Tag">
+            <img src="./zeichen-eisblau.png" alt="" />
+            <span className="wordmark">Velonify</span>
+          </Link>
+          <div className="brand-sub">CRM</div>
           {loading && db && <span className="sync-dot" title="Wird aktualisiert …" aria-label="Wird aktualisiert" />}
         </div>
         <Suche />
@@ -38,6 +44,14 @@ export function Layout() {
           <NavLink to="/einrichtung" className={navClass}>
             Einrichtung
           </NavLink>
+          <div className="segmented theme-switch" role="radiogroup" aria-label="Darstellung">
+            <button type="button" role="radio" aria-checked={theme === 'light'} className={theme === 'light' ? 'is-active' : ''} onClick={() => setTheme('light')}>
+              Hell
+            </button>
+            <button type="button" role="radio" aria-checked={theme === 'espresso'} className={theme === 'espresso' ? 'is-active' : ''} onClick={() => setTheme('espresso')}>
+              Espresso
+            </button>
+          </div>
           {user && (
             <div className="user">
               {user.picture ? (
@@ -60,7 +74,7 @@ export function Layout() {
       <main className="main">
         {isDemo && (
           <div className="demo-banner">
-            <strong>Demo-Modus</strong> – erfundene Beispieldaten, Drive und Kalender sind simuliert. Änderungen gehen beim Neuladen verloren.
+            <strong>Demo-Modus</strong> Erfundene Beispieldaten, Drive und Kalender sind simuliert. Änderungen gehen beim Neuladen verloren.
           </div>
         )}
         <Outlet />

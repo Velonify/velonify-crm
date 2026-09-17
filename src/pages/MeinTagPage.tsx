@@ -38,9 +38,7 @@ function AufgabenListe({ titel, aufgaben, heute, leer, onDeal, klasse = '' }: {
                 onChange={() => perform((s) => s.setWiedervorlageErledigt(a.wiedervorlage!.id, true), `Erledigt: ${a.titel}`)}
               />
             ) : (
-              <span className="task-kind" title="Nächster Schritt eines Deals" aria-hidden="true">
-                ➜
-              </span>
+              <span className="task-kind" title="Nächster Schritt eines Deals" aria-hidden="true" />
             )}
             <div className="task-body">
               {a.art === 'deal' ? (
@@ -98,6 +96,7 @@ export function MeinTagPage() {
   return (
     <div className="page">
       <PageHeader
+        eyebrow={new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}
         title={`${begruessung}${ich ? `, ${ich}` : ''}`}
         subtitle={offen === 0 ? 'Für heute ist nichts offen.' : `${offen} ${offen === 1 ? 'Sache ist' : 'Sachen sind'} heute dran.`}
         actions={
@@ -111,7 +110,7 @@ export function MeinTagPage() {
               </button>
             </div>
             <button type="button" className="button primary" onClick={() => setNeueWiedervorlage(true)}>
-              + Wiedervorlage
+              Wiedervorlage anlegen
             </button>
           </>
         }
@@ -137,7 +136,7 @@ export function MeinTagPage() {
           <span className="kpi-label">Offene Deals</span>
           <span className="kpi-value">{zahlen.offen}</span>
         </div>
-        <div className="kpi">
+        <div className="kpi panel">
           <span className="kpi-label">Pipeline-Wert</span>
           <span className="kpi-value">{formatEuro(zahlen.pipelineWert)}</span>
           <span className="kpi-sub">gewichtet {formatEuro(zahlen.gewichtet)}</span>
@@ -174,9 +173,7 @@ export function MeinTagPage() {
                   const firma = db.firmen.find((f) => f.id === d.firma_id);
                   return (
                     <li key={d.id}>
-                      <span className="task-kind" aria-hidden="true">
-                        ?
-                      </span>
+                      <span className="task-kind open" aria-hidden="true" />
                       <div className="task-body">
                         <button type="button" className="link-button" onClick={() => setDealDialog(d)}>
                           {d.titel}

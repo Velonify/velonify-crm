@@ -85,7 +85,7 @@ export function DriveKarte({ firma, db }: { firma: Firma; db: Database }) {
             <ul className="file-list">
               {ordner.data.inhalt.slice(0, 12).map((datei) => (
                 <li key={datei.id}>
-                  <span aria-hidden="true">{isFolder(datei) ? '📁' : '📄'}</span>
+                  <span className="file-kind">{isFolder(datei) ? 'Ordner' : 'Datei'}</span>
                   <a href={link(datei.id, datei.webViewLink)} target="_blank" rel="noreferrer noopener">
                     {datei.name}
                   </a>

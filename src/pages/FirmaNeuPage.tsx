@@ -14,7 +14,7 @@ export function FirmaNeuPage() {
 
   return (
     <div className="page narrow">
-      <PageHeader title="Neue Firma" />
+      <PageHeader eyebrow="Firmen" title="Neue Firma" />
       {db ? (
         <FirmaForm
           initial={{ ...EMPTY_FIRMA_INPUT, zustaendig: ich ?? '' }}

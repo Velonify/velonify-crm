@@ -65,7 +65,7 @@ export function FirmaAktePage() {
   if (!f) {
     return (
       <div className="page">
-        <PageHeader title="Firma nicht gefunden" />
+        <PageHeader eyebrow="Firmen" title="Firma nicht gefunden" />
         <p>
           Diese Firma gibt es nicht (mehr). <Link to="/firmen">Zur Firmenliste</Link>
         </p>
@@ -77,7 +77,7 @@ export function FirmaAktePage() {
   if (editing) {
     return (
       <div className="page narrow">
-        <PageHeader title={`${f.name} bearbeiten`} />
+        <PageHeader eyebrow="Firma bearbeiten" title={f.name} />
         <FirmaForm
           initial={toInput(f)}
           listen={db.listen}
@@ -106,10 +106,12 @@ export function FirmaAktePage() {
 
   return (
     <div className="page wide">
-      <nav className="breadcrumb">
-        <Link to="/firmen">Firmen</Link> <span aria-hidden="true">/</span> {f.name}
-      </nav>
       <PageHeader
+        eyebrow={
+          <nav aria-label="Pfad">
+            <Link to="/firmen">Firmen</Link>
+          </nav>
+        }
         title={f.name}
         subtitle={
           <span className="badges">

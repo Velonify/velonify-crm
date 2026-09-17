@@ -86,7 +86,7 @@ export function ImportPage() {
 
   return (
     <div className="page">
-      <PageHeader title="Leads importieren" subtitle="CSV aus dem Magento-Lead-Qualifier oder eine eigene Liste mit mindestens der Spalte „domain“." />
+      <PageHeader eyebrow="Leads" title="Leads importieren" subtitle="CSV aus dem Magento-Lead-Qualifier oder eine eigene Liste mit mindestens der Spalte „domain“." />
 
       {ergebnis && (
         <div className="hint-box success">
@@ -99,7 +99,7 @@ export function ImportPage() {
       <Card title="1. Datei wählen">
         <label className="file-drop">
           <input key={inputKey} type="file" accept=".csv,text/csv" onChange={(e) => void lies(e.target.files?.[0])} />
-          <span className="file-drop-label">{dateiname && rows ? `📄 ${dateiname} – ${anzahl(rows.length - 1, 'Zeile', 'Zeilen')}` : '📄 CSV-Datei auswählen …'}</span>
+          <span className="file-drop-label">{dateiname && rows ? `${dateiname} – ${anzahl(rows.length - 1, 'Zeile', 'Zeilen')}` : 'CSV-Datei auswählen …'}</span>
         </label>
         {leseFehler && <p className="alert error">{leseFehler}</p>}
         <details className="muted small">
@@ -219,7 +219,6 @@ export function ImportPage() {
                       </td>
                       <td className="hide-sm">{z.tier || '–'}</td>
                       <td className={z.dubletteVon ? 'warn-text' : 'muted'}>
-                        {z.dubletteVon && '⚠ '}
                         {z.hinweis}
                         {z.dubletteVon?.firmaId && (
                           <>

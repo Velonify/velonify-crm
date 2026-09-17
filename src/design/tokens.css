@@ -1,0 +1,64 @@
+/* Vendored from github.com/Velonify/velonify-design-system tokens/tokens.css @ 988ae9f – do not edit here, update the design system and copy again. */
+/* Velonify tokens: generated from tokens.json */
+
+:root, [data-theme="light"] {
+  --bordeaux: #45142D;
+  --espresso: #2C0E18;
+  --eisblau: #C5D8E6;
+  --white: #FFFFFF;
+  --black: #000000;
+  --surface: var(--white);
+  --ink: var(--black);
+  --ink-muted: rgba(0,0,0,0.65);
+  --line: rgba(0,0,0,0.12);
+  --rule: var(--ink);
+  --accent: var(--bordeaux);
+  --on-accent: var(--white);
+  --panel: var(--bordeaux);
+  --on-panel: var(--white);
+  --on-panel-muted: rgba(255,255,255,0.75);
+  --panel-border: var(--bordeaux);
+  --highlight: var(--eisblau);
+  --on-highlight: var(--espresso);
+  --focus: var(--bordeaux);
+  --selection-bg: var(--bordeaux);
+}
+[data-theme="espresso"] {
+  --surface: var(--espresso);
+  --ink: var(--white);
+  --ink-muted: rgba(255,255,255,0.72);
+  --line: rgba(255,255,255,0.16);
+  --accent: var(--eisblau);
+  --on-accent: var(--espresso);
+  --panel-border: var(--eisblau);
+  --focus: var(--eisblau);
+}
+:root {
+  --space-1: 10px;
+  --space-2: 14px;
+  --space-3: 18px;
+  --space-4: 26px;
+  --space-5: 40px;
+  --space-6: 72px;
+  --space-7: 96px;
+  --radius-none: 0;
+  --radius-app-icon: 22%;
+  --border-hairline: 1px;
+  --border-rule: 1.5px;
+  --border-accent: 4px;
+  --font-display: "Krona One", "Arial Narrow", sans-serif;
+  --font-sans: "Albert Sans", "Helvetica Neue", Arial, sans-serif;
+}
+.display-xl { font-family: var(--font-display); font-size: 168px; line-height: 0.92; font-weight: 400; letter-spacing: 0.01em; text-transform: uppercase; }
+.display-l { font-family: var(--font-display); font-size: 72px; line-height: 1.08; font-weight: 400; letter-spacing: 0.01em; text-transform: uppercase; }
+.display-m { font-family: var(--font-display); font-size: 60px; line-height: 1.08; font-weight: 400; letter-spacing: 0.01em; text-transform: uppercase; }
+.heading-s { font-family: var(--font-display); font-size: 25px; line-height: 1.08; font-weight: 400; letter-spacing: 0.01em; text-transform: uppercase; }
+.heading-xs { font-family: var(--font-display); font-size: 20px; line-height: 1.08; font-weight: 400; letter-spacing: 0.01em; text-transform: uppercase; }
+.lead { font-family: var(--font-sans); font-size: 26px; line-height: 1.3; font-weight: 600; }
+.panel-text { font-family: var(--font-sans); font-size: 21px; line-height: 1.45; font-weight: 600; }
+.body-l { font-family: var(--font-sans); font-size: 18px; line-height: 1.6; font-weight: 400; }
+.body { font-family: var(--font-sans); font-size: 15px; line-height: 1.55; font-weight: 500; }
+.body-s { font-family: var(--font-sans); font-size: 13.5px; line-height: 1.5; font-weight: 500; }
+.eyebrow { font-family: var(--font-sans); font-size: 12.5px; line-height: 1.2; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; }
+.label { font-family: var(--font-sans); font-size: 12px; line-height: 1.2; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+.tag { font-family: var(--font-sans); font-size: 10px; line-height: 1.2; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
