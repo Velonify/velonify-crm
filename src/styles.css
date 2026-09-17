@@ -527,6 +527,16 @@ fieldset.plain.invalid legend { color: var(--danger); }
 .search-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .search-details { font-size: 13px; color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Theme switch (src/lib/useTheme.ts): a soft crossfade of the whole page … */
+::view-transition-old(root),
+::view-transition-new(root) { animation-duration: 0.35s; animation-timing-function: ease-in-out; }
+/* … or, without View Transitions, a short colour transition on every element. */
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before {
+  transition: background-color 0.35s ease-in-out, color 0.35s ease-in-out, border-color 0.35s ease-in-out, outline-color 0.35s ease-in-out !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before { transition: none !important; animation-duration: 0s !important; }
   .spinner, .sync-dot { animation: none; }
