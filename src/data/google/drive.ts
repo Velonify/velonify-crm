@@ -1,6 +1,7 @@
 import { googleRequest, missingScope, type TokenProvider } from './http';
 
 export const FOLDER_MIME = 'application/vnd.google-apps.folder';
+export const SPREADSHEET_MIME = 'application/vnd.google-apps.spreadsheet';
 
 export interface DriveFile {
   id: string;
@@ -19,6 +20,8 @@ export interface DriveApi {
   getFile(id: string): Promise<DriveFile>;
   listChildren(folderId: string): Promise<DriveFile[]>;
   createFolder(name: string, parentId: string): Promise<DriveFile>;
+  /** Creates an empty Google file (e.g. a spreadsheet) directly in a folder. */
+  createFile(name: string, mimeType: string, parentId: string): Promise<DriveFile>;
   copyFile(fileId: string, name: string, parentId: string): Promise<DriveFile>;
   move(fileId: string, fromParentId: string, toParentId: string): Promise<DriveFile>;
   findFoldersByName(name: string): Promise<DriveFile[]>;
@@ -91,6 +94,13 @@ export class GoogleDrive implements DriveApi {
     });
   }
 
+  createFile(name: string, mimeType: string, parentId: string): Promise<DriveFile> {
+    return this.request(`${BASE_URL}?fields=${FIELDS}&${SHARED}`, {
+      method: 'POST',
+      body: JSON.stringify({ name, mimeType, parents: [parentId] }),
+    });
+  }
+
   copyFile(fileId: string, name: string, parentId: string): Promise<DriveFile> {
     return this.request(`${BASE_URL}/${encodeURIComponent(fileId)}/copy?fields=${FIELDS}&${SHARED}`, {
       method: 'POST',
@@ -105,3 +115,4 @@ export class GoogleDrive implements DriveApi {
 }
 
 export const driveFolderUrl = (id: string) => `https://drive.google.com/drive/folders/${encodeURIComponent(id)}`;
+export const spreadsheetFileUrl = (id: string) => `https://docs.google.com/spreadsheets/d/${encodeURIComponent(id)}/edit`;

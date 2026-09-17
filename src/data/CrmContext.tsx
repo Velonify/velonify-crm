@@ -57,6 +57,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         drive: new GoogleDrive(getToken),
         calendar: new GoogleCalendar(getToken),
         currentUser: userEmail,
+        tabelle: (spreadsheetId) => new SheetsClient(spreadsheetId, getToken),
       });
       setBackend({ service, sheets });
     }

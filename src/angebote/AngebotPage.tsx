@@ -20,8 +20,10 @@ import {
   type KategorieStatus,
   type ManuellZiel,
 } from '../data/angebote';
+import { isDemo } from '../config';
 import { useCrm } from '../data/CrmContext';
-import { isAbgeschlossen } from '../data/constants';
+import { EINSTELLUNG, isAbgeschlossen } from '../data/constants';
+import { spreadsheetFileUrl } from '../data/google/drive';
 import type { CrmService } from '../data/crm';
 import { ABRECHNUNGEN, katalogBaum, SPRACHEN, type KategorieMitLeistungen, type Sprache } from '../data/katalog';
 import type { Angebot, AngebotsDaten, Auswahl, AuswahlKategorie, AuswahlPosten, Database } from '../data/types';
@@ -121,6 +123,70 @@ function KategorieBlock({
       </div>
       {offen && <ul className="auswahl-posten">{children}</ul>}
     </li>
+  );
+}
+
+function KalkulationKarte({ angebot, db, dirty, aendern }: { angebot?: Angebot; db: Database; dirty: boolean; aendern: <T>(a: (s: CrmService) => Promise<T>) => Promise<T> }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>();
+  const firma = angebot && db.firmen.find((f) => f.id === angebot.firma_id);
+  const proposals = db.einstellungen[EINSTELLUNG.proposalsOrdner];
+
+  const anlegen = async () => {
+    if (!angebot) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      const ergebnis = await aendern((s) => s.legeKalkulationAn(angebot.id, angebot.geaendert_am));
+      toast.show(`Kalkulations-Sheet angelegt: ${ergebnis.datei.name}`);
+    } catch (err) {
+      setError(err);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="card angebot-kalkulation">
+      <header className="card-header">
+        <h2>Kalkulation</h2>
+      </header>
+      {!angebot ? (
+        <p className="muted small">Nach dem Anlegen des Angebots lässt sich hier das Kalkulations-Sheet erzeugen.</p>
+      ) : angebot.sheet_id ? (
+        <>
+          <p className="small">Das Kalkulations-Sheet ist angelegt. Preise je Unterpunkt dort eintragen.</p>
+          {isDemo ? (
+            <p className="muted small">Im Demo-Modus nur simuliert.</p>
+          ) : (
+            <a className="button primary large" href={spreadsheetFileUrl(angebot.sheet_id)} target="_blank" rel="noreferrer noopener">
+              Sheet öffnen ↗
+            </a>
+          )}
+          {dirty && <p className="hint warn-text">Änderungen an der Auswahl werden nicht ins bestehende Sheet übertragen.</p>}
+        </>
+      ) : (
+        <>
+          <p className="muted small">
+            {firma?.drive_ordner_id
+              ? 'Wird im Drive-Ordner der Firma angelegt (in 00_Account, falls vorhanden).'
+              : proposals
+                ? 'Die Firma hat noch keinen Drive-Ordner. Das Sheet wird in 02_Sales/02_Proposals angelegt.'
+                : ''}
+          </p>
+          {!firma?.drive_ordner_id && !proposals && (
+            <p className="hint warn-text">
+              Kein Ablageort: Die Firma hat keinen Drive-Ordner und „02_Proposals“ ist nicht eingerichtet. <Link to="/einrichtung">Zur Einrichtung</Link>
+            </p>
+          )}
+          <FormError error={error} />
+          <button type="button" className="button primary large" onClick={anlegen} disabled={busy || dirty}>
+            {busy ? 'Legt an …' : 'Kalkulations-Sheet anlegen'}
+          </button>
+          {dirty && <p className="hint">Bitte erst die Änderungen speichern.</p>}
+        </>
+      )}
+    </section>
   );
 }
 
@@ -523,11 +589,9 @@ function AngebotFormular({ daten, db, angebot, aendern }: { daten: AngebotsDaten
               <button type="button" className="button primary large" onClick={speichern} disabled={busy || (!dirty && Boolean(angebot))}>
                 {busy ? 'Speichert …' : angebot ? (dirty ? 'Änderungen speichern' : 'Gespeichert') : 'Angebot anlegen'}
               </button>
-              <button type="button" className="button large" disabled title="Folgt im nächsten Ausbauschritt">
-                Kalkulations-Sheet anlegen
-              </button>
             </div>
           </section>
+          <KalkulationKarte angebot={angebot} db={db} dirty={dirty} aendern={aendern} />
         </aside>
       </div>
     </div>
