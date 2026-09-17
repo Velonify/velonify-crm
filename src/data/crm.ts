@@ -4,6 +4,7 @@ import type { CalendarApi, CalendarEvent } from './google/calendar';
 import { isFolder, type DriveApi, type DriveFile } from './google/drive';
 import { ID_PREFIX, isoDate, newId } from './ids';
 import type { ImportPlan } from './importCsv';
+import { naechsteSortierung, prepareKategorie, prepareLeistung, verschiebe } from './katalog';
 import {
   driveFolderName,
   isValidEmail,
@@ -14,6 +15,7 @@ import {
   prepareWiedervorlage,
 } from './rules';
 import { driveKonfiguration } from './selectors';
+import { STARTKATALOG } from './startkatalog';
 import type { Store } from './store';
 import type {
   Aktivitaet,
@@ -24,8 +26,13 @@ import type {
   Einstellungen,
   Firma,
   FirmaInput,
+  Katalog,
   Kontakt,
   KontaktInput,
+  Leistung,
+  LeistungInput,
+  Leistungskategorie,
+  LeistungskategorieInput,
   Meta,
   Wiedervorlage,
   WiedervorlageInput,
@@ -288,6 +295,118 @@ export class CrmService {
 
   saveEinstellungen(values: Einstellungen): Promise<void> {
     return this.store.saveEinstellungen(values);
+  }
+
+  // ─── Leistungskatalog ──────────────────────────────────────────────────────
+
+  loadKatalog(): Promise<Katalog> {
+    return this.store.loadKatalog();
+  }
+
+  async saveKategorie(input: LeistungskategorieInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<Leistungskategorie> {
+    const clean = prepareKategorie(input);
+    if (existing) {
+      const [kategorie] = await this.store.update('leistungskategorien', [
+        { id: existing.id, changes: { ...clean, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm },
+      ]);
+      return kategorie;
+    }
+    const katalog = await this.store.loadKatalog();
+    const kategorie: Leistungskategorie = {
+      ...clean,
+      id: newId(ID_PREFIX.leistungskategorien),
+      sortierung: naechsteSortierung(katalog.kategorien),
+      archiviert: false,
+      ...this.created(),
+    };
+    await this.store.insert('leistungskategorien', [kategorie]);
+    return kategorie;
+  }
+
+  async saveLeistung(input: LeistungInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<Leistung> {
+    const clean = prepareLeistung(input);
+    const katalog = await this.store.loadKatalog();
+    CrmService.find(katalog.kategorien, clean.kategorie_id);
+    const inKategorie = katalog.leistungen.filter((l) => l.kategorie_id === clean.kategorie_id && l.id !== existing?.id);
+
+    if (existing) {
+      const vorher = CrmService.find(katalog.leistungen, existing.id);
+      // Moved to another category: append at its end.
+      const sortierung = vorher.kategorie_id === clean.kategorie_id ? {} : { sortierung: naechsteSortierung(inKategorie) };
+      const [leistung] = await this.store.update('leistungen', [
+        { id: existing.id, changes: { ...clean, ...sortierung, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm },
+      ]);
+      return leistung;
+    }
+    const leistung: Leistung = { ...clean, id: newId(ID_PREFIX.leistungen), sortierung: naechsteSortierung(inKategorie), archiviert: false, ...this.created() };
+    await this.store.insert('leistungen', [leistung]);
+    return leistung;
+  }
+
+  async setKategorieArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<Leistungskategorie> {
+    const [kategorie] = await this.store.update('leistungskategorien', [{ id, changes: { archiviert, ...this.changed() }, expectedGeaendertAm }]);
+    return kategorie;
+  }
+
+  async setLeistungArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<Leistung> {
+    const [leistung] = await this.store.update('leistungen', [{ id, changes: { archiviert, ...this.changed() }, expectedGeaendertAm }]);
+    return leistung;
+  }
+
+  /** Moves a category one place up or down among the active categories. */
+  async verschiebeKategorie(id: string, richtung: -1 | 1): Promise<void> {
+    const katalog = await this.store.loadKatalog();
+    const aktive = katalog.kategorien.filter((k) => !k.archiviert);
+    await this.store.update('leistungskategorien', verschiebe(aktive, id, richtung).map(({ id: kid, sortierung }) => ({ id: kid, changes: { sortierung } })));
+  }
+
+  /** Moves a sub-item one place up or down within its category. */
+  async verschiebeLeistung(id: string, richtung: -1 | 1): Promise<void> {
+    const katalog = await this.store.loadKatalog();
+    const leistung = CrmService.find(katalog.leistungen, id);
+    const geschwister = katalog.leistungen.filter((l) => l.kategorie_id === leistung.kategorie_id && !l.archiviert);
+    await this.store.update('leistungen', verschiebe(geschwister, id, richtung).map(({ id: lid, sortierung }) => ({ id: lid, changes: { sortierung } })));
+  }
+
+  /** Fills an empty catalogue with the start catalogue. Refuses once anything exists, so nothing is duplicated. */
+  async uebernimmStartkatalog(): Promise<{ kategorien: number; leistungen: number }> {
+    const katalog = await this.store.loadKatalog();
+    if (katalog.kategorien.length > 0) {
+      throw new ValidationError('katalog', 'Der Katalog enthält schon Hauptkategorien. Der Startkatalog wird nur in einen leeren Katalog übernommen.');
+    }
+    const meta = this.created();
+    const kategorien: Leistungskategorie[] = [];
+    const leistungen: Leistung[] = [];
+    STARTKATALOG.forEach((start, i) => {
+      const kategorie: Leistungskategorie = {
+        id: newId(ID_PREFIX.leistungskategorien),
+        titel_de: start.titel[0],
+        titel_en: start.titel[1],
+        umfang_de: start.umfang[0],
+        umfang_en: start.umfang[1],
+        abrechnung: start.abrechnung,
+        sortierung: (i + 1) * 10,
+        archiviert: false,
+        ...meta,
+      };
+      kategorien.push(kategorie);
+      start.leistungen.forEach((l, j) => {
+        leistungen.push({
+          id: newId(ID_PREFIX.leistungen),
+          kategorie_id: kategorie.id,
+          titel_de: l.titel[0],
+          titel_en: l.titel[1],
+          text_de: l.text[0],
+          text_en: l.text[1],
+          sortierung: (j + 1) * 10,
+          archiviert: false,
+          ...meta,
+        });
+      });
+    });
+    await this.store.insert('leistungskategorien', kategorien);
+    await this.store.insert('leistungen', leistungen);
+    return { kategorien: kategorien.length, leistungen: leistungen.length };
   }
 
   // ─── Google Drive ──────────────────────────────────────────────────────────

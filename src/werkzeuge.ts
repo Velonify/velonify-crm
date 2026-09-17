@@ -32,8 +32,9 @@ export const WERKZEUGE: Werkzeug[] = [
   {
     id: 'angebote',
     name: 'Angebots-Rechner',
-    beschreibung: 'Angebote aus Bausteinen kalkulieren und als Google Doc ablegen',
-    navigation: [],
+    beschreibung: 'Leistungen auswählen, im Sheet kalkulieren, Angebot als PDF',
+    pfad: '/angebote',
+    navigation: [{ label: 'Leistungen', pfad: '/angebote/leistungen' }],
   },
 ];
 

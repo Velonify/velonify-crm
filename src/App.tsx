@@ -1,4 +1,5 @@
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { LeistungenPage } from './angebote/LeistungenPage';
 import { useAuth } from './auth/AuthContext';
 import { Layout } from './components/Layout';
 import { ReauthDialog } from './components/ReauthDialog';
@@ -39,6 +40,11 @@ export function App() {
                 <Route path="firmen/neu" element={<FirmaNeuPage />} />
                 <Route path="firmen/:id" element={<FirmaAktePage />} />
                 <Route path="import" element={<ImportPage />} />
+              </Route>
+              <Route path="angebote">
+                {/* Until the offer list exists, the tool opens on its catalogue. */}
+                <Route index element={<Navigate to="leistungen" replace />} />
+                <Route path="leistungen" element={<LeistungenPage />} />
               </Route>
               <Route path="einrichtung" element={<EinrichtungPage />} />
               <Route path="pipeline" element={<AlteCrmAdresse />} />

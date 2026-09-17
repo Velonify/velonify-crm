@@ -7,6 +7,8 @@ export const ID_PREFIX = {
   deals: 'D',
   aktivitaeten: 'A',
   wiedervorlagen: 'W',
+  leistungskategorien: 'LK',
+  leistungen: 'L',
 } as const;
 
 export function newId(prefix: string, length = 8): string {

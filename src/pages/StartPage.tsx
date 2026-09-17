@@ -37,6 +37,13 @@ function Werkzeuge({ heute, ueberfaellig, pipelineWert }: { heute: number; ueber
         </span>
         <span className="tool-cta">CRM öffnen →</span>
       </Link>
+      {WERKZEUGE.filter((w) => w.id !== 'home' && w.id !== 'crm' && !istGeplant(w)).map((w) => (
+        <Link key={w.id} to={w.pfad!} className="tool">
+          <span className="tool-label">{w.name}</span>
+          <span className="tool-text">{w.beschreibung}</span>
+          <span className="tool-cta">Öffnen →</span>
+        </Link>
+      ))}
       {WERKZEUGE.filter(istGeplant).map((w) => (
         <div key={w.id} className="tool is-planned" aria-disabled="true">
           <span className="tool-label">

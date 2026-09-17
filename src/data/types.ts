@@ -98,6 +98,40 @@ export interface Wiedervorlage {
 }
 export type WiedervorlageInput = Pick<Wiedervorlage, 'firma_id' | 'deal_id' | 'titel' | 'faellig_am' | 'zustaendig'>;
 
+export type Abrechnung = 'einmalig' | 'monatlich';
+
+/** Main category of the service catalogue, e.g. "Datenmigration". No prices: those are set per offer. */
+export interface Leistungskategorie extends Meta {
+  id: string;
+  titel_de: string;
+  titel_en: string;
+  /** Short scope line for the overview table of the offer */
+  umfang_de: string;
+  umfang_en: string;
+  abrechnung: string;
+  sortierung: number | null;
+  archiviert: boolean;
+}
+export type LeistungskategorieInput = Pick<Leistungskategorie, 'titel_de' | 'titel_en' | 'umfang_de' | 'umfang_en' | 'abrechnung'>;
+
+/** Sub-item of a category; `text_*` becomes a bullet in the offer's service description. */
+export interface Leistung extends Meta {
+  id: string;
+  kategorie_id: string;
+  titel_de: string;
+  titel_en: string;
+  text_de: string;
+  text_en: string;
+  sortierung: number | null;
+  archiviert: boolean;
+}
+export type LeistungInput = Pick<Leistung, 'kategorie_id' | 'titel_de' | 'titel_en' | 'text_de' | 'text_en'>;
+
+export interface Katalog {
+  kategorien: Leistungskategorie[];
+  leistungen: Leistung[];
+}
+
 export type Listen = Record<string, string[]>;
 export type Einstellungen = Record<string, string>;
 
@@ -107,6 +141,8 @@ export interface EntityMap {
   deals: Deal;
   aktivitaeten: Aktivitaet;
   wiedervorlagen: Wiedervorlage;
+  leistungskategorien: Leistungskategorie;
+  leistungen: Leistung;
 }
 
 /** Everything the app knows, loaded in one go. */
@@ -133,3 +169,7 @@ export const EMPTY_KONTAKT_INPUT: KontaktInput = {
 export const EMPTY_DEAL_INPUT: DealInput = {
   titel: '', kontakt_id: '', wert_eur: null, wahrscheinlichkeit: null, zustaendig: '', naechster_schritt: '', naechster_schritt_am: '',
 };
+
+export const EMPTY_KATEGORIE_INPUT: LeistungskategorieInput = { titel_de: '', titel_en: '', umfang_de: '', umfang_en: '', abrechnung: 'einmalig' };
+
+export const EMPTY_LEISTUNG_INPUT: LeistungInput = { kategorie_id: '', titel_de: '', titel_en: '', text_de: '', text_en: '' };
