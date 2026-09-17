@@ -4,6 +4,7 @@ import type { CalendarApi, CalendarEvent } from './google/calendar';
 import { isFolder, type DriveApi, type DriveFile } from './google/drive';
 import { ID_PREFIX, isoDate, newId } from './ids';
 import { anzahlPosten, prepareAngebot, statusLabel } from './angebote';
+import { ANSCHREIBEN_STATUS, prepareAnschreiben, verlaufText, type AnschreibenInput } from './anschreiben';
 import type { ImportPlan } from './importCsv';
 import { naechsteSortierung, prepareKategorie, prepareLeistung, verschiebe } from './katalog';
 import {
@@ -22,6 +23,7 @@ import type {
   Aktivitaet,
   Angebot,
   AngebotInput,
+  Anschreiben,
   AngebotsDaten,
   AktivitaetInput,
   Database,
@@ -390,6 +392,9 @@ export class CrmService {
         abrechnung: start.abrechnung,
         sortierung: (i + 1) * 10,
         archiviert: false,
+        outreach_anlass: '',
+        outreach_nutzen: '',
+        outreach_beleg: '',
         ...meta,
       };
       kategorien.push(kategorie);
@@ -460,6 +465,69 @@ export class CrmService {
   async setAngebotArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<Angebot> {
     const [angebot] = await this.store.update('angebote', [{ id, changes: { archiviert, ...this.changed() }, expectedGeaendertAm }]);
     return angebot;
+  }
+
+  // ─── Contact Generator ─────────────────────────────────────────────────────
+
+  loadAnschreiben(): Promise<Anschreiben[]> {
+    return this.store.loadAnschreiben();
+  }
+
+  /**
+   * Records a message that was sent by hand: stores it, logs it in the firm's history and moves an early deal
+   * to "kontaktiert". Without an open deal one can be created on the way.
+   */
+  async markiereGesendet(input: AnschreibenInput, optionen: { neuerDeal?: { titel: string; zustaendig: string } } = {}): Promise<Anschreiben> {
+    const clean = prepareAnschreiben(input);
+    // Fails with SchemaError before anything is written while the tab is missing.
+    await this.store.loadAnschreiben();
+    const db = await this.store.load();
+    const firma = CrmService.find(db.firmen, clean.firma_id);
+    if (clean.kontakt_id && CrmService.find(db.kontakte, clean.kontakt_id).firma_id !== firma.id) {
+      throw new ValidationError('kontakt_id', 'Der Ansprechpartner gehört zu einer anderen Firma.');
+    }
+    let deal = clean.deal_id ? CrmService.find(db.deals, clean.deal_id) : undefined;
+    if (deal && deal.firma_id !== firma.id) throw new ValidationError('deal_id', 'Der Deal gehört zu einer anderen Firma.');
+    if (!deal && optionen.neuerDeal) {
+      deal = await this.saveDeal(firma.id, {
+        titel: optionen.neuerDeal.titel,
+        kontakt_id: clean.kontakt_id,
+        wert_eur: null,
+        wahrscheinlichkeit: null,
+        zustaendig: optionen.neuerDeal.zustaendig,
+        naechster_schritt: '',
+        naechster_schritt_am: '',
+      });
+    }
+
+    const anschreiben: Anschreiben = {
+      ...clean,
+      id: newId(ID_PREFIX.anschreiben),
+      deal_id: deal?.id ?? '',
+      status: 'gesendet',
+      gesendet_am: this.timestamp(),
+      von: this.currentUser(),
+      archiviert: false,
+      ...this.created(),
+    };
+    await this.store.insert('anschreiben', [anschreiben]);
+    await this.log({
+      firma_id: firma.id,
+      kontakt_id: clean.kontakt_id,
+      deal_id: anschreiben.deal_id,
+      typ: clean.kanal === 'email' ? 'mail' : 'notiz',
+      text: verlaufText(anschreiben),
+    });
+    if (deal && (deal.phase === 'neu' || deal.phase === 'qualifiziert')) {
+      await this.changePhase(deal.id, 'kontaktiert', deal.geaendert_am);
+    }
+    return anschreiben;
+  }
+
+  async setAnschreibenStatus(id: string, status: string, expectedGeaendertAm: string): Promise<Anschreiben> {
+    if (!ANSCHREIBEN_STATUS.some((s) => s.wert === status)) throw new ValidationError('status', `Unbekannter Status „${status}“.`);
+    const [anschreiben] = await this.store.update('anschreiben', [{ id, changes: { status, ...this.changed() }, expectedGeaendertAm }]);
+    return anschreiben;
   }
 
   // ─── Google Drive ──────────────────────────────────────────────────────────
