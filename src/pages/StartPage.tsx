@@ -12,7 +12,7 @@ import type { Database } from '../data/types';
 import { dateiname } from '../lib/dateiname';
 import { faelligText, formatEuro } from '../lib/format';
 import { useIch } from '../lib/useIch';
-import { GEPLANTE_WERKZEUGE } from '../werkzeuge';
+import { istGeplant, WERKZEUGE } from '../werkzeuge';
 
 const MAX_AUFGABEN = 5;
 
@@ -37,12 +37,12 @@ function Werkzeuge({ heute, ueberfaellig, pipelineWert }: { heute: number; ueber
         </span>
         <span className="tool-cta">CRM öffnen →</span>
       </Link>
-      {GEPLANTE_WERKZEUGE.map((w) => (
-        <div key={w.name} className="tool is-planned" aria-disabled="true">
+      {WERKZEUGE.filter(istGeplant).map((w) => (
+        <div key={w.id} className="tool is-planned" aria-disabled="true">
           <span className="tool-label">
-            {w.titel} <span className="badge subtle">In Planung</span>
+            {w.name} <span className="badge subtle">In Planung</span>
           </span>
-          <span className="tool-text">{w.text}</span>
+          <span className="tool-text">{w.beschreibung}</span>
         </div>
       ))}
     </section>
