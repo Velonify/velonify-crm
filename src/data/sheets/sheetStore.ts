@@ -1,7 +1,7 @@
 import { ConflictError, NotFoundError, SchemaError } from '../errors';
-import { ENTITY_TABS, KATALOG_TABS, LISTEN_DEFAULTS, SCHEMA, type EntityTab, type TabSchema } from '../schema';
+import { ENTITY_TABS, ANGEBOTS_TABS, LISTEN_DEFAULTS, SCHEMA, type EntityTab, type TabSchema } from '../schema';
 import type { RecordUpdate, Store } from '../store';
-import type { Database, Einstellungen, EntityMap, Katalog, Listen } from '../types';
+import type { AngebotsDaten, Database, Einstellungen, EntityMap, Listen } from '../types';
 import { columnLetter, recordToRow, rowToRecord } from './rows';
 import { quoteTab, type SheetsApi, type ValueWrite } from './sheetsClient';
 
@@ -75,20 +75,24 @@ export class SheetStore implements Store {
     };
   }
 
-  async loadKatalog(): Promise<Katalog> {
+  async loadAngebotsDaten(): Promise<AngebotsDaten> {
     const info = await this.api.getSpreadsheet();
     const vorhanden = new Set(info.sheets?.map((sheet) => sheet.properties.title));
-    if (KATALOG_TABS.some((tab) => !vorhanden.has(tab))) {
-      throw new SchemaError('Der Leistungskatalog ist noch nicht eingerichtet. Bitte unter „Einrichtung“ auf „Einrichten“ klicken.');
+    if (ANGEBOTS_TABS.some((tab) => !vorhanden.has(tab))) {
+      throw new SchemaError('Der Angebots-Rechner ist noch nicht eingerichtet. Bitte unter „Einrichtung“ auf „Einrichten“ klicken.');
     }
-    const values = await this.api.batchGetValues(KATALOG_TABS.map((tab) => fullRange(tab)));
-    const [kategorien, leistungen] = KATALOG_TABS.map((tab, i) => {
+    const values = await this.api.batchGetValues(ANGEBOTS_TABS.map((tab) => fullRange(tab)));
+    const tables = ANGEBOTS_TABS.map((tab, i) => {
       const table = splitHeader(values[i]);
       assertColumns(SCHEMA[tab], table.header);
       this.headers.set(tab, table.header);
       return table;
     });
-    return { kategorien: entityRows('leistungskategorien', kategorien), leistungen: entityRows('leistungen', leistungen) };
+    return {
+      kategorien: entityRows('leistungskategorien', tables[0]),
+      leistungen: entityRows('leistungen', tables[1]),
+      angebote: entityRows('angebote', tables[2]),
+    };
   }
 
   private async header(tab: string): Promise<string[]> {

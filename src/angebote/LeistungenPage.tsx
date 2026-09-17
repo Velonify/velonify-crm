@@ -6,7 +6,7 @@ import { STARTKATALOG } from '../data/startkatalog';
 import type { Leistung, Leistungskategorie } from '../data/types';
 import { errorMessage } from '../lib/errors';
 import { KategorieDialog, LeistungDialog } from './KatalogDialoge';
-import { useKatalog } from './useKatalog';
+import { useAngebotsDaten } from './useAngebotsDaten';
 
 type Offen =
   | { art: 'kategorie'; kategorie?: Leistungskategorie }
@@ -27,7 +27,7 @@ function Pfeile({ label, oben, unten, onMove }: { label: string; oben: boolean; 
 }
 
 export function LeistungenPage() {
-  const { data, error, loading, reload, aendern } = useKatalog();
+  const { data, error, loading, reload, aendern } = useAngebotsDaten();
   const toast = useToast();
   const [sprache, setSprache] = useState<Sprache>('de');
   const [archivierte, setArchivierte] = useState(false);

@@ -1,4 +1,6 @@
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { AngebotePage } from './angebote/AngebotePage';
+import { AngebotPage } from './angebote/AngebotPage';
 import { LeistungenPage } from './angebote/LeistungenPage';
 import { useAuth } from './auth/AuthContext';
 import { Layout } from './components/Layout';
@@ -42,9 +44,10 @@ export function App() {
                 <Route path="import" element={<ImportPage />} />
               </Route>
               <Route path="angebote">
-                {/* Until the offer list exists, the tool opens on its catalogue. */}
-                <Route index element={<Navigate to="leistungen" replace />} />
+                <Route index element={<AngebotePage />} />
+                <Route path="neu" element={<AngebotPage />} />
                 <Route path="leistungen" element={<LeistungenPage />} />
+                <Route path=":id" element={<AngebotPage />} />
               </Route>
               <Route path="einrichtung" element={<EinrichtungPage />} />
               <Route path="pipeline" element={<AlteCrmAdresse />} />

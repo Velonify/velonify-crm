@@ -3,11 +3,11 @@ import { useCrm } from '../data/CrmContext';
 import type { CrmService } from '../data/crm';
 import { useLoad } from '../lib/useLoad';
 
-/** Loads the service catalogue for the offer tool; `aendern` runs a write and reloads it. */
-export function useKatalog() {
+/** Loads catalogue and offers for the offer tool; `aendern` runs a write and reloads them. */
+export function useAngebotsDaten() {
   const { service, mutate } = useCrm();
-  const katalog = useLoad(() => (service ? service.loadKatalog() : new Promise<never>(() => {})), [service]);
-  const { reload } = katalog;
+  const daten = useLoad(() => (service ? service.loadAngebotsDaten() : new Promise<never>(() => {})), [service]);
+  const { reload } = daten;
 
   const aendern = useCallback(
     async <T,>(action: (s: CrmService) => Promise<T>): Promise<T> => {
@@ -20,5 +20,5 @@ export function useKatalog() {
     [mutate, reload],
   );
 
-  return { ...katalog, aendern };
+  return { ...daten, aendern };
 }

@@ -66,13 +66,13 @@ describe('Leistungskatalog', () => {
     }
     const crmAlt = service(ohne);
     await expect(crmAlt.load()).resolves.toMatchObject({ firmen: [] });
-    await expect(crmAlt.loadKatalog()).rejects.toBeInstanceOf(SchemaError);
+    await expect(crmAlt.loadAngebotsDaten()).rejects.toBeInstanceOf(SchemaError);
   });
 
   it('takes over the start catalogue once, in order', async () => {
     const ergebnis = await crm.uebernimmStartkatalog();
     expect(ergebnis.kategorien).toBe(STARTKATALOG.length);
-    const baum = katalogBaum(await crm.loadKatalog());
+    const baum = katalogBaum(await crm.loadAngebotsDaten());
     expect(baum.map((k) => k.kategorie.titel_de)).toEqual(STARTKATALOG.map((k) => k.titel[0]));
     expect(baum[0].leistungen.map((l) => l.titel_en)).toEqual(STARTKATALOG[0].leistungen.map((l) => l.titel[1]));
     await expect(crm.uebernimmStartkatalog()).rejects.toBeInstanceOf(ValidationError);
@@ -86,19 +86,19 @@ describe('Leistungskatalog', () => {
     await crm.saveLeistung({ ...EMPTY_LEISTUNG_INPUT, kategorie_id: web.id, titel_de: 'Formular' });
 
     await crm.verschiebeKategorie(ads.id, -1);
-    let baum = katalogBaum(await crm.loadKatalog());
+    let baum = katalogBaum(await crm.loadAngebotsDaten());
     expect(baum.map((k) => k.kategorie.titel_de)).toEqual(['Ads', 'Website']);
 
     await crm.verschiebeLeistung(setup.id, 1);
-    baum = katalogBaum(await crm.loadKatalog());
+    baum = katalogBaum(await crm.loadAngebotsDaten());
     expect(baum[1].leistungen.map((l) => l.titel_de)).toEqual(['Formular', 'Setup']);
 
     const verschoben = await crm.saveLeistung({ ...EMPTY_LEISTUNG_INPUT, kategorie_id: ads.id, titel_de: 'Setup' }, { id: setup.id, expectedGeaendertAm: setup.geaendert_am });
-    baum = katalogBaum(await crm.loadKatalog());
+    baum = katalogBaum(await crm.loadAngebotsDaten());
     expect(baum[0].leistungen.map((l) => l.id)).toEqual([verschoben.id]);
 
     await crm.setKategorieArchiviert(web.id, true, web.geaendert_am);
-    const katalog = await crm.loadKatalog();
+    const katalog = await crm.loadAngebotsDaten();
     expect(katalogBaum(katalog).map((k) => k.kategorie.titel_de)).toEqual(['Ads']);
     expect(katalogBaum(katalog, true)).toHaveLength(2);
   });

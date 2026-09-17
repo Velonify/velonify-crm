@@ -3,6 +3,7 @@ import { NotConfiguredError, NotFoundError, ValidationError } from './errors';
 import type { CalendarApi, CalendarEvent } from './google/calendar';
 import { isFolder, type DriveApi, type DriveFile } from './google/drive';
 import { ID_PREFIX, isoDate, newId } from './ids';
+import { anzahlPosten, prepareAngebot, statusLabel } from './angebote';
 import type { ImportPlan } from './importCsv';
 import { naechsteSortierung, prepareKategorie, prepareLeistung, verschiebe } from './katalog';
 import {
@@ -19,6 +20,9 @@ import { STARTKATALOG } from './startkatalog';
 import type { Store } from './store';
 import type {
   Aktivitaet,
+  Angebot,
+  AngebotInput,
+  AngebotsDaten,
   AktivitaetInput,
   Database,
   Deal,
@@ -26,7 +30,6 @@ import type {
   Einstellungen,
   Firma,
   FirmaInput,
-  Katalog,
   Kontakt,
   KontaktInput,
   Leistung,
@@ -299,8 +302,8 @@ export class CrmService {
 
   // ─── Leistungskatalog ──────────────────────────────────────────────────────
 
-  loadKatalog(): Promise<Katalog> {
-    return this.store.loadKatalog();
+  loadAngebotsDaten(): Promise<AngebotsDaten> {
+    return this.store.loadAngebotsDaten();
   }
 
   async saveKategorie(input: LeistungskategorieInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<Leistungskategorie> {
@@ -311,7 +314,7 @@ export class CrmService {
       ]);
       return kategorie;
     }
-    const katalog = await this.store.loadKatalog();
+    const katalog = await this.store.loadAngebotsDaten();
     const kategorie: Leistungskategorie = {
       ...clean,
       id: newId(ID_PREFIX.leistungskategorien),
@@ -325,7 +328,7 @@ export class CrmService {
 
   async saveLeistung(input: LeistungInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<Leistung> {
     const clean = prepareLeistung(input);
-    const katalog = await this.store.loadKatalog();
+    const katalog = await this.store.loadAngebotsDaten();
     CrmService.find(katalog.kategorien, clean.kategorie_id);
     const inKategorie = katalog.leistungen.filter((l) => l.kategorie_id === clean.kategorie_id && l.id !== existing?.id);
 
@@ -355,14 +358,14 @@ export class CrmService {
 
   /** Moves a category one place up or down among the active categories. */
   async verschiebeKategorie(id: string, richtung: -1 | 1): Promise<void> {
-    const katalog = await this.store.loadKatalog();
+    const katalog = await this.store.loadAngebotsDaten();
     const aktive = katalog.kategorien.filter((k) => !k.archiviert);
     await this.store.update('leistungskategorien', verschiebe(aktive, id, richtung).map(({ id: kid, sortierung }) => ({ id: kid, changes: { sortierung } })));
   }
 
   /** Moves a sub-item one place up or down within its category. */
   async verschiebeLeistung(id: string, richtung: -1 | 1): Promise<void> {
-    const katalog = await this.store.loadKatalog();
+    const katalog = await this.store.loadAngebotsDaten();
     const leistung = CrmService.find(katalog.leistungen, id);
     const geschwister = katalog.leistungen.filter((l) => l.kategorie_id === leistung.kategorie_id && !l.archiviert);
     await this.store.update('leistungen', verschiebe(geschwister, id, richtung).map(({ id: lid, sortierung }) => ({ id: lid, changes: { sortierung } })));
@@ -370,7 +373,7 @@ export class CrmService {
 
   /** Fills an empty catalogue with the start catalogue. Refuses once anything exists, so nothing is duplicated. */
   async uebernimmStartkatalog(): Promise<{ kategorien: number; leistungen: number }> {
-    const katalog = await this.store.loadKatalog();
+    const katalog = await this.store.loadAngebotsDaten();
     if (katalog.kategorien.length > 0) {
       throw new ValidationError('katalog', 'Der Katalog enthält schon Hauptkategorien. Der Startkatalog wird nur in einen leeren Katalog übernommen.');
     }
@@ -407,6 +410,56 @@ export class CrmService {
     await this.store.insert('leistungskategorien', kategorien);
     await this.store.insert('leistungen', leistungen);
     return { kategorien: kategorien.length, leistungen: leistungen.length };
+  }
+
+  // ─── Angebote ──────────────────────────────────────────────────────────────
+
+  async saveAngebot(input: AngebotInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<Angebot> {
+    const daten = await this.store.loadAngebotsDaten();
+    const clean = prepareAngebot(input, daten.angebote, existing?.id);
+    const db = await this.store.load();
+    const firma = CrmService.find(db.firmen, clean.firma_id);
+    if (clean.deal_id && CrmService.find(db.deals, clean.deal_id).firma_id !== firma.id) {
+      throw new ValidationError('deal_id', 'Der Deal gehört zu einer anderen Firma.');
+    }
+    if (clean.kontakt_id && CrmService.find(db.kontakte, clean.kontakt_id).firma_id !== firma.id) {
+      throw new ValidationError('kontakt_id', 'Der Ansprechpartner gehört zu einer anderen Firma.');
+    }
+    const felder = { ...clean, auswahl: JSON.stringify(clean.auswahl) };
+
+    if (existing) {
+      const [angebot] = await this.store.update('angebote', [
+        { id: existing.id, changes: { ...felder, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm },
+      ]);
+      return angebot;
+    }
+    const angebot: Angebot = {
+      ...felder,
+      id: newId(ID_PREFIX.angebote),
+      version: 1,
+      status: 'entwurf',
+      sheet_id: '',
+      pdf_id: '',
+      summe_einmalig_eur: null,
+      summe_monatlich_eur: null,
+      summe_optional_eur: null,
+      archiviert: false,
+      ...this.created(),
+    };
+    await this.store.insert('angebote', [angebot]);
+    await this.log({
+      firma_id: firma.id,
+      kontakt_id: clean.kontakt_id,
+      deal_id: clean.deal_id,
+      typ: 'system',
+      text: `Angebot ${angebot.nummer} angelegt: ${angebot.titel} (${anzahlPosten(clean.auswahl)} Leistungen, ${statusLabel(angebot.status)})`,
+    });
+    return angebot;
+  }
+
+  async setAngebotArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<Angebot> {
+    const [angebot] = await this.store.update('angebote', [{ id, changes: { archiviert, ...this.changed() }, expectedGeaendertAm }]);
+    return angebot;
   }
 
   // ─── Google Drive ──────────────────────────────────────────────────────────
