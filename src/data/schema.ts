@@ -50,6 +50,18 @@ export const SCHEMA = {
       'erstellt_von', 'erstellt_am',
     ],
   },
+  leistungskategorien: {
+    name: 'leistungskategorien',
+    columns: ['id', 'titel_de', 'titel_en', 'umfang_de', 'umfang_en', 'abrechnung', 'sortierung', 'archiviert', ...META],
+    numeric: ['sortierung'],
+    boolean: ['archiviert'],
+  },
+  leistungen: {
+    name: 'leistungen',
+    columns: ['id', 'kategorie_id', 'titel_de', 'titel_en', 'text_de', 'text_en', 'sortierung', 'archiviert', ...META],
+    numeric: ['sortierung'],
+    boolean: ['archiviert'],
+  },
   listen: {
     name: 'listen',
     columns: ['liste', 'wert'],
@@ -62,8 +74,11 @@ export const SCHEMA = {
 
 export type TabName = keyof typeof SCHEMA;
 
+/** Tabs the CRM loads on start. */
 export const ENTITY_TABS = ['firmen', 'kontakte', 'deals', 'aktivitaeten', 'wiedervorlagen'] as const;
-export type EntityTab = (typeof ENTITY_TABS)[number];
+/** Tabs of the offer tool, loaded only when it is opened – so the CRM keeps working before they are set up. */
+export const KATALOG_TABS = ['leistungskategorien', 'leistungen'] as const;
+export type EntityTab = (typeof ENTITY_TABS)[number] | (typeof KATALOG_TABS)[number];
 
 /** Editable select values, written to the "listen" tab on setup and maintained there afterwards. */
 export const LISTEN_DEFAULTS: Record<string, string[]> = {

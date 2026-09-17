@@ -1,5 +1,5 @@
 import type { EntityTab } from './schema';
-import type { Database, Einstellungen, EntityMap } from './types';
+import type { Database, Einstellungen, EntityMap, Katalog } from './types';
 
 export interface RecordUpdate<T> {
   id: string;
@@ -14,6 +14,8 @@ export interface RecordUpdate<T> {
  */
 export interface Store {
   load(): Promise<Database>;
+  /** Service catalogue of the offer tool. Throws SchemaError while its tabs are not set up. */
+  loadKatalog(): Promise<Katalog>;
   insert<K extends EntityTab>(tab: K, records: EntityMap[K][]): Promise<void>;
   /** All updates of one call are checked first and then written together. */
   update<K extends EntityTab>(tab: K, updates: RecordUpdate<EntityMap[K]>[]): Promise<EntityMap[K][]>;

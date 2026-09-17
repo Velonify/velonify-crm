@@ -1,7 +1,7 @@
 import { ConflictError, NotFoundError, SchemaError } from '../errors';
-import { ENTITY_TABS, LISTEN_DEFAULTS, SCHEMA, type EntityTab, type TabSchema } from '../schema';
+import { ENTITY_TABS, KATALOG_TABS, LISTEN_DEFAULTS, SCHEMA, type EntityTab, type TabSchema } from '../schema';
 import type { RecordUpdate, Store } from '../store';
-import type { Database, Einstellungen, EntityMap, Listen } from '../types';
+import type { Database, Einstellungen, EntityMap, Katalog, Listen } from '../types';
 import { columnLetter, recordToRow, rowToRecord } from './rows';
 import { quoteTab, type SheetsApi, type ValueWrite } from './sheetsClient';
 
@@ -11,6 +11,13 @@ const fullRange = (tab: string) => `${quoteTab(tab)}!A1:ZZ`;
 function splitHeader(values: unknown[][]): { header: string[]; rows: unknown[][] } {
   const [headerRow = [], ...rows] = values;
   return { header: headerRow.map((cell) => String(cell ?? '').trim()), rows };
+}
+
+function entityRows<K extends EntityTab>(tab: K, table: { header: string[]; rows: unknown[][] }): EntityMap[K][] {
+  const idIndex = table.header.indexOf('id');
+  return table.rows
+    .filter((row) => String(row[idIndex] ?? '').trim() !== '')
+    .map((row) => rowToRecord(SCHEMA[tab], table.header, row) as unknown as EntityMap[K]);
 }
 
 function assertColumns(schema: TabSchema, header: string[]): void {
@@ -41,13 +48,7 @@ export class SheetStore implements Store {
       parsed.set(schema.name, table);
     });
 
-    const entities = <K extends EntityTab>(tab: K): EntityMap[K][] => {
-      const { header, rows } = parsed.get(tab)!;
-      const idIndex = header.indexOf('id');
-      return rows
-        .filter((row) => String(row[idIndex] ?? '').trim() !== '')
-        .map((row) => rowToRecord(SCHEMA[tab], header, row) as unknown as EntityMap[K]);
-    };
+    const entities = <K extends EntityTab>(tab: K): EntityMap[K][] => entityRows(tab, parsed.get(tab)!);
 
     const listen: Listen = {};
     for (const row of plainRows(parsed.get('listen')!, SCHEMA.listen)) {
@@ -72,6 +73,22 @@ export class SheetStore implements Store {
       listen: { ...LISTEN_DEFAULTS, ...listen },
       einstellungen,
     };
+  }
+
+  async loadKatalog(): Promise<Katalog> {
+    const info = await this.api.getSpreadsheet();
+    const vorhanden = new Set(info.sheets?.map((sheet) => sheet.properties.title));
+    if (KATALOG_TABS.some((tab) => !vorhanden.has(tab))) {
+      throw new SchemaError('Der Leistungskatalog ist noch nicht eingerichtet. Bitte unter „Einrichtung“ auf „Einrichten“ klicken.');
+    }
+    const values = await this.api.batchGetValues(KATALOG_TABS.map((tab) => fullRange(tab)));
+    const [kategorien, leistungen] = KATALOG_TABS.map((tab, i) => {
+      const table = splitHeader(values[i]);
+      assertColumns(SCHEMA[tab], table.header);
+      this.headers.set(tab, table.header);
+      return table;
+    });
+    return { kategorien: entityRows('leistungskategorien', kategorien), leistungen: entityRows('leistungen', leistungen) };
   }
 
   private async header(tab: string): Promise<string[]> {
