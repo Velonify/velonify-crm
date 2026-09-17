@@ -154,7 +154,7 @@ export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel, al
             {error instanceof DuplicateError && (
               <>
                 {' '}
-                <Link to={`/firmen/${error.existingId}`}>Zur Firma</Link>
+                <Link to={`/crm/firmen/${error.existingId}`}>Zur Firma</Link>
               </>
             )}
           </span>
@@ -167,7 +167,7 @@ export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel, al
           <ul className="dubletten-liste">
             {dubletten.map((t) => (
               <li key={t.firma.id}>
-                <Link to={`/firmen/${t.firma.id}`} target="_blank" rel="noopener">
+                <Link to={`/crm/firmen/${t.firma.id}`} target="_blank" rel="noopener">
                   {t.firma.name}
                   {t.firma.domain && ` (${t.firma.domain})`}
                 </Link>{' '}

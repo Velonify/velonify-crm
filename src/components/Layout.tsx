@@ -3,6 +3,7 @@ import { useAuth } from '../auth/AuthContext';
 import { isDemo } from '../config';
 import { useCrm } from '../data/CrmContext';
 import { useTheme } from '../lib/useTheme';
+import { GEPLANTE_WERKZEUGE } from '../werkzeuge';
 import { Suche } from './Suche';
 
 const navClass = ({ isActive }: { isActive: boolean }) => `nav-item${isActive ? ' is-active' : ''}`;
@@ -18,27 +19,40 @@ export function Layout() {
       {/* In light mode the sidebar is brand espresso; in dark mode it joins the dark theme. */}
       <aside className="sidebar" data-theme={theme === 'dark' ? 'dark' : 'espresso'}>
         <div className="brand">
-          <Link to="/" className="lockup" aria-label="Velonify CRM – Mein Tag">
+          <Link to="/" className="lockup" aria-label="Velonify – Start">
             <img src="./zeichen-eisblau.png" alt="" />
             <span className="wordmark">Velonify</span>
           </Link>
-          <div className="brand-sub">CRM</div>
+          <div className="brand-sub">Intern</div>
           {loading && db && <span className="sync-dot" title="Wird aktualisiert …" aria-label="Wird aktualisiert" />}
         </div>
         <Suche />
         <nav className="nav">
           <NavLink to="/" end className={navClass}>
-            Mein Tag
+            Start
           </NavLink>
-          <NavLink to="/pipeline" className={navClass}>
-            Pipeline
-          </NavLink>
-          <NavLink to="/firmen" className={navClass}>
-            Firmen
-          </NavLink>
-          <NavLink to="/import" className={navClass}>
-            Import
-          </NavLink>
+          <div className="nav-group" role="group" aria-labelledby="nav-crm">
+            <span className="nav-group-label" id="nav-crm">
+              CRM
+            </span>
+            <NavLink to="/crm" end className={navClass}>
+              Mein Tag
+            </NavLink>
+            <NavLink to="/crm/pipeline" className={navClass}>
+              Pipeline
+            </NavLink>
+            <NavLink to="/crm/firmen" className={navClass}>
+              Firmen
+            </NavLink>
+            <NavLink to="/crm/import" className={navClass}>
+              Import
+            </NavLink>
+          </div>
+          {GEPLANTE_WERKZEUGE.map((w) => (
+            <span key={w.name} className="nav-item is-planned" title={`${w.titel}: in Planung`}>
+              {w.name} <span className="nav-tag">bald</span>
+            </span>
+          ))}
         </nav>
         <div className="sidebar-footer">
           <NavLink to="/einrichtung" className={navClass}>

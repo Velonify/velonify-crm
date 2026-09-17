@@ -65,7 +65,7 @@ function SuchDialog({ onClose }: { onClose(): void }) {
 
   const oeffne = (t: Treffer) => {
     onClose();
-    navigate(`/firmen/${t.firmaId}`);
+    navigate(`/crm/firmen/${t.firmaId}`);
   };
 
   const onKeyDown = (event: React.KeyboardEvent) => {

@@ -1,4 +1,4 @@
-import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
 import { Layout } from './components/Layout';
 import { ReauthDialog } from './components/ReauthDialog';
@@ -12,6 +12,13 @@ import { ImportPage } from './pages/ImportPage';
 import { LoginPage } from './pages/LoginPage';
 import { MeinTagPage } from './pages/MeinTagPage';
 import { PipelinePage } from './pages/PipelinePage';
+import { StartPage } from './pages/StartPage';
+
+/** Links from before the start page (/#/firmen/…) now live under /crm. */
+function AlteCrmAdresse() {
+  const { pathname, search } = useLocation();
+  return <Navigate to={`/crm${pathname}${search}`} replace />;
+}
 
 export function App() {
   const { state } = useAuth();
@@ -24,13 +31,19 @@ export function App() {
         <HashRouter>
           <Routes>
             <Route element={<Layout />}>
-              <Route index element={<MeinTagPage />} />
-              <Route path="pipeline" element={<PipelinePage />} />
-              <Route path="firmen" element={<FirmenListePage />} />
-              <Route path="firmen/neu" element={<FirmaNeuPage />} />
-              <Route path="firmen/:id" element={<FirmaAktePage />} />
-              <Route path="import" element={<ImportPage />} />
+              <Route index element={<StartPage />} />
+              <Route path="crm">
+                <Route index element={<MeinTagPage />} />
+                <Route path="pipeline" element={<PipelinePage />} />
+                <Route path="firmen" element={<FirmenListePage />} />
+                <Route path="firmen/neu" element={<FirmaNeuPage />} />
+                <Route path="firmen/:id" element={<FirmaAktePage />} />
+                <Route path="import" element={<ImportPage />} />
+              </Route>
               <Route path="einrichtung" element={<EinrichtungPage />} />
+              <Route path="pipeline" element={<AlteCrmAdresse />} />
+              <Route path="firmen/*" element={<AlteCrmAdresse />} />
+              <Route path="import" element={<AlteCrmAdresse />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

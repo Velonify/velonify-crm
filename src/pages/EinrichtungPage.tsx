@@ -3,7 +3,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/Toasts';
 import { Card, ErrorBox, FormError, Loading, PageHeader } from '../components/ui';
 import { config, isDemo, spreadsheetUrl } from '../config';
-import { DEFAULT_DEAL_TITEL, DRIVE_ORDNER_NAMEN, EINSTELLUNG } from '../data/constants';
+import { DEFAULT_DEAL_TITEL, DRIVE_ORDNER_NAMEN, EINSTELLUNG, FIRMEN_LINKS } from '../data/constants';
 import { useCrm } from '../data/CrmContext';
 import { AuthExpiredError } from '../data/errors';
 import { driveFolderUrl, type DriveFile } from '../data/google/drive';
@@ -222,6 +222,51 @@ function TeamKarte() {
   );
 }
 
+function LinksKarte() {
+  const { db, mutate } = useCrm();
+  const toast = useToast();
+  const [werte, setWerte] = useState<Record<string, string>>(() => Object.fromEntries(FIRMEN_LINKS.map((l) => [l.einstellung, db?.einstellungen[l.einstellung] ?? ''])));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>();
+  const ungueltig = FIRMEN_LINKS.filter((l) => werte[l.einstellung].trim() && !/^https:\/\/\S+$/i.test(werte[l.einstellung].trim()));
+
+  const speichern = async () => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      const bereinigt = Object.fromEntries(Object.entries(werte).map(([k, v]) => [k, v.trim()]));
+      await mutate((s) => s.saveEinstellungen(bereinigt));
+      setWerte(bereinigt);
+      toast.show('Links gespeichert');
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card title="4. Links auf der Startseite">
+      <p className="muted">Firmenweite Adressen für den Schnellzugriff. Leere Felder erscheinen nicht auf der Startseite.</p>
+      <div className="grid">
+        {FIRMEN_LINKS.map((l) => (
+          <label key={l.einstellung} className={`field${ungueltig.includes(l) ? ' invalid' : ''}`}>
+            <span className="field-label">{l.label}</span>
+            <input type="url" value={werte[l.einstellung]} onChange={(e) => setWerte((w) => ({ ...w, [l.einstellung]: e.target.value }))} placeholder="https://…" />
+            <small className="field-hint">{ungueltig.includes(l) ? 'Muss mit https:// beginnen.' : l.hinweis}</small>
+          </label>
+        ))}
+      </div>
+      <FormError error={error} />
+      <div className="form-actions">
+        <button type="button" className="button primary" onClick={speichern} disabled={busy || ungueltig.length > 0}>
+          {busy ? 'Speichert …' : 'Speichern'}
+        </button>
+      </div>
+    </Card>
+  );
+}
+
 export function EinrichtungPage() {
   const { db, error } = useCrm();
   return (
@@ -241,6 +286,7 @@ export function EinrichtungPage() {
       {/* Remount once data is there, so the fields start with the saved values. */}
       <DriveKarte key={db ? 'bereit' : 'laedt'} />
       <TeamKarte />
+      <LinksKarte key={db ? 'bereit' : 'laedt'} />
     </div>
   );
 }
