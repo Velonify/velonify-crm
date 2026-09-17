@@ -13,7 +13,7 @@
       // Theme before first paint, so dark-mode users see no white flash. Same rule as src/lib/useTheme.ts.
       try {
         var t = localStorage.getItem('velonify-crm.theme');
-        document.documentElement.dataset.theme = t === 'light' || t === 'espresso' ? t : matchMedia('(prefers-color-scheme: dark)').matches ? 'espresso' : 'light';
+        document.documentElement.dataset.theme = t === 'light' ? 'light' : t === 'dark' || t === 'espresso' || matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       } catch (e) {}
     </script>
   </head>

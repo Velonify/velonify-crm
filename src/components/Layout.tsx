@@ -15,8 +15,8 @@ export function Layout() {
 
   return (
     <div className="app">
-      {/* The sidebar is always espresso ("Design & Intern"); the content follows the chosen theme. */}
-      <aside className="sidebar" data-theme="espresso">
+      {/* In light mode the sidebar is brand espresso; in dark mode it joins the dark theme. */}
+      <aside className="sidebar" data-theme={theme === 'dark' ? 'dark' : 'espresso'}>
         <div className="brand">
           <Link to="/" className="lockup" aria-label="Velonify CRM – Mein Tag">
             <img src="./zeichen-eisblau.png" alt="" />
@@ -48,8 +48,8 @@ export function Layout() {
             <button type="button" role="radio" aria-checked={theme === 'light'} className={theme === 'light' ? 'is-active' : ''} onClick={() => setTheme('light')}>
               Hell
             </button>
-            <button type="button" role="radio" aria-checked={theme === 'espresso'} className={theme === 'espresso' ? 'is-active' : ''} onClick={() => setTheme('espresso')}>
-              Espresso
+            <button type="button" role="radio" aria-checked={theme === 'dark'} className={theme === 'dark' ? 'is-active' : ''} onClick={() => setTheme('dark')}>
+              Dunkel
             </button>
           </div>
           {user && (

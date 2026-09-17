@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
-/** Velonify themes: "light" for official documents, "espresso" for internal and design work. */
-export type Theme = 'light' | 'espresso';
+/** "light" is the design system's light theme; "dark" the app's own, eye-friendly dark mode. */
+export type Theme = 'light' | 'dark';
 
 const KEY = 'velonify-crm.theme';
 const dark = () => window.matchMedia('(prefers-color-scheme: dark)');
@@ -9,21 +9,22 @@ const dark = () => window.matchMedia('(prefers-color-scheme: dark)');
 function read(): Theme | null {
   try {
     const value = localStorage.getItem(KEY);
-    return value === 'light' || value === 'espresso' ? value : null;
+    if (value === 'espresso') return 'dark'; // stored by the first redesign draft
+    return value === 'light' || value === 'dark' ? value : null;
   } catch {
     return null;
   }
 }
 
-/** The active theme: picked once in this browser, otherwise light or espresso following the system's dark mode. */
+/** The active theme: picked once in this browser, otherwise light or dark following the system's dark mode. */
 export function useTheme(): [Theme, (theme: Theme) => void] {
   const [gewaehlt, setGewaehlt] = useState<Theme | null>(read);
-  const [system, setSystem] = useState<Theme>(() => (dark().matches ? 'espresso' : 'light'));
+  const [system, setSystem] = useState<Theme>(() => (dark().matches ? 'dark' : 'light'));
   const theme = gewaehlt ?? system;
 
   useEffect(() => {
     const media = dark();
-    const onChange = () => setSystem(media.matches ? 'espresso' : 'light');
+    const onChange = () => setSystem(media.matches ? 'dark' : 'light');
     media.addEventListener('change', onChange);
     return () => media.removeEventListener('change', onChange);
   }, []);
