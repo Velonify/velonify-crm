@@ -24,6 +24,7 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   const shared = drive.add('Velonify', null);
   const sales = drive.add('02_Sales', shared.id);
   const leads = drive.add('01_Leads', sales.id);
+  const proposals = drive.add('02_Proposals', sales.id);
   const clients = drive.add('01_Clients', shared.id);
   const templates = drive.add('03_Templates', shared.id);
   const vorlage = drive.add('01_Client-Folder-Template', templates.id);
@@ -41,11 +42,14 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
     drive,
     calendar,
     currentUser: () => (seeding ? 'demo@velonify.de' : currentUser()),
+    // Calculation sheets live in memory too; their links lead nowhere.
+    tabelle: () => new MemorySheets('Kalkulation (Demo)'),
   });
   await service.saveEinstellungen({
     [EINSTELLUNG.leadsOrdner]: leads.id,
     [EINSTELLUNG.clientsOrdner]: clients.id,
     [EINSTELLUNG.vorlageOrdner]: vorlage.id,
+    [EINSTELLUNG.proposalsOrdner]: proposals.id,
   });
 
   const heute = isoDate(new Date());

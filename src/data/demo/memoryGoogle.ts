@@ -36,6 +36,11 @@ export class MemoryDrive implements DriveApi {
     return { ...this.add(name, parentId) };
   }
 
+  async createFile(name: string, mimeType: string, parentId: string): Promise<DriveFile> {
+    await this.getFile(parentId);
+    return { ...this.add(name, parentId, mimeType) };
+  }
+
   async copyFile(fileId: string, name: string, parentId: string): Promise<DriveFile> {
     const source = await this.getFile(fileId);
     return { ...this.add(name, parentId, source.mimeType) };

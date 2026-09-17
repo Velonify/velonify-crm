@@ -103,6 +103,7 @@ const ORDNER: { key: OrdnerSchluessel; einstellung: string; label: string; hinwe
   { key: 'leads', einstellung: EINSTELLUNG.leadsOrdner, label: 'Lead-Ordner', hinweis: '02_Sales/01_Leads – hier entstehen neue Lead-Ordner' },
   { key: 'clients', einstellung: EINSTELLUNG.clientsOrdner, label: 'Kunden-Ordner', hinweis: '01_Clients – hierhin wandern Leads bei „Angebot“' },
   { key: 'vorlage', einstellung: EINSTELLUNG.vorlageOrdner, label: 'Ordnervorlage', hinweis: '03_Templates/01_Client-Folder-Template (optional)' },
+  { key: 'proposals', einstellung: EINSTELLUNG.proposalsOrdner, label: 'Angebote', hinweis: '02_Sales/02_Proposals – Kalkulationen für Firmen ohne eigenen Ordner' },
 ];
 
 function DriveKarte() {

@@ -1,11 +1,14 @@
 import { DEFAULT_DEAL_TITEL, EINSTELLUNG, isAbgeschlossen, phaseLabel, PHASEN, type Phase } from './constants';
 import { NotConfiguredError, NotFoundError, ValidationError } from './errors';
 import type { CalendarApi, CalendarEvent } from './google/calendar';
-import { isFolder, type DriveApi, type DriveFile } from './google/drive';
-import { ID_PREFIX, isoDate, newId } from './ids';
-import { anzahlPosten, prepareAngebot, statusLabel } from './angebote';
+import { isFolder, SPREADSHEET_MIME, type DriveApi, type DriveFile } from './google/drive';
+import { addDays, ID_PREFIX, isoDate, newId } from './ids';
+import { anzahlPosten, parseAuswahl, prepareAngebot, statusLabel } from './angebote';
 import { ANSCHREIBEN_STATUS, prepareAnschreiben, prepareOutreachLeistung, verlaufText, type AnschreibenInput } from './anschreiben';
 import type { ImportPlan } from './importCsv';
+import { baueKalkulation, kalkulationsThema } from './kalkulation';
+import type { SheetsApi } from './sheets/sheetsClient';
+import { dateiname } from '../lib/dateiname';
 import { naechsteSortierung, prepareKategorie, prepareLeistung, verschiebe } from './katalog';
 import {
   driveFolderName,
@@ -53,6 +56,15 @@ export interface CrmDeps {
   calendar: CalendarApi;
   currentUser: () => string;
   now?: () => Date;
+  /** Sheets access to another spreadsheet than the CRM database, e.g. an offer's calculation sheet. */
+  tabelle?: (spreadsheetId: string) => SheetsApi;
+}
+
+export interface KalkulationsErgebnis {
+  angebot: Angebot;
+  datei: DriveFile;
+  /** Where the file was put: the firm's folder (or its 00_Account) or the central proposals folder */
+  ort: 'firma' | 'proposals';
 }
 
 export type OrdnerOrt = 'leads' | 'clients' | 'andere';
@@ -86,6 +98,7 @@ export class CrmService {
   private readonly calendar: CalendarApi;
   private readonly currentUser: () => string;
   private readonly now: () => Date;
+  private readonly tabelle?: (spreadsheetId: string) => SheetsApi;
 
   constructor(deps: CrmDeps) {
     this.store = deps.store;
@@ -93,6 +106,7 @@ export class CrmService {
     this.calendar = deps.calendar;
     this.currentUser = deps.currentUser;
     this.now = deps.now ?? (() => new Date());
+    this.tabelle = deps.tabelle;
   }
 
   load(): Promise<Database> {
@@ -461,6 +475,76 @@ export class CrmService {
       text: `Angebot ${angebot.nummer} angelegt: ${angebot.titel} (${anzahlPosten(clean.auswahl)} Leistungen, ${statusLabel(angebot.status)})`,
     });
     return angebot;
+  }
+
+  /** Folder for an offer's files: the firm's 00_Account (or the firm folder itself), otherwise 02_Sales/02_Proposals. */
+  async angebotsOrdner(db: Database, firma: Firma): Promise<{ id: string; ort: 'firma' | 'proposals' } | null> {
+    if (firma.drive_ordner_id) {
+      const account = (await this.drive.listChildren(firma.drive_ordner_id)).find((f) => isFolder(f) && f.name === '00_Account');
+      return { id: account?.id ?? firma.drive_ordner_id, ort: 'firma' };
+    }
+    const proposals = db.einstellungen[EINSTELLUNG.proposalsOrdner];
+    return proposals ? { id: proposals, ort: 'proposals' } : null;
+  }
+
+  /** Creates the calculation sheet for a saved offer: selected services as rows, prices to be filled in by hand. */
+  async legeKalkulationAn(angebotId: string, expectedGeaendertAm: string): Promise<KalkulationsErgebnis> {
+    if (!this.tabelle) throw new NotConfiguredError('Kalkulations-Sheets können hier nicht angelegt werden.');
+    const daten = await this.store.loadAngebotsDaten();
+    const angebot = CrmService.find(daten.angebote, angebotId);
+    if (angebot.geaendert_am !== expectedGeaendertAm) {
+      throw new ValidationError('angebot', 'Das Angebot wurde inzwischen geändert. Bitte neu laden und erneut versuchen.');
+    }
+    if (angebot.sheet_id) throw new ValidationError('sheet_id', 'Für dieses Angebot gibt es schon ein Kalkulations-Sheet.');
+    const auswahl = parseAuswahl(angebot.auswahl);
+    if (anzahlPosten(auswahl) === 0) throw new ValidationError('auswahl', 'Das Angebot enthält keine Leistungen.');
+
+    const db = await this.store.load();
+    const firma = CrmService.find(db.firmen, angebot.firma_id);
+    const ordner = await this.angebotsOrdner(db, firma);
+    if (!ordner) {
+      throw new NotConfiguredError(`„${firma.name}“ hat keinen Drive-Ordner, und der Ordner „02_Proposals“ ist noch nicht eingerichtet (Einrichtung → Google Drive).`);
+    }
+    const kontakt = db.kontakte.find((k) => k.id === angebot.kontakt_id);
+    const heute = this.today();
+    const name = dateiname({ datum: heute, kuerzel: firma.kuerzel, thema: kalkulationsThema(angebot.titel), version: angebot.version ?? 1 });
+
+    const datei = await this.drive.createFile(name, SPREADSHEET_MIME, ordner.id);
+    try {
+      await this.tabelle(datei.id).batchUpdate(
+      baueKalkulation({
+        nummer: angebot.nummer,
+        version: angebot.version ?? 1,
+        datum: heute,
+        gueltigBis: addDays(heute, 30),
+        firma: firma.name,
+        ansprechpartner: kontakt ? kontaktName(kontakt) : '',
+        titel: angebot.titel,
+        sprache: angebot.sprache === 'en' ? 'en' : 'de',
+        auswahl,
+      }),
+      );
+    } catch (err) {
+      // The empty file stays in Drive (nothing is deleted automatically); say so, so nobody keeps a half-built sheet.
+      const grund = err instanceof Error ? err.message : String(err);
+      throw new Error(`Die Datei „${name}“ wurde angelegt, konnte aber nicht befüllt werden: ${grund} Bitte die leere Datei in Drive archivieren und erneut versuchen.`);
+    }
+
+    const [aktualisiert] = await this.store.update('angebote', [
+      {
+        id: angebot.id,
+        changes: { sheet_id: datei.id, status: angebot.status === 'entwurf' ? 'kalkulation' : angebot.status, ...this.changed() },
+        expectedGeaendertAm,
+      },
+    ]);
+    await this.log({
+      firma_id: firma.id,
+      kontakt_id: angebot.kontakt_id,
+      deal_id: angebot.deal_id,
+      typ: 'system',
+      text: `Kalkulations-Sheet für Angebot ${angebot.nummer} angelegt: ${name}${ordner.ort === 'proposals' ? ' (in 02_Proposals)' : ''}`,
+    });
+    return { angebot: aktualisiert, datei, ort: ordner.ort };
   }
 
   async setAngebotArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<Angebot> {

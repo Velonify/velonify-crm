@@ -61,6 +61,7 @@ export const EINSTELLUNG = {
   leadsOrdner: 'drive_leads_ordner_id',
   clientsOrdner: 'drive_clients_ordner_id',
   vorlageOrdner: 'drive_vorlage_ordner_id',
+  proposalsOrdner: 'drive_proposals_ordner_id',
   dealTitel: 'deal_titel_standard',
 } as const;
 
@@ -80,4 +81,5 @@ export const DRIVE_ORDNER_NAMEN = {
   leads: '01_Leads',
   clients: '01_Clients',
   vorlage: '01_Client-Folder-Template',
+  proposals: '02_Proposals',
 } as const;

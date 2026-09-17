@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ErrorBox, Loading, PageHeader } from '../components/ui';
 import { ANGEBOT_STATUS, anzahlPosten, parseAuswahl, statusLabel } from '../data/angebote';
+import { isDemo } from '../config';
 import { useCrm } from '../data/CrmContext';
+import { spreadsheetFileUrl } from '../data/google/drive';
 import { relativeDays } from '../lib/format';
 import { useAngebotsDaten } from './useAngebotsDaten';
 
@@ -86,6 +88,14 @@ export function AngebotePage() {
                   </Link>
                   <div className="row-sub">
                     {firma?.kuerzel && <span className="kuerzel">{firma.kuerzel}</span>} {firma?.name ?? 'Firma nicht gefunden'}
+                    {a.sheet_id && !isDemo && (
+                      <>
+                        {' · '}
+                        <a href={spreadsheetFileUrl(a.sheet_id)} target="_blank" rel="noreferrer noopener" onClick={(e) => e.stopPropagation()}>
+                          Sheet ↗
+                        </a>
+                      </>
+                    )}
                   </div>
                 </td>
                 <td className="hide-sm">{a.sprache === 'en' ? 'Englisch' : 'Deutsch'}</td>
