@@ -227,6 +227,7 @@ export function EinrichtungPage() {
   return (
     <div className="page narrow">
       <PageHeader
+        eyebrow="System"
         title="Einrichtung"
         subtitle={isDemo ? 'Demo-Modus: Alles läuft mit einem Beispiel-Sheet im Browser.' : `Angemeldet für @${config.allowedDomain}`}
       />

@@ -64,6 +64,7 @@ export function PipelinePage() {
   return (
     <div className="page full">
       <PageHeader
+        eyebrow="Vertrieb"
         title="Pipeline"
         subtitle={`Offen: ${formatEuro(offenSumme)} · gewichtet ${formatEuro(offenGewichtet)}`}
         actions={
@@ -78,7 +79,7 @@ export function PipelinePage() {
               ))}
             </select>
             <button type="button" className="button primary" onClick={() => setDialog({})}>
-              + Deal
+              Deal anlegen
             </button>
           </>
         }
@@ -108,7 +109,7 @@ export function PipelinePage() {
               <h2>
                 {phaseLabel(spalte.phase)} <span className="count">{spalte.deals.length}</span>
               </h2>
-              <span className="muted small">{formatEuro(spalte.summe)}</span>
+              <span className="board-column-sum">{formatEuro(spalte.summe)}</span>
             </header>
             <ul className="board-cards">
               {spalte.deals.map(({ deal, firma }) => {

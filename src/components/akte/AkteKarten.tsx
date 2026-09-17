@@ -190,8 +190,6 @@ export function WiedervorlagenKarte({ firma, db, ich }: { firma: Firma; db: Data
 
 // ─── Verlauf ─────────────────────────────────────────────────────────────────
 
-const TYP_ICON: Record<string, string> = { notiz: '✎', anruf: '☎', mail: '✉', meeting: '◷', phasenwechsel: '➜', system: '⚙' };
-
 export function VerlaufKarte({ firma, db }: { firma: Firma; db: Database }) {
   const { mutate } = useCrm();
   const toast = useToast();
@@ -245,7 +243,7 @@ export function VerlaufKarte({ firma, db }: { firma: Firma; db: Database }) {
           <div className="segmented" role="radiogroup" aria-label="Art">
             {AKTIVITAET_TYPEN.map((t) => (
               <button key={t} type="button" role="radio" aria-checked={typ === t} className={typ === t ? 'is-active' : ''} onClick={() => setTyp(t)}>
-                {TYP_ICON[t]} {AKTIVITAET_LABEL[t]}
+                {AKTIVITAET_LABEL[t]}
               </button>
             ))}
           </div>
@@ -283,9 +281,7 @@ export function VerlaufKarte({ firma, db }: { firma: Firma; db: Database }) {
       <ol className="timeline">
         {sichtbar.map((a: Aktivitaet) => (
           <li key={a.id} className={`timeline-item typ-${a.typ}`}>
-            <span className="timeline-icon" aria-hidden="true">
-              {TYP_ICON[a.typ] ?? '•'}
-            </span>
+            <span className="timeline-icon" aria-hidden="true" />
             <div>
               <div className="timeline-meta">
                 <strong>{AKTIVITAET_LABEL[a.typ] ?? a.typ}</strong> · {formatDateTime(a.datum)} · {shortUser(a.von)}

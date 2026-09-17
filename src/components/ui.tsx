@@ -48,10 +48,11 @@ export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => v
   );
 }
 
-export function PageHeader({ title, subtitle, actions }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
+export function PageHeader({ eyebrow, title, subtitle, actions }: { eyebrow?: ReactNode; title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
     <header className="page-header">
       <div className="page-title">
+        {eyebrow && <div className="eyebrow-mark">{eyebrow}</div>}
         <h1>{title}</h1>
         {subtitle && <div className="page-subtitle">{subtitle}</div>}
       </div>

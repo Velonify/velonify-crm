@@ -5,7 +5,6 @@ import { useCrm } from '../data/CrmContext';
 import { suche, type Treffer, type TrefferArt } from '../data/suche';
 
 const ART_LABEL: Record<TrefferArt, string> = { firma: 'Firmen', kontakt: 'Kontakte', deal: 'Deals' };
-const ART_ICON: Record<TrefferArt, string> = { firma: '🏢', kontakt: '👤', deal: '€' };
 const REIHENFOLGE: TrefferArt[] = ['firma', 'kontakt', 'deal'];
 
 export const istMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
@@ -32,7 +31,7 @@ export function Suche() {
         <span className="search-trigger-label">Suchen</span>
         <kbd>{istMac ? '⌘K' : 'Strg K'}</kbd>
       </button>
-      {/* Rendered at body level, so it does not inherit the dark sidebar's colours. */}
+      {/* Rendered at body level, so it follows the page theme, not the espresso sidebar. */}
       {offen && createPortal(<SuchDialog onClose={() => setOffen(false)} />, document.body)}
     </>
   );
@@ -133,9 +132,6 @@ function SuchDialog({ onClose }: { onClose(): void }) {
                         onMouseMove={() => aktiv !== i && setAktiv(i)}
                         onClick={() => oeffne(t)}
                       >
-                        <span className="search-icon" aria-hidden="true">
-                          {ART_ICON[t.art]}
-                        </span>
                         <span className="search-text">
                           <span className="search-title">{t.titel}</span>
                           <span className="search-details">
