@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AKTIVITAET_LABEL, AKTIVITAET_TYPEN, isAbgeschlossen, PHASEN, phaseLabel } from '../../data/constants';
 import { useCrm } from '../../data/CrmContext';
 import { isoDate } from '../../data/ids';
@@ -64,6 +65,11 @@ export function DealsKarte({ firma, db, ich, requestPhase }: { firma: Firma; db:
                   </div>
                 )}
                 {deal.phase === 'verloren' && deal.verlustgrund && <div className="row-sub">Grund: {deal.verlustgrund}</div>}
+                {!isAbgeschlossen(deal.phase) && !firma.archiviert && (
+                  <Link to={`/angebote/neu?firma=${firma.id}&deal=${deal.id}`} className="small">
+                    Angebot erstellen →
+                  </Link>
+                )}
               </div>
               <select
                 className="phase-select"

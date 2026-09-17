@@ -132,6 +132,67 @@ export interface Katalog {
   leistungen: Leistung[];
 }
 
+/** One chosen sub-item, with its texts copied in the offer's language (later catalogue edits do not change the offer). */
+export interface AuswahlPosten {
+  /** leistung_id for catalogue items, "manuell-…" for items added by hand */
+  schluessel: string;
+  leistung_id: string;
+  titel: string;
+  text: string;
+  notiz: string;
+}
+
+export interface AuswahlKategorie {
+  /** kategorie_id for catalogue categories, "eigen-…" for categories created in the offer */
+  schluessel: string;
+  kategorie_id: string;
+  titel: string;
+  umfang: string;
+  abrechnung: string;
+  /** Shown separately in sheet and PDF and not part of the total */
+  optional: boolean;
+  posten: AuswahlPosten[];
+}
+
+export interface Auswahl {
+  kategorien: AuswahlKategorie[];
+}
+
+export interface Angebot extends Meta {
+  id: string;
+  /** "2026/49" – shared by all versions of an offer */
+  nummer: string;
+  version: number | null;
+  sprache: string;
+  firma_id: string;
+  deal_id: string;
+  kontakt_id: string;
+  titel: string;
+  status: string;
+  /** Auswahl as JSON */
+  auswahl: string;
+  sheet_id: string;
+  pdf_id: string;
+  summe_einmalig_eur: number | null;
+  summe_monatlich_eur: number | null;
+  summe_optional_eur: number | null;
+  archiviert: boolean;
+}
+
+export interface AngebotInput {
+  nummer: string;
+  sprache: string;
+  firma_id: string;
+  deal_id: string;
+  kontakt_id: string;
+  titel: string;
+  auswahl: Auswahl;
+}
+
+export interface AngebotsDaten extends Katalog {
+  angebote: Angebot[];
+}
+
 export type Listen = Record<string, string[]>;
 export type Einstellungen = Record<string, string>;
 
@@ -143,6 +204,7 @@ export interface EntityMap {
   wiedervorlagen: Wiedervorlage;
   leistungskategorien: Leistungskategorie;
   leistungen: Leistung;
+  angebote: Angebot;
 }
 
 /** Everything the app knows, loaded in one go. */

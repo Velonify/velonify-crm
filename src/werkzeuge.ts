@@ -34,7 +34,11 @@ export const WERKZEUGE: Werkzeug[] = [
     name: 'Angebots-Rechner',
     beschreibung: 'Leistungen auswählen, im Sheet kalkulieren, Angebot als PDF',
     pfad: '/angebote',
-    navigation: [{ label: 'Leistungen', pfad: '/angebote/leistungen' }],
+    navigation: [
+      { label: 'Angebote', pfad: '/angebote', end: true },
+      { label: 'Neues Angebot', pfad: '/angebote/neu' },
+      { label: 'Leistungen', pfad: '/angebote/leistungen' },
+    ],
   },
 ];
 
