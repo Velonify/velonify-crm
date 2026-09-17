@@ -43,16 +43,7 @@ function useFormular<T>(start: T, aendern: Aendern, onClose: () => void) {
 
 export function KategorieDialog({ kategorie, aendern, onClose }: { kategorie?: Leistungskategorie; aendern: Aendern; onClose(): void }) {
   const start: LeistungskategorieInput = kategorie
-    ? {
-        titel_de: kategorie.titel_de,
-        titel_en: kategorie.titel_en,
-        umfang_de: kategorie.umfang_de,
-        umfang_en: kategorie.umfang_en,
-        abrechnung: kategorie.abrechnung || 'einmalig',
-        outreach_anlass: kategorie.outreach_anlass,
-        outreach_nutzen: kategorie.outreach_nutzen,
-        outreach_beleg: kategorie.outreach_beleg,
-      }
+    ? { titel_de: kategorie.titel_de, titel_en: kategorie.titel_en, umfang_de: kategorie.umfang_de, umfang_en: kategorie.umfang_en, abrechnung: kategorie.abrechnung || 'einmalig' }
     : EMPTY_KATEGORIE_INPUT;
   const f = useFormular(start, aendern, onClose);
   const invalid = fieldOf(f.error);
@@ -113,21 +104,6 @@ export function KategorieDialog({ kategorie, aendern, onClose }: { kategorie?: L
           <textarea rows={2} {...f.text('umfang_en')} />
         </Field>
       </div>
-      <fieldset className="plain outreach-felder">
-        <legend>Für den Contact Generator</legend>
-        <p className="small muted">Damit Claude weiß, womit diese Leistung in einer ersten Nachricht überzeugt. Nur auf Deutsch, Claude schreibt trotzdem in der gewählten Sprache.</p>
-        <div className="grid">
-          <Field label="Anlass" hint="Welches Problem oder welcher Anlass passt, z. B. „Magento 2.4.6 ohne Support seit 11.08.2026“">
-            <textarea rows={2} {...f.text('outreach_anlass')} />
-          </Field>
-          <Field label="Nutzen" hint="Was der Kunde davon hat, in 1–2 Sätzen">
-            <textarea rows={2} {...f.text('outreach_nutzen')} />
-          </Field>
-          <Field label="Beleg" hint="Referenz oder Zahl – Kundennamen nur mit Freigabe" wide>
-            <textarea rows={2} {...f.text('outreach_beleg')} />
-          </Field>
-        </div>
-      </fieldset>
       <FormError error={f.error} />
     </Dialog>
   );

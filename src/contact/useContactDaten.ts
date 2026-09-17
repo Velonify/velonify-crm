@@ -6,16 +6,10 @@ import { useCrm } from '../data/CrmContext';
 import type { CrmService } from '../data/crm';
 import { useLoad } from '../lib/useLoad';
 
-/** Catalogue and sent messages for the Contact Generator; `aendern` runs a write and reloads them. */
+/** Services and sent messages of the Contact Generator; `aendern` runs a write and reloads them. */
 export function useContactDaten() {
   const { service, mutate } = useCrm();
-  const daten = useLoad(
-    () =>
-      service
-        ? Promise.all([service.loadAngebotsDaten(), service.loadAnschreiben()]).then(([katalog, anschreiben]) => ({ katalog, anschreiben }))
-        : new Promise<never>(() => {}),
-    [service],
-  );
+  const daten = useLoad(() => (service ? service.loadContactDaten() : new Promise<never>(() => {})), [service]);
   const { reload } = daten;
 
   const aendern = useCallback(

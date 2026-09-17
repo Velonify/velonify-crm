@@ -1,7 +1,7 @@
 import { ConflictError, NotFoundError, SchemaError } from '../errors';
 import { ENTITY_TABS, ANGEBOTS_TABS, CONTACT_TABS, LISTEN_DEFAULTS, SCHEMA, type EntityTab, type TabSchema } from '../schema';
 import type { RecordUpdate, Store } from '../store';
-import type { AngebotsDaten, Anschreiben, Database, Einstellungen, EntityMap, Listen } from '../types';
+import type { AngebotsDaten, ContactDaten, Database, Einstellungen, EntityMap, Listen } from '../types';
 import { columnLetter, recordToRow, rowToRecord } from './rows';
 import { quoteTab, type SheetsApi, type ValueWrite } from './sheetsClient';
 
@@ -20,18 +20,8 @@ function entityRows<K extends EntityTab>(tab: K, table: { header: string[]; rows
     .map((row) => rowToRecord(SCHEMA[tab], table.header, row) as unknown as EntityMap[K]);
 }
 
-/** Refuses to drop a value silently because an optional column has not been set up yet. */
-function assertWritable(schema: TabSchema, header: string[], values: Record<string, unknown>): void {
-  const missing = (schema.optional ?? []).filter((column) => !header.includes(column) && String(values[column] ?? '').trim() !== '');
-  if (missing.length > 0) {
-    throw new SchemaError(
-      `Im Tabellenblatt „${schema.name}“ fehlen die Spalten ${missing.join(', ')}. Bitte unter „Einrichtung“ auf „Einrichten“ klicken und dann erneut speichern.`,
-    );
-  }
-}
-
 function assertColumns(schema: TabSchema, header: string[]): void {
-  const missing = schema.columns.filter((column) => !header.includes(column) && !schema.optional?.includes(column));
+  const missing = schema.columns.filter((column) => !header.includes(column));
   if (missing.length > 0) {
     throw new SchemaError(
       `Im Tabellenblatt „${schema.name}“ fehlen Spalten (${missing.join(', ')}). Bitte unter „Einrichtung“ auf „Einrichten“ klicken.`,
@@ -105,16 +95,20 @@ export class SheetStore implements Store {
     };
   }
 
-  async loadAnschreiben(): Promise<Anschreiben[]> {
+  async loadContactDaten(): Promise<ContactDaten> {
     const info = await this.api.getSpreadsheet();
     const vorhanden = new Set(info.sheets?.map((sheet) => sheet.properties.title));
     if (CONTACT_TABS.some((tab) => !vorhanden.has(tab))) {
       throw new SchemaError('Der Contact Generator ist noch nicht eingerichtet. Bitte unter „Einrichtung“ auf „Einrichten“ klicken.');
     }
-    const table = splitHeader(await this.api.getValues(fullRange('anschreiben')));
-    assertColumns(SCHEMA.anschreiben, table.header);
-    this.headers.set('anschreiben', table.header);
-    return entityRows('anschreiben', table);
+    const values = await this.api.batchGetValues(CONTACT_TABS.map((tab) => fullRange(tab)));
+    const tables = CONTACT_TABS.map((tab, i) => {
+      const table = splitHeader(values[i]);
+      assertColumns(SCHEMA[tab], table.header);
+      this.headers.set(tab, table.header);
+      return table;
+    });
+    return { leistungen: entityRows('outreach_leistungen', tables[0]), anschreiben: entityRows('anschreiben', tables[1]) };
   }
 
   private async header(tab: string): Promise<string[]> {
@@ -130,7 +124,6 @@ export class SheetStore implements Store {
     const schema = SCHEMA[tab];
     const header = await this.header(tab);
     assertColumns(schema, header);
-    for (const record of records) assertWritable(schema, header, record as unknown as Record<string, unknown>);
     await this.api.appendValues(
       `${quoteTab(tab)}!A1`,
       records.map((record) => recordToRow(schema, header, record as unknown as Record<string, unknown>)),
@@ -157,7 +150,6 @@ export class SheetStore implements Store {
     for (const update of updates) {
       const index = rowIndexById.get(update.id);
       if (index === undefined) throw new NotFoundError();
-      assertWritable(schema, header, update.changes as Record<string, unknown>);
       const current = rowToRecord(schema, header, rows[index]);
       if (update.expectedGeaendertAm !== undefined && String(current.geaendert_am ?? '') !== update.expectedGeaendertAm) {
         throw new ConflictError(String(current.geaendert_von ?? ''), String(current.geaendert_am ?? ''));

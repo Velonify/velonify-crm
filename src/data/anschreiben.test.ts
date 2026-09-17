@@ -1,30 +1,29 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { baueAnfrage, mailtoLink, mitSignatur, prepareAnschreiben, verlaufText, vornameAus, zeichen, type AnschreibenInput } from './anschreiben';
+import { aktiveLeistungen, baueAnfrage, mailtoLink, mitSignatur, prepareAnschreiben, verlaufText, vornameAus, zeichen, type AnschreibenInput } from './anschreiben';
 import { DemoGenerator } from './contactGenerator';
 import { CrmService } from './crm';
 import { MemoryCalendar, MemoryDrive } from './demo/memoryGoogle';
 import { MemorySheets } from './demo/memorySheets';
 import { createDemoBackend } from './demo/seed';
 import { SchemaError, ValidationError } from './errors';
-import { katalogBaum } from './katalog';
 import { runSetup } from './sheets/setup';
 import { SheetStore } from './sheets/sheetStore';
-import { EMPTY_DEAL_INPUT, EMPTY_FIRMA_INPUT, EMPTY_KONTAKT_INPUT, type AngebotsDaten, type Database } from './types';
+import { EMPTY_DEAL_INPUT, EMPTY_FIRMA_INPUT, EMPTY_KONTAKT_INPUT, EMPTY_OUTREACH_LEISTUNG_INPUT, type ContactDaten, type Database } from './types';
 
 describe('Anfrage an den Contact Generator', () => {
   let db: Database;
-  let katalog: AngebotsDaten;
+  let contact: ContactDaten;
 
   beforeEach(async () => {
     const { service } = await createDemoBackend(() => 'test@velonify.de');
     db = await service.load();
-    katalog = await service.loadAngebotsDaten();
+    contact = await service.loadContactDaten();
   });
 
-  it('sends company, contact and catalogue service, but no addresses, phone numbers or register data', () => {
+  it('sends company, contact and service, but no addresses, phone numbers or register data', () => {
     const firma = db.firmen.find((f) => f.name.startsWith('Nordlicht'))!;
     const kontakt = db.kontakte.find((k) => k.firma_id === firma.id)!;
-    const [migration] = katalogBaum(katalog).filter((k) => k.kategorie.titel_de === 'Datenmigration');
+    const migration = contact.leistungen.find((l) => l.titel === 'Shopify Migration')!;
     const anfrage = baueAnfrage({
       kanal: 'email',
       sprache: 'de',
@@ -32,14 +31,14 @@ describe('Anfrage an den Contact Generator', () => {
       absender: ' Lukas ',
       firma,
       kontakt,
-      leistung: { art: 'katalog', kategorie: { ...migration.kategorie, outreach_anlass: 'Support-Ende' }, leistungen: migration.leistungen },
+      leistung: { art: 'liste', leistung: { ...migration, beleg: 'Referenz' } },
       aufhaenger: '',
     });
     expect(anfrage.absender).toEqual({ vorname: 'Lukas' });
     expect(anfrage.firma).toMatchObject({ name: firma.name, version: '2.4.6', eol: 'eol' });
     expect(anfrage.kontakt).toEqual({ vorname: 'Mara', nachname: 'Holm', rolle: 'Head of E-Commerce' });
-    expect(anfrage.leistung).toMatchObject({ titel: 'Datenmigration', anlass: 'Support-Ende' });
-    expect(anfrage.leistung.unterpunkte.length).toBe(migration.leistungen.length);
+    expect(anfrage.leistung).toMatchObject({ titel: 'Shopify Migration', anlass: migration.anlass, nutzen: migration.nutzen, beleg: 'Referenz', beschreibung: migration.beschreibung });
+    expect(anfrage.leistung.anlass).toContain('Magento');
     const text = JSON.stringify(anfrage);
     for (const privat of [firma.email_allgemein, firma.telefon_allgemein, firma.register, kontakt.email, kontakt.telefon]) {
       expect(text).not.toContain(privat);
@@ -83,7 +82,7 @@ describe('Hilfen', () => {
 
   it('validates messages before they are recorded', () => {
     const basis: AnschreibenInput = {
-      firma_id: 'F-1', kontakt_id: '', deal_id: '', kanal: 'linkedin_notiz', kategorie_id: '', leistung: 'SEO',
+      firma_id: 'F-1', kontakt_id: '', deal_id: '', kanal: 'linkedin_notiz', leistung_id: '', leistung: 'SEO',
       sprache: 'de', anrede: 'sie', aufhaenger: '', betreff: 'wird entfernt', text: ' Hallo ',
     };
     expect(prepareAnschreiben(basis)).toMatchObject({ text: 'Hallo', betreff: '' });
@@ -105,7 +104,7 @@ describe('CrmService: Contact Generator', () => {
   });
 
   const nachricht = (firmaId: string, extra: Partial<AnschreibenInput> = {}): AnschreibenInput => ({
-    firma_id: firmaId, kontakt_id: '', deal_id: '', kanal: 'email', kategorie_id: '', leistung: 'Datenmigration',
+    firma_id: firmaId, kontakt_id: '', deal_id: '', kanal: 'email', leistung_id: '', leistung: 'Datenmigration',
     sprache: 'de', anrede: 'sie', aufhaenger: '', betreff: 'Magento 2.4.6', text: 'Hallo Mara', ...extra,
   });
 
@@ -116,7 +115,7 @@ describe('CrmService: Contact Generator', () => {
 
     const gesendet = await crm.markiereGesendet(nachricht(firma.id, { kontakt_id: kontakt.id, deal_id: deal.id }));
     expect(gesendet).toMatchObject({ status: 'gesendet', von: 'lugge@velonify.de', deal_id: deal.id });
-    expect(await crm.loadAnschreiben()).toHaveLength(1);
+    expect((await crm.loadContactDaten()).anschreiben).toHaveLength(1);
 
     const db = await crm.load();
     expect(db.deals.find((d) => d.id === deal.id)?.phase).toBe('kontaktiert');
@@ -124,9 +123,9 @@ describe('CrmService: Contact Generator', () => {
     expect(eintraege.find((a) => a.typ === 'mail')?.text).toContain('Betreff: Magento 2.4.6');
     expect(eintraege.some((a) => a.typ === 'phasenwechsel' && a.text.includes('Kontaktiert'))).toBe(true);
 
-    const [aktualisiert] = await crm.loadAnschreiben();
+    const [aktualisiert] = (await crm.loadContactDaten()).anschreiben;
     await crm.setAnschreibenStatus(aktualisiert.id, 'antwort', aktualisiert.geaendert_am);
-    expect((await crm.loadAnschreiben())[0].status).toBe('antwort');
+    expect(((await crm.loadContactDaten()).anschreiben)[0].status).toBe('antwort');
     await expect(crm.setAnschreibenStatus(aktualisiert.id, 'vielleicht', aktualisiert.geaendert_am)).rejects.toThrow(ValidationError);
   });
 
@@ -151,7 +150,7 @@ describe('CrmService: Contact Generator', () => {
     const deal = await crm.saveDeal(b.id, { ...EMPTY_DEAL_INPUT, titel: 'X' });
     await expect(crm.markiereGesendet(nachricht(a.id, { kontakt_id: kontakt.id }))).rejects.toThrow(ValidationError);
     await expect(crm.markiereGesendet(nachricht(a.id, { deal_id: deal.id }))).rejects.toThrow(ValidationError);
-    expect(await crm.loadAnschreiben()).toHaveLength(0);
+    expect((await crm.loadContactDaten()).anschreiben).toHaveLength(0);
   });
 
   it('asks for setup before writing anything when the tab is missing', async () => {
@@ -167,28 +166,31 @@ describe('CrmService: Contact Generator', () => {
     expect((await ohneTab.load()).aktivitaeten).toHaveLength(0);
   });
 
-  it('keeps the offer tool working before the outreach columns exist, but does not drop outreach texts', async () => {
-    const [kategorie] = (await crm.uebernimmStartkatalog(), await crm.loadAngebotsDaten()).kategorien;
-    // Simulate a sheet set up before the outreach columns existed: remove them from header and rows.
-    const zeilen = sheets.rows('leistungskategorien');
-    for (const spalte of ['outreach_anlass', 'outreach_nutzen', 'outreach_beleg']) {
-      const index = (zeilen[0] as string[]).indexOf(spalte);
-      for (const zeile of zeilen) zeile.splice(index, 1);
-    }
-    const store = new SheetStore(sheets);
-    const alt = new CrmService({ store, drive: new MemoryDrive(), calendar: new MemoryCalendar(), currentUser: () => 'x@velonify.de' });
+  it('has its own service list: start list once, then edit, add and archive', async () => {
+    expect(await crm.uebernimmOutreachStartliste()).toBe(6);
+    await expect(crm.uebernimmOutreachStartliste()).rejects.toThrow(ValidationError);
+    let { leistungen } = await crm.loadContactDaten();
+    expect(aktiveLeistungen(leistungen).map((l) => l.titel)).toEqual([
+      'Shopify Migration',
+      'Klaviyo Setup & Email Marketing',
+      'Media Buying',
+      'Shopify Store Management',
+      'Google Ads Setup / Tracking Setup / UTMs / Consent Management',
+      'Full E-Commerce Service',
+    ]);
+    // The offer catalogue is not touched.
+    expect((await crm.loadAngebotsDaten()).kategorien).toHaveLength(0);
 
-    const daten = await alt.loadAngebotsDaten();
-    expect(daten.kategorien[0]).toMatchObject({ titel_de: kategorie.titel_de, outreach_anlass: '' });
-    const input = { ...kategorie, titel_en: 'Analysis' };
-    await expect(alt.saveKategorie(input, { id: kategorie.id, expectedGeaendertAm: kategorie.geaendert_am })).resolves.toMatchObject({ titel_en: 'Analysis' });
+    const media = leistungen.find((l) => l.titel === 'Media Buying')!;
+    await crm.saveOutreachLeistung({ ...media, beleg: ' ROAS verdoppelt ' }, { id: media.id, expectedGeaendertAm: media.geaendert_am });
+    const neu = await crm.saveOutreachLeistung({ ...EMPTY_OUTREACH_LEISTUNG_INPUT, titel: 'SEO' });
+    await expect(crm.saveOutreachLeistung({ ...EMPTY_OUTREACH_LEISTUNG_INPUT, titel: ' ' })).rejects.toThrow(ValidationError);
+    await crm.setOutreachLeistungArchiviert(media.id, true, (await crm.loadContactDaten()).leistungen.find((l) => l.id === media.id)!.geaendert_am);
 
-    const neu = (await alt.loadAngebotsDaten()).kategorien[0];
-    await expect(alt.saveKategorie({ ...input, outreach_nutzen: 'Weniger Aufwand' }, { id: neu.id, expectedGeaendertAm: neu.geaendert_am })).rejects.toThrow(SchemaError);
-
-    await runSetup(sheets);
-    const nachSetup = (await crm.loadAngebotsDaten()).kategorien[0];
-    await crm.saveKategorie({ ...input, outreach_nutzen: 'Weniger Aufwand' }, { id: nachSetup.id, expectedGeaendertAm: nachSetup.geaendert_am });
-    expect((await crm.loadAngebotsDaten()).kategorien[0].outreach_nutzen).toBe('Weniger Aufwand');
+    ({ leistungen } = await crm.loadContactDaten());
+    expect(leistungen.find((l) => l.id === media.id)).toMatchObject({ beleg: 'ROAS verdoppelt', archiviert: true });
+    const aktiv = aktiveLeistungen(leistungen);
+    expect(aktiv.at(-1)?.id).toBe(neu.id);
+    expect(aktiv.some((l) => l.id === media.id)).toBe(false);
   });
 });
