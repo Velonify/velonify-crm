@@ -114,6 +114,15 @@ const ZAHLUNGSPLAN: Record<Sprache, { einmalig: [number, string][]; monatlich: [
   },
 };
 
+/**
+ * Sheets parses formulas in the spreadsheet's locale: with a comma as decimal separator, arguments are
+ * separated by semicolons and a comma in a formula is a parse error (#ERROR!). The sheet is therefore created
+ * as de_DE and every formula uses semicolons and no decimal literals (19/100 instead of 0.19).
+ * Verified against a real spreadsheet on 17.09.2026.
+ */
+const LOCALE = 'de_DE';
+const T = ';';
+
 /** File name part after date and Kürzel, e.g. "kalkulation-shopify-migration". */
 export const kalkulationsThema = (titel: string) => `kalkulation ${titel}`;
 
@@ -181,14 +190,14 @@ export function baueKalkulation(daten: KalkulationsDaten): unknown[] {
   const summe = (label: string, typ: string, wert: string, betont = false) =>
     zeile([text(label, fett()), leer(), formel(wert, fett({ numberFormat: EURO, ...(betont && { backgroundColor: FARBE.summe }) })), leer(), leer(), leer(), text(`summe:${typ}`, typFormat)]) + 1;
 
-  const einmalig = summe('Einmalig netto', 'einmalig', `=SUMIFS(${r('C')},${r('G')},"kategorie",${r('D')},"nein",${r('E')},"einmalig")`);
+  const einmalig = summe('Einmalig netto', 'einmalig', `=SUMIFS(${r('C')}${T}${r('G')}${T}"kategorie"${T}${r('D')}${T}"nein"${T}${r('E')}${T}"einmalig")`);
   const nachlass = summe('Nachlass', 'nachlass', `=-N(B${nachlassZeile + 1})`);
   const netto = summe('Einmalig netto nach Nachlass', 'einmalig_netto', `=C${einmalig}+C${nachlass}`, true);
-  const ust = summe('Umsatzsteuer', 'umsatzsteuer', `=IF(B${ustZeile + 1}="19 %",ROUND(C${netto}*0.19,2),0)`);
+  const ust = summe('Umsatzsteuer', 'umsatzsteuer', `=IF(B${ustZeile + 1}="19 %"${T}ROUND(C${netto}*19/100${T}2)${T}0)`);
   summe('Einmalig brutto', 'einmalig_brutto', `=C${netto}+C${ust}`);
   zeile([]);
-  summe('Monatlich netto', 'monatlich', `=SUMIFS(${r('C')},${r('G')},"kategorie",${r('D')},"nein",${r('E')},"monatlich")`, true);
-  summe('Optional netto', 'optional', `=SUMIFS(${r('C')},${r('G')},"kategorie",${r('D')},"ja")`);
+  summe('Monatlich netto', 'monatlich', `=SUMIFS(${r('C')}${T}${r('G')}${T}"kategorie"${T}${r('D')}${T}"nein"${T}${r('E')}${T}"monatlich")`, true);
+  summe('Optional netto', 'optional', `=SUMIFS(${r('C')}${T}${r('G')}${T}"kategorie"${T}${r('D')}${T}"ja")`);
 
   // ─── Tab "Texte" ───
   const texte: Zelle[][] = [];
@@ -214,6 +223,7 @@ export function baueKalkulation(daten: KalkulationsDaten): unknown[] {
   });
 
   return [
+    { updateSpreadsheetProperties: { properties: { locale: LOCALE }, fields: 'locale' } },
     { updateSheetProperties: { properties: { sheetId: ANGEBOT, title: KALKULATION_BLATT.angebot }, fields: 'title' } },
     {
       addSheet: {
