@@ -42,8 +42,8 @@ describe('baueKalkulation', () => {
   const zeileVon = (typ: string, ab = 0) => angebot.findIndex((z, i) => i >= ab && z[6] === typ) + 1; // 1-based
 
   it('names the tabs and writes the header data', () => {
-    expect((requests as Request[])[0].updateSheetProperties.properties.title).toBe(KALKULATION_BLATT.angebot);
-    expect((requests as Request[])[1].addSheet.properties.title).toBe(KALKULATION_BLATT.texte);
+    expect((requests as Request[])[1].updateSheetProperties.properties.title).toBe(KALKULATION_BLATT.angebot);
+    expect((requests as Request[])[2].addSheet.properties.title).toBe(KALKULATION_BLATT.texte);
     expect(angebot[zeileVon('kopf:nummer') - 1][1]).toBe('2026/49');
     expect(angebot[zeileVon('kopf:ansprechpartner') - 1][1]).toBe('Mara Holm');
   });
@@ -62,14 +62,24 @@ describe('baueKalkulation', () => {
     const erste = zeileVon('kategorie');
     const letzte = angebot.map((z) => z[6]).lastIndexOf('posten') + 1;
     const bereich = (s: string) => `${s}${erste}:${s}${letzte}`;
-    expect(angebot[zeileVon('summe:einmalig') - 1][2]).toBe(`=SUMIFS(${bereich('C')},${bereich('G')},"kategorie",${bereich('D')},"nein",${bereich('E')},"einmalig")`);
+    expect(angebot[zeileVon('summe:einmalig') - 1][2]).toBe(`=SUMIFS(${bereich('C')};${bereich('G')};"kategorie";${bereich('D')};"nein";${bereich('E')};"einmalig")`);
     expect(angebot[zeileVon('summe:monatlich') - 1][2]).toContain('"monatlich"');
-    expect(angebot[zeileVon('summe:umsatzsteuer') - 1][2]).toBe(`=IF(B${zeileVon('kopf:umsatzsteuer')}="19 %",ROUND(C${zeileVon('summe:einmalig_netto')}*0.19,2),0)`);
+    expect(angebot[zeileVon('summe:umsatzsteuer') - 1][2]).toBe(`=IF(B${zeileVon('kopf:umsatzsteuer')}="19 %";ROUND(C${zeileVon('summe:einmalig_netto')}*19/100;2);0)`);
 
     const manuell = (requests as Request[]).find((r) => r.updateCells?.start.sheetId === 0)!.updateCells.rows.flatMap((r: { values?: Zelle[] }) => r.values ?? []);
     const hyperlink = manuell.find((z: Zelle) => z.userEnteredValue?.stringValue === '=HYPERLINK("x")');
     expect(hyperlink?.userEnteredValue?.formulaValue).toBeUndefined();
     expect(hyperlink).toBeDefined();
+  });
+
+  it('writes formulas in the syntax of a German sheet: semicolons, no decimal points', () => {
+    expect((requests as Request[])[0].updateSpreadsheetProperties).toMatchObject({ properties: { locale: 'de_DE' } });
+    const formeln = [...raster(requests, 0), ...raster(requests, 1)].flat().filter((z) => z.startsWith('='));
+    expect(formeln.length).toBeGreaterThan(5);
+    for (const f of formeln) {
+      expect(f).not.toContain(',');
+      expect(f.replace(/[A-Z]+\d+/g, '')).not.toMatch(/\d\.\d/);
+    }
   });
 
   it('prepares texts and a payment plan that adds up to 100', () => {
