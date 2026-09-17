@@ -10,6 +10,7 @@ export const ID_PREFIX = {
   leistungskategorien: 'LK',
   leistungen: 'L',
   angebote: 'AN',
+  anschreiben: 'AS',
 } as const;
 
 export function newId(prefix: string, length = 8): string {

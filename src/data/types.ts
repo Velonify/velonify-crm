@@ -111,8 +111,17 @@ export interface Leistungskategorie extends Meta {
   abrechnung: string;
   sortierung: number | null;
   archiviert: boolean;
+  /** For the Contact Generator: which problem or occasion fits this service */
+  outreach_anlass: string;
+  /** For the Contact Generator: what the customer gains, in one or two sentences */
+  outreach_nutzen: string;
+  /** For the Contact Generator: a reference or figure that builds trust */
+  outreach_beleg: string;
 }
-export type LeistungskategorieInput = Pick<Leistungskategorie, 'titel_de' | 'titel_en' | 'umfang_de' | 'umfang_en' | 'abrechnung'>;
+export type LeistungskategorieInput = Pick<
+  Leistungskategorie,
+  'titel_de' | 'titel_en' | 'umfang_de' | 'umfang_en' | 'abrechnung' | 'outreach_anlass' | 'outreach_nutzen' | 'outreach_beleg'
+>;
 
 /** Sub-item of a category; `text_*` becomes a bullet in the offer's service description. */
 export interface Leistung extends Meta {
@@ -193,6 +202,29 @@ export interface AngebotsDaten extends Katalog {
   angebote: Angebot[];
 }
 
+/** A first message written with the Contact Generator and marked as sent. */
+export interface Anschreiben extends Meta {
+  id: string;
+  firma_id: string;
+  kontakt_id: string;
+  deal_id: string;
+  kanal: string;
+  /** Catalogue category, empty for a service entered by hand */
+  kategorie_id: string;
+  /** Title of the service at the time of sending */
+  leistung: string;
+  sprache: string;
+  anrede: string;
+  aufhaenger: string;
+  betreff: string;
+  text: string;
+  status: string;
+  /** ISO timestamp */
+  gesendet_am: string;
+  von: string;
+  archiviert: boolean;
+}
+
 export type Listen = Record<string, string[]>;
 export type Einstellungen = Record<string, string>;
 
@@ -205,6 +237,7 @@ export interface EntityMap {
   leistungskategorien: Leistungskategorie;
   leistungen: Leistung;
   angebote: Angebot;
+  anschreiben: Anschreiben;
 }
 
 /** Everything the app knows, loaded in one go. */
@@ -232,6 +265,8 @@ export const EMPTY_DEAL_INPUT: DealInput = {
   titel: '', kontakt_id: '', wert_eur: null, wahrscheinlichkeit: null, zustaendig: '', naechster_schritt: '', naechster_schritt_am: '',
 };
 
-export const EMPTY_KATEGORIE_INPUT: LeistungskategorieInput = { titel_de: '', titel_en: '', umfang_de: '', umfang_en: '', abrechnung: 'einmalig' };
+export const EMPTY_KATEGORIE_INPUT: LeistungskategorieInput = {
+  titel_de: '', titel_en: '', umfang_de: '', umfang_en: '', abrechnung: 'einmalig', outreach_anlass: '', outreach_nutzen: '', outreach_beleg: '',
+};
 
 export const EMPTY_LEISTUNG_INPUT: LeistungInput = { kategorie_id: '', titel_de: '', titel_en: '', text_de: '', text_en: '' };

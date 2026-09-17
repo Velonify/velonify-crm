@@ -131,6 +131,11 @@ export function FirmaAktePage() {
             <button type="button" className="button" onClick={toggleArchive}>
               {f.archiviert ? 'Wiederherstellen' : 'Archivieren'}
             </button>
+            {!f.archiviert && (
+              <Link to={`/contact?firma=${f.id}`} className="button">
+                Anschreiben
+              </Link>
+            )}
             <button type="button" className="button primary" onClick={() => setEditing(true)} disabled={f.archiviert}>
               Bearbeiten
             </button>

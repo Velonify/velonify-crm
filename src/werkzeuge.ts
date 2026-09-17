@@ -40,6 +40,16 @@ export const WERKZEUGE: Werkzeug[] = [
       { label: 'Leistungen', pfad: '/angebote/leistungen' },
     ],
   },
+  {
+    id: 'contact',
+    name: 'Contact Generator',
+    beschreibung: 'Erste Nachricht für Instagram, LinkedIn oder E-Mail aus den CRM-Daten',
+    pfad: '/contact',
+    navigation: [
+      { label: 'Neues Anschreiben', pfad: '/contact', end: true },
+      { label: 'Gesendet', pfad: '/contact/gesendet' },
+    ],
+  },
 ];
 
 export const istGeplant = (w: Werkzeug) => !w.pfad;

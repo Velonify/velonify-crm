@@ -3,6 +3,8 @@ import { AngebotePage } from './angebote/AngebotePage';
 import { AngebotPage } from './angebote/AngebotPage';
 import { LeistungenPage } from './angebote/LeistungenPage';
 import { useAuth } from './auth/AuthContext';
+import { ContactGeneratorPage } from './contact/ContactGeneratorPage';
+import { GesendetPage } from './contact/GesendetPage';
 import { Layout } from './components/Layout';
 import { ReauthDialog } from './components/ReauthDialog';
 import { ToastProvider } from './components/Toasts';
@@ -48,6 +50,10 @@ export function App() {
                 <Route path="neu" element={<AngebotPage />} />
                 <Route path="leistungen" element={<LeistungenPage />} />
                 <Route path=":id" element={<AngebotPage />} />
+              </Route>
+              <Route path="contact">
+                <Route index element={<ContactGeneratorPage />} />
+                <Route path="gesendet" element={<GesendetPage />} />
               </Route>
               <Route path="einrichtung" element={<EinrichtungPage />} />
               <Route path="pipeline" element={<AlteCrmAdresse />} />
