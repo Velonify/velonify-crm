@@ -31,7 +31,7 @@ export function Suche() {
         <span className="search-trigger-label">Suchen</span>
         <kbd>{istMac ? '⌘K' : 'Strg K'}</kbd>
       </button>
-      {/* Rendered at body level, so it follows the page theme, not the espresso sidebar. */}
+      {/* Rendered at body level, so it follows the page theme, not the sidebar. */}
       {offen && createPortal(<SuchDialog onClose={() => setOffen(false)} />, document.body)}
     </>
   );
