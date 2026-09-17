@@ -4,7 +4,7 @@ import type { CalendarApi, CalendarEvent } from './google/calendar';
 import { isFolder, type DriveApi, type DriveFile } from './google/drive';
 import { ID_PREFIX, isoDate, newId } from './ids';
 import { anzahlPosten, prepareAngebot, statusLabel } from './angebote';
-import { ANSCHREIBEN_STATUS, prepareAnschreiben, verlaufText, type AnschreibenInput } from './anschreiben';
+import { ANSCHREIBEN_STATUS, prepareAnschreiben, prepareOutreachLeistung, verlaufText, type AnschreibenInput } from './anschreiben';
 import type { ImportPlan } from './importCsv';
 import { naechsteSortierung, prepareKategorie, prepareLeistung, verschiebe } from './katalog';
 import {
@@ -17,6 +17,7 @@ import {
   prepareWiedervorlage,
 } from './rules';
 import { driveKonfiguration } from './selectors';
+import { OUTREACH_STARTLISTE } from './outreachStart';
 import { STARTKATALOG } from './startkatalog';
 import type { Store } from './store';
 import type {
@@ -24,6 +25,7 @@ import type {
   Angebot,
   AngebotInput,
   Anschreiben,
+  ContactDaten,
   AngebotsDaten,
   AktivitaetInput,
   Database,
@@ -39,6 +41,8 @@ import type {
   Leistungskategorie,
   LeistungskategorieInput,
   Meta,
+  OutreachLeistung,
+  OutreachLeistungInput,
   Wiedervorlage,
   WiedervorlageInput,
 } from './types';
@@ -392,9 +396,6 @@ export class CrmService {
         abrechnung: start.abrechnung,
         sortierung: (i + 1) * 10,
         archiviert: false,
-        outreach_anlass: '',
-        outreach_nutzen: '',
-        outreach_beleg: '',
         ...meta,
       };
       kategorien.push(kategorie);
@@ -469,8 +470,43 @@ export class CrmService {
 
   // ─── Contact Generator ─────────────────────────────────────────────────────
 
-  loadAnschreiben(): Promise<Anschreiben[]> {
-    return this.store.loadAnschreiben();
+  loadContactDaten(): Promise<ContactDaten> {
+    return this.store.loadContactDaten();
+  }
+
+  async saveOutreachLeistung(input: OutreachLeistungInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<OutreachLeistung> {
+    const clean = prepareOutreachLeistung(input);
+    if (existing) {
+      const [leistung] = await this.store.update('outreach_leistungen', [
+        { id: existing.id, changes: { ...clean, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm },
+      ]);
+      return leistung;
+    }
+    const { leistungen } = await this.store.loadContactDaten();
+    const leistung: OutreachLeistung = { ...clean, id: newId(ID_PREFIX.outreach_leistungen), sortierung: naechsteSortierung(leistungen), archiviert: false, ...this.created() };
+    await this.store.insert('outreach_leistungen', [leistung]);
+    return leistung;
+  }
+
+  async setOutreachLeistungArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<OutreachLeistung> {
+    const [leistung] = await this.store.update('outreach_leistungen', [{ id, changes: { archiviert, ...this.changed() }, expectedGeaendertAm }]);
+    return leistung;
+  }
+
+  /** Fills an empty service list with the start list. Refuses once anything exists, so nothing is duplicated. */
+  async uebernimmOutreachStartliste(): Promise<number> {
+    const { leistungen } = await this.store.loadContactDaten();
+    if (leistungen.length > 0) throw new ValidationError('leistungen', 'Die Liste enthält schon Leistungen. Die Startliste wird nur in eine leere Liste übernommen.');
+    const meta = this.created();
+    const neu: OutreachLeistung[] = OUTREACH_STARTLISTE.map((start, i) => ({
+      ...start,
+      id: newId(ID_PREFIX.outreach_leistungen),
+      sortierung: (i + 1) * 10,
+      archiviert: false,
+      ...meta,
+    }));
+    await this.store.insert('outreach_leistungen', neu);
+    return neu.length;
   }
 
   /**
@@ -479,8 +515,8 @@ export class CrmService {
    */
   async markiereGesendet(input: AnschreibenInput, optionen: { neuerDeal?: { titel: string; zustaendig: string } } = {}): Promise<Anschreiben> {
     const clean = prepareAnschreiben(input);
-    // Fails with SchemaError before anything is written while the tab is missing.
-    await this.store.loadAnschreiben();
+    // Fails with SchemaError before anything is written while the tabs are missing.
+    await this.store.loadContactDaten();
     const db = await this.store.load();
     const firma = CrmService.find(db.firmen, clean.firma_id);
     if (clean.kontakt_id && CrmService.find(db.kontakte, clean.kontakt_id).firma_id !== firma.id) {

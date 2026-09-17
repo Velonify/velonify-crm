@@ -10,6 +10,7 @@ export const ID_PREFIX = {
   leistungskategorien: 'LK',
   leistungen: 'L',
   angebote: 'AN',
+  outreach_leistungen: 'OL',
   anschreiben: 'AS',
 } as const;
 

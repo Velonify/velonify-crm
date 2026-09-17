@@ -90,6 +90,7 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   await firma({ name: 'Seeblick Heimtextil', domain: 'seeblick-heimtextil.example', tier: 'B', score: 58, plattform: 'magento2', version: '2.4.5', eol: 'eol', ort: 'Konstanz', zustaendig: 'Lugge' });
 
   await service.uebernimmStartkatalog();
+  await service.uebernimmOutreachStartliste();
 
   seeding = false;
   return { service, sheets };

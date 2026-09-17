@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/Toasts';
 import { Card, ErrorBox, Field, FormError, Loading, PageHeader } from '../components/ui';
 import {
+  aktiveLeistungen,
   baueAnfrage,
   KANAELE,
   kanalInfo,
@@ -23,9 +24,8 @@ import { useCrm } from '../data/CrmContext';
 import { phaseLabel } from '../data/constants';
 import type { CrmService } from '../data/crm';
 import { AuthExpiredError } from '../data/errors';
-import { katalogBaum } from '../data/katalog';
 import { kontaktName } from '../data/rules';
-import type { AngebotsDaten, Database } from '../data/types';
+import type { ContactDaten, Database } from '../data/types';
 import { errorMessage, fieldOf } from '../lib/errors';
 import { useIch } from '../lib/useIch';
 import { useContactDaten, useGenerator } from './useContactDaten';
@@ -73,14 +73,14 @@ const ANREDEN = [
   { wert: 'du', label: 'Du' },
 ] as const;
 
-function Generator({ db, katalog, aendern }: { db: Database; katalog: AngebotsDaten; aendern: <T>(a: (s: CrmService) => Promise<T>) => Promise<T> }) {
+function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; aendern: <T>(a: (s: CrmService) => Promise<T>) => Promise<T> }) {
   const [params] = useSearchParams();
   const { state, expire } = useAuth();
   const toast = useToast();
   const generator = useGenerator();
   const [ich] = useIch(db.listen.team);
   const user = state.status === 'signedOut' ? null : state.user;
-  const baum = useMemo(() => katalogBaum(katalog), [katalog]);
+  const leistungen = useMemo(() => aktiveLeistungen(daten.leistungen), [daten]);
 
   const firmen = useMemo(() => db.firmen.filter((f) => !f.archiviert).sort((a, b) => a.name.localeCompare(b.name, 'de')), [db]);
   const vorschlag = (firmaId: string, kontaktId?: string | null) => {
@@ -118,9 +118,9 @@ function Generator({ db, katalog, aendern }: { db: Database; katalog: AngebotsDa
   const kontakte = db.kontakte.filter((k) => k.firma_id === firmaId && !k.archiviert);
   const kontakt = kontakte.find((k) => k.id === kontaktId);
   const deals = offeneDeals(db.deals, firmaId);
-  const kategorie = baum.find((k) => `k:${k.kategorie.id}` === leistungWert);
-  const wahl: LeistungsWahl | null = kategorie
-    ? { art: 'katalog', kategorie: kategorie.kategorie, leistungen: kategorie.leistungen }
+  const gewaehlteLeistung = leistungen.find((l) => l.id === leistungWert);
+  const wahl: LeistungsWahl | null = gewaehlteLeistung
+    ? { art: 'liste', leistung: gewaehlteLeistung }
     : leistungWert === 'manuell'
       ? { art: 'manuell', ...manuell }
       : null;
@@ -210,7 +210,7 @@ function Generator({ db, katalog, aendern }: { db: Database; katalog: AngebotsDa
             kontakt_id: kontaktId,
             deal_id: dealId,
             kanal,
-            kategorie_id: wahl.art === 'katalog' ? wahl.kategorie.id : '',
+            leistung_id: wahl.art === 'liste' ? wahl.leistung.id : '',
             leistung: leistungsTitel(wahl),
             sprache,
             anrede,
@@ -233,7 +233,7 @@ function Generator({ db, katalog, aendern }: { db: Database; katalog: AngebotsDa
 
   const laenge = variante ? zeichen(variante.text) : 0;
   const zuLang = Boolean(info.zeichenLimit && laenge > info.zeichenLimit);
-  const outreachLeer = wahl?.art === 'katalog' && !wahl.kategorie.outreach_anlass && !wahl.kategorie.outreach_nutzen && !wahl.kategorie.outreach_beleg;
+  const outreachLeer = wahl?.art === 'liste' && !wahl.leistung.anlass && !wahl.leistung.nutzen && !wahl.leistung.beleg;
   const dealVorher = db.deals.find((d) => d.id === dealId);
 
   return (
@@ -301,14 +301,12 @@ function Generator({ db, katalog, aendern }: { db: Database; katalog: AngebotsDa
               <Field label="Leistung" invalid={invalid === 'leistung'} wide>
                 <select value={leistungWert} onChange={(e) => setLeistungWert(e.target.value)}>
                   <option value="">Bitte wählen …</option>
-                  <optgroup label="Leistungskatalog">
-                    {baum.map((k) => (
-                      <option key={k.kategorie.id} value={`k:${k.kategorie.id}`}>
-                        {k.kategorie.titel_de}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <option value="manuell">Manuell beschreiben …</option>
+                  {leistungen.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.titel}
+                    </option>
+                  ))}
+                  <option value="manuell">Manuell</option>
                 </select>
               </Field>
               {leistungWert === 'manuell' && (
@@ -328,10 +326,15 @@ function Generator({ db, katalog, aendern }: { db: Database; katalog: AngebotsDa
                 <textarea rows={3} value={aufhaenger} onChange={(e) => setAufhaenger(e.target.value)} placeholder="z. B. Neue Herbstkollektion online, Ladezeit der Startseite über 5 Sekunden" />
               </Field>
             </div>
+            {leistungen.length === 0 && (
+              <p className="hint-box">
+                Noch keine Leistungen hinterlegt. <Link to="/contact/leistungen">Startliste übernehmen</Link> oder „Manuell“ wählen.
+              </p>
+            )}
             {outreachLeer && (
               <p className="hint-box">
-                Für „{wahl.kategorie.titel_de}“ sind noch kein Anlass, Nutzen oder Beleg hinterlegt. Claude arbeitet dann nur mit Titel und Unterpunkten.{' '}
-                <Link to="/angebote/leistungen">Leistungen pflegen</Link>
+                Für „{wahl.leistung.titel}“ sind noch kein Anlass, Nutzen oder Beleg hinterlegt. Claude arbeitet dann nur mit Titel und Beschreibung.{' '}
+                <Link to="/contact/leistungen">Leistungen pflegen</Link>
               </p>
             )}
             {istEmail && (
@@ -472,5 +475,5 @@ export function ContactGeneratorPage() {
     const fehler = error ?? crmError;
     return <div className="page">{fehler ? <ErrorBox error={fehler} onRetry={error ? reload : refresh} /> : loading && <Loading />}</div>;
   }
-  return <Generator db={db} katalog={data.katalog} aendern={aendern} />;
+  return <Generator db={db} daten={data} aendern={aendern} />;
 }

@@ -7,11 +7,6 @@ export interface TabSchema {
   readonly columns: readonly string[];
   readonly numeric?: readonly string[];
   readonly boolean?: readonly string[];
-  /**
-   * Columns added after the tab went live. Setup creates them, but loading does not insist on them,
-   * so a tool keeps working until someone clicks "Einrichten". Writing a value into a missing one fails.
-   */
-  readonly optional?: readonly string[];
 }
 
 const META = ['erstellt_am', 'erstellt_von', 'geaendert_am', 'geaendert_von'] as const;
@@ -57,13 +52,9 @@ export const SCHEMA = {
   },
   leistungskategorien: {
     name: 'leistungskategorien',
-    columns: [
-      'id', 'titel_de', 'titel_en', 'umfang_de', 'umfang_en', 'abrechnung', 'sortierung', 'archiviert',
-      'outreach_anlass', 'outreach_nutzen', 'outreach_beleg', ...META,
-    ],
+    columns: ['id', 'titel_de', 'titel_en', 'umfang_de', 'umfang_en', 'abrechnung', 'sortierung', 'archiviert', ...META],
     numeric: ['sortierung'],
     boolean: ['archiviert'],
-    optional: ['outreach_anlass', 'outreach_nutzen', 'outreach_beleg'],
   },
   leistungen: {
     name: 'leistungen',
@@ -80,10 +71,16 @@ export const SCHEMA = {
     numeric: ['version', 'summe_einmalig_eur', 'summe_monatlich_eur', 'summe_optional_eur'],
     boolean: ['archiviert'],
   },
+  outreach_leistungen: {
+    name: 'outreach_leistungen',
+    columns: ['id', 'titel', 'beschreibung', 'anlass', 'nutzen', 'beleg', 'sortierung', 'archiviert', ...META],
+    numeric: ['sortierung'],
+    boolean: ['archiviert'],
+  },
   anschreiben: {
     name: 'anschreiben',
     columns: [
-      'id', 'firma_id', 'kontakt_id', 'deal_id', 'kanal', 'kategorie_id', 'leistung', 'sprache', 'anrede', 'aufhaenger',
+      'id', 'firma_id', 'kontakt_id', 'deal_id', 'kanal', 'leistung_id', 'leistung', 'sprache', 'anrede', 'aufhaenger',
       'betreff', 'text', 'status', 'gesendet_am', 'von', 'archiviert', ...META,
     ],
     boolean: ['archiviert'],
@@ -104,8 +101,8 @@ export type TabName = keyof typeof SCHEMA;
 export const ENTITY_TABS = ['firmen', 'kontakte', 'deals', 'aktivitaeten', 'wiedervorlagen'] as const;
 /** Tabs of the offer tool, loaded only when it is opened – so the CRM keeps working before they are set up. */
 export const ANGEBOTS_TABS = ['leistungskategorien', 'leistungen', 'angebote'] as const;
-/** Tab of the Contact Generator, loaded only when it is opened. */
-export const CONTACT_TABS = ['anschreiben'] as const;
+/** Tabs of the Contact Generator, loaded only when it is opened. */
+export const CONTACT_TABS = ['outreach_leistungen', 'anschreiben'] as const;
 export type EntityTab = (typeof ENTITY_TABS)[number] | (typeof ANGEBOTS_TABS)[number] | (typeof CONTACT_TABS)[number];
 
 /** Editable select values, written to the "listen" tab on setup and maintained there afterwards. */

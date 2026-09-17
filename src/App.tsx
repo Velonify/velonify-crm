@@ -5,6 +5,7 @@ import { LeistungenPage } from './angebote/LeistungenPage';
 import { useAuth } from './auth/AuthContext';
 import { ContactGeneratorPage } from './contact/ContactGeneratorPage';
 import { GesendetPage } from './contact/GesendetPage';
+import { OutreachLeistungenPage } from './contact/OutreachLeistungenPage';
 import { Layout } from './components/Layout';
 import { ReauthDialog } from './components/ReauthDialog';
 import { ToastProvider } from './components/Toasts';
@@ -54,6 +55,7 @@ export function App() {
               <Route path="contact">
                 <Route index element={<ContactGeneratorPage />} />
                 <Route path="gesendet" element={<GesendetPage />} />
+                <Route path="leistungen" element={<OutreachLeistungenPage />} />
               </Route>
               <Route path="einrichtung" element={<EinrichtungPage />} />
               <Route path="pipeline" element={<AlteCrmAdresse />} />

@@ -1,6 +1,6 @@
 import { isAbgeschlossen } from './constants';
 import { ValidationError } from './errors';
-import type { Anschreiben, Deal, Firma, Kontakt, Leistung, Leistungskategorie } from './types';
+import type { Anschreiben, Deal, Firma, Kontakt, OutreachLeistung, OutreachLeistungInput } from './types';
 
 export const KANAELE = [
   { wert: 'instagram', label: 'Instagram', verlauf: 'Instagram-Nachricht', zeichenLimit: 1000, anrede: 'du' },
@@ -23,11 +23,21 @@ export const ANSCHREIBEN_STATUS = [
 
 export const anschreibenStatusLabel = (wert: string) => ANSCHREIBEN_STATUS.find((s) => s.wert === wert)?.label ?? (wert || '–');
 
-export type LeistungsWahl =
-  | { art: 'katalog'; kategorie: Leistungskategorie; leistungen: readonly Leistung[] }
-  | { art: 'manuell'; titel: string; beschreibung: string };
+export type LeistungsWahl = { art: 'liste'; leistung: OutreachLeistung } | { art: 'manuell'; titel: string; beschreibung: string };
 
-export const leistungsTitel = (wahl: LeistungsWahl) => (wahl.art === 'katalog' ? wahl.kategorie.titel_de : wahl.titel.trim());
+export const leistungsTitel = (wahl: LeistungsWahl) => (wahl.art === 'liste' ? wahl.leistung.titel : wahl.titel.trim());
+
+/** Active services in list order. */
+export const aktiveLeistungen = (leistungen: readonly OutreachLeistung[]) =>
+  leistungen
+    .filter((l) => !l.archiviert)
+    .sort((a, b) => (a.sortierung ?? Number.MAX_SAFE_INTEGER) - (b.sortierung ?? Number.MAX_SAFE_INTEGER) || a.titel.localeCompare(b.titel, 'de'));
+
+export function prepareOutreachLeistung(input: OutreachLeistungInput): OutreachLeistungInput {
+  const clean = Object.fromEntries(Object.entries(input).map(([k, v]) => [k, String(v ?? '').trim()])) as OutreachLeistungInput;
+  if (!clean.titel) throw new ValidationError('titel', 'Bitte einen Titel angeben.');
+  return clean;
+}
 
 export interface GeneratorEingabe {
   kanal: Kanal;
@@ -92,14 +102,14 @@ export function baueAnfrage(e: GeneratorEingabe): GeneratorAnfrage {
     },
     kontakt: e.kontakt ? { vorname: kurz(e.kontakt.vorname, 60), nachname: kurz(e.kontakt.nachname, 60), rolle: kurz(e.kontakt.rolle, 120) } : null,
     leistung:
-      e.leistung.art === 'katalog'
+      e.leistung.art === 'liste'
         ? {
             titel: kurz(titel, 200),
-            unterpunkte: e.leistung.leistungen.filter((l) => !l.archiviert).slice(0, 30).map((l) => kurz(l.titel_de, 200)),
-            anlass: kurz(e.leistung.kategorie.outreach_anlass, 1000),
-            nutzen: kurz(e.leistung.kategorie.outreach_nutzen, 1000),
-            beleg: kurz(e.leistung.kategorie.outreach_beleg, 1000),
-            beschreibung: '',
+            unterpunkte: [],
+            anlass: kurz(e.leistung.leistung.anlass, 1000),
+            nutzen: kurz(e.leistung.leistung.nutzen, 1000),
+            beleg: kurz(e.leistung.leistung.beleg, 1000),
+            beschreibung: kurz(e.leistung.leistung.beschreibung, 2000),
           }
         : { titel: kurz(titel, 200), unterpunkte: [], anlass: '', nutzen: '', beleg: '', beschreibung: kurz(e.leistung.beschreibung, 2000) },
     aufhaenger: kurz(e.aufhaenger, 1000),
@@ -131,7 +141,7 @@ export const offeneDeals = (deals: readonly Deal[], firmaId: string) =>
 
 export type AnschreibenInput = Pick<
   Anschreiben,
-  'firma_id' | 'kontakt_id' | 'deal_id' | 'kanal' | 'kategorie_id' | 'leistung' | 'sprache' | 'anrede' | 'aufhaenger' | 'betreff' | 'text'
+  'firma_id' | 'kontakt_id' | 'deal_id' | 'kanal' | 'leistung_id' | 'leistung' | 'sprache' | 'anrede' | 'aufhaenger' | 'betreff' | 'text'
 >;
 
 export function prepareAnschreiben(input: AnschreibenInput): AnschreibenInput {

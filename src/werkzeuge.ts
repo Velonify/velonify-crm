@@ -48,6 +48,7 @@ export const WERKZEUGE: Werkzeug[] = [
     navigation: [
       { label: 'Neues Anschreiben', pfad: '/contact', end: true },
       { label: 'Gesendet', pfad: '/contact/gesendet' },
+      { label: 'Leistungen', pfad: '/contact/leistungen' },
     ],
   },
 ];

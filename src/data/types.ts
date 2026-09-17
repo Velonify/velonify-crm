@@ -111,17 +111,8 @@ export interface Leistungskategorie extends Meta {
   abrechnung: string;
   sortierung: number | null;
   archiviert: boolean;
-  /** For the Contact Generator: which problem or occasion fits this service */
-  outreach_anlass: string;
-  /** For the Contact Generator: what the customer gains, in one or two sentences */
-  outreach_nutzen: string;
-  /** For the Contact Generator: a reference or figure that builds trust */
-  outreach_beleg: string;
 }
-export type LeistungskategorieInput = Pick<
-  Leistungskategorie,
-  'titel_de' | 'titel_en' | 'umfang_de' | 'umfang_en' | 'abrechnung' | 'outreach_anlass' | 'outreach_nutzen' | 'outreach_beleg'
->;
+export type LeistungskategorieInput = Pick<Leistungskategorie, 'titel_de' | 'titel_en' | 'umfang_de' | 'umfang_en' | 'abrechnung'>;
 
 /** Sub-item of a category; `text_*` becomes a bullet in the offer's service description. */
 export interface Leistung extends Meta {
@@ -202,6 +193,26 @@ export interface AngebotsDaten extends Katalog {
   angebote: Angebot[];
 }
 
+/**
+ * Service offered in first messages of the Contact Generator. Its own short list, separate from the offer catalogue:
+ * outreach pitches a few packages, offers itemise many services.
+ */
+export interface OutreachLeistung extends Meta {
+  id: string;
+  titel: string;
+  /** What the service includes */
+  beschreibung: string;
+  /** Which problem or occasion fits this service */
+  anlass: string;
+  /** What the customer gains, in one or two sentences */
+  nutzen: string;
+  /** A reference or figure that builds trust */
+  beleg: string;
+  sortierung: number | null;
+  archiviert: boolean;
+}
+export type OutreachLeistungInput = Pick<OutreachLeistung, 'titel' | 'beschreibung' | 'anlass' | 'nutzen' | 'beleg'>;
+
 /** A first message written with the Contact Generator and marked as sent. */
 export interface Anschreiben extends Meta {
   id: string;
@@ -209,8 +220,8 @@ export interface Anschreiben extends Meta {
   kontakt_id: string;
   deal_id: string;
   kanal: string;
-  /** Catalogue category, empty for a service entered by hand */
-  kategorie_id: string;
+  /** Outreach service, empty for a service entered by hand */
+  leistung_id: string;
   /** Title of the service at the time of sending */
   leistung: string;
   sprache: string;
@@ -225,6 +236,11 @@ export interface Anschreiben extends Meta {
   archiviert: boolean;
 }
 
+export interface ContactDaten {
+  leistungen: OutreachLeistung[];
+  anschreiben: Anschreiben[];
+}
+
 export type Listen = Record<string, string[]>;
 export type Einstellungen = Record<string, string>;
 
@@ -237,6 +253,7 @@ export interface EntityMap {
   leistungskategorien: Leistungskategorie;
   leistungen: Leistung;
   angebote: Angebot;
+  outreach_leistungen: OutreachLeistung;
   anschreiben: Anschreiben;
 }
 
@@ -265,8 +282,8 @@ export const EMPTY_DEAL_INPUT: DealInput = {
   titel: '', kontakt_id: '', wert_eur: null, wahrscheinlichkeit: null, zustaendig: '', naechster_schritt: '', naechster_schritt_am: '',
 };
 
-export const EMPTY_KATEGORIE_INPUT: LeistungskategorieInput = {
-  titel_de: '', titel_en: '', umfang_de: '', umfang_en: '', abrechnung: 'einmalig', outreach_anlass: '', outreach_nutzen: '', outreach_beleg: '',
-};
+export const EMPTY_KATEGORIE_INPUT: LeistungskategorieInput = { titel_de: '', titel_en: '', umfang_de: '', umfang_en: '', abrechnung: 'einmalig' };
+
+export const EMPTY_OUTREACH_LEISTUNG_INPUT: OutreachLeistungInput = { titel: '', beschreibung: '', anlass: '', nutzen: '', beleg: '' };
 
 export const EMPTY_LEISTUNG_INPUT: LeistungInput = { kategorie_id: '', titel_de: '', titel_en: '', text_de: '', text_en: '' };
