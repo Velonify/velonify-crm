@@ -35,10 +35,11 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
 
   // Seed data is attributed to a demo user; afterwards to whoever uses the demo.
   let seeding = true;
+  const calendar = new MemoryCalendar();
   const service = new CrmService({
     store: new SheetStore(sheets),
     drive,
-    calendar: new MemoryCalendar(),
+    calendar,
     currentUser: () => (seeding ? 'demo@velonify.de' : currentUser()),
   });
   await service.saveEinstellungen({
@@ -91,6 +92,22 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
 
   await service.uebernimmStartkatalog();
   await service.uebernimmOutreachStartliste();
+
+  // A few appointments this week, so the calendar page has something to show.
+  const um = (tage: number, stunde: number, minute = 0) => {
+    const d = new Date();
+    d.setDate(d.getDate() + tage);
+    d.setHours(stunde, minute, 0, 0);
+    return d.toISOString();
+  };
+  const termin = (titel: string, start: string, ende: string, teilnehmer: string[], extra: Partial<(typeof calendar.events)[number]> = {}) =>
+    calendar.events.push({ id: `demo-${calendar.events.length}`, titel, start, ende, teilnehmer, abgesagt: false, ganztaegig: false, ...extra });
+  termin('Team-Sync', um(0, 9, 30), um(0, 10), ['lugge@velonify.de', 'johannes@velonify.de', 'julian@velonify.de'], { meetLink: 'https://meet.google.com/demo-team-sync' });
+  termin('Migrations-Call Nordlicht', um(0, 14), um(0, 15), ['lugge@velonify.de', 'mara.holm@nordlicht-outdoor.example'], { meetLink: 'https://meet.google.com/demo-nordlicht' });
+  termin('Workshop Kleinod', um(1, 10), um(1, 12), ['julian@velonify.de', 'jonas@kleinod-schmuck.example'], { ort: 'Leipzig' });
+  termin('Fokuszeit Angebot', um(2, 13), um(2, 16), ['lugge@velonify.de']);
+  termin('E-Commerce-Messe', addDays(heute, 3), addDays(heute, 5), [], { ganztaegig: true, ort: 'Köln' });
+  termin('Abgelehnter Termin', um(1, 16), um(1, 17), ['lugge@velonify.de', 'extern@beispiel.example'], { antwort: 'declined' });
 
   seeding = false;
   return { service, sheets };

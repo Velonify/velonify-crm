@@ -10,6 +10,11 @@ export interface CalendarEvent {
   link?: string;
   meetLink?: string;
   abgesagt: boolean;
+  /** All-day events carry dates (YYYY-MM-DD) instead of timestamps; the end date is exclusive. */
+  ganztaegig: boolean;
+  ort?: string;
+  /** The signed-in person's reply, when invited */
+  antwort?: 'accepted' | 'declined' | 'tentative' | 'needsAction';
 }
 
 export interface MeetingRequest {
@@ -26,6 +31,8 @@ export interface CalendarApi {
   createMeeting(request: MeetingRequest): Promise<CalendarEvent>;
   /** Events in the signed-in person's primary calendar where `email` takes part. */
   findEvents(email: string, von: string, bis: string): Promise<CalendarEvent[]>;
+  /** All events in the signed-in person's primary calendar between two ISO timestamps, in start order. */
+  listEvents(von: string, bis: string): Promise<CalendarEvent[]>;
 }
 
 const BASE_URL = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
@@ -36,9 +43,11 @@ interface GoogleEvent {
   status?: string;
   htmlLink?: string;
   hangoutLink?: string;
+  location?: string;
+  eventType?: string;
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
-  attendees?: { email?: string }[];
+  attendees?: { email?: string; self?: boolean; responseStatus?: string }[];
   organizer?: { email?: string };
   conferenceData?: { entryPoints?: { entryPointType?: string; uri?: string }[] };
 }
@@ -61,6 +70,9 @@ function toEvent(event: GoogleEvent): CalendarEvent {
     link: event.htmlLink,
     meetLink: event.hangoutLink ?? video,
     abgesagt: event.status === 'cancelled',
+    ganztaegig: !event.start?.dateTime && Boolean(event.start?.date),
+    ort: event.location,
+    antwort: event.attendees?.find((a) => a.self)?.responseStatus as CalendarEvent['antwort'],
   };
 }
 
@@ -102,5 +114,12 @@ export class GoogleCalendar implements CalendarApi {
     const wanted = email.toLowerCase();
     // q is a fuzzy full-text search; keep only events the person really takes part in.
     return (data.items ?? []).map(toEvent).filter((e) => e.teilnehmer.some((t) => t.toLowerCase() === wanted));
+  }
+
+  async listEvents(von: string, bis: string): Promise<CalendarEvent[]> {
+    const params = new URLSearchParams({ timeMin: von, timeMax: bis, singleEvents: 'true', orderBy: 'startTime', maxResults: '250' });
+    const data = await googleRequest<{ items?: GoogleEvent[] }>(this.getToken, `${BASE_URL}?${params}`, {}, describe);
+    // Working-location entries ("Home", "Office") would fill every day without being appointments.
+    return (data.items ?? []).filter((e) => e.eventType !== 'workingLocation').map(toEvent).filter((e) => !e.abgesagt);
   }
 }
