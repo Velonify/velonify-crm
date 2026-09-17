@@ -130,7 +130,7 @@ export function PipelinePage() {
                     }}
                   >
                     <div className="board-card-top">
-                      <Link to={`/firmen/${firma.id}`} className="row-title">
+                      <Link to={`/crm/firmen/${firma.id}`} className="row-title">
                         {firma.name}
                       </Link>
                       {firma.tier && <TierBadge tier={firma.tier} />}

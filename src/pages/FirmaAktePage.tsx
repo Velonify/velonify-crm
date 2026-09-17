@@ -37,7 +37,7 @@ function DublettenHinweis({ firma, alle }: { firma: Firma; alle: readonly Firma[
       <ul className="dubletten-liste">
         {treffer.map((t) => (
           <li key={t.firma.id}>
-            <Link to={`/firmen/${t.firma.id}`}>
+            <Link to={`/crm/firmen/${t.firma.id}`}>
               {t.firma.name}
               {t.firma.domain && ` (${t.firma.domain})`}
             </Link>{' '}
@@ -67,7 +67,7 @@ export function FirmaAktePage() {
       <div className="page">
         <PageHeader eyebrow="Firmen" title="Firma nicht gefunden" />
         <p>
-          Diese Firma gibt es nicht (mehr). <Link to="/firmen">Zur Firmenliste</Link>
+          Diese Firma gibt es nicht (mehr). <Link to="/crm/firmen">Zur Firmenliste</Link>
         </p>
         {loading && <Loading />}
       </div>
@@ -109,7 +109,7 @@ export function FirmaAktePage() {
       <PageHeader
         eyebrow={
           <nav aria-label="Pfad">
-            <Link to="/firmen">Firmen</Link>
+            <Link to="/crm/firmen">Firmen</Link>
           </nav>
         }
         title={f.name}

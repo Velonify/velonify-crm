@@ -92,7 +92,7 @@ export function ImportPage() {
         <div className="hint-box success">
           <strong>Import abgeschlossen:</strong> {anzahl(ergebnis.neu, 'neue Firma', 'neue Firmen')}, {ergebnis.ergaenzt} ergänzt,{' '}
           {anzahl(ergebnis.kontakte, 'Kontakt', 'Kontakte')}, {anzahl(ergebnis.deals, 'Deal', 'Deals')}.{' '}
-          <Link to="/firmen?status=lead">Zu den Leads</Link> · <Link to="/pipeline">Zur Pipeline</Link>
+          <Link to="/crm/firmen?status=lead">Zu den Leads</Link> · <Link to="/crm/pipeline">Zur Pipeline</Link>
         </div>
       )}
 
@@ -214,7 +214,7 @@ export function ImportPage() {
                         <span className={`badge aktion-${z.aktion}`}>{AKTION_LABEL[z.aktion]}</span>
                       </td>
                       <td>
-                        {z.firmaId ? <Link to={`/firmen/${z.firmaId}`}>{z.name}</Link> : z.name || <span className="muted">–</span>}
+                        {z.firmaId ? <Link to={`/crm/firmen/${z.firmaId}`}>{z.name}</Link> : z.name || <span className="muted">–</span>}
                         <div className="row-sub">{z.domain}</div>
                       </td>
                       <td className="hide-sm">{z.tier || '–'}</td>
@@ -223,7 +223,7 @@ export function ImportPage() {
                         {z.dubletteVon?.firmaId && (
                           <>
                             {' '}
-                            <Link to={`/firmen/${z.dubletteVon.firmaId}`}>Ansehen</Link>
+                            <Link to={`/crm/firmen/${z.dubletteVon.firmaId}`}>Ansehen</Link>
                           </>
                         )}
                       </td>

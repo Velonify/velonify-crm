@@ -28,8 +28,8 @@ export function LoginPage() {
       <main className="login-main">
         <div className="login-card">
           <div className="eyebrow-mark">Anmeldung</div>
-          <h1>Velonify CRM</h1>
-          <p className="lead-text">Leads, Vertrieb und Kundenakte an einem Ort.</p>
+          <h1>Velonify intern</h1>
+          <p className="lead-text">CRM, Kunden und interne Werkzeuge an einem Ort.</p>
           <button type="button" className="button primary large" onClick={handleClick} disabled={!googleReady || busy}>
             {busy ? 'Anmeldung läuft …' : googleReady ? 'Mit Google anmelden' : 'Google-Anmeldung wird geladen …'}
           </button>

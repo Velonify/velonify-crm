@@ -1,6 +1,6 @@
-# Velonify CRM
+# Velonify intern
 
-Internes CRM für Leads, Vertrieb, Angebote und Kundenakte.
+Interne Company Page: Startseite mit Schnellzugriff, dazu das CRM für Leads, Vertrieb, Angebote und Kundenakte. Weitere Werkzeuge (als Nächstes der Angebots-Kalkulator) kommen als eigene Bereiche in der Seitenleiste dazu.
 
 - **Oberfläche:** React-App auf GitHub Pages
 - **Daten:** ein Google Sheet („CRM-Datenbank“) in der Shared Drive. **Keine Kundendaten in diesem Repo.**
@@ -12,6 +12,7 @@ Ohne Google-Zugangsdaten startet die App im **Demo-Modus** mit erfundenen Beispi
 
 | Bereich | Was es kann |
 |---|---|
+| **Startseite** | Kacheln für die Werkzeuge (CRM mit heutigen und überfälligen Aufgaben und Pipeline-Wert), „Heute dran“, Kunden und offene Angebote mit Links zu Drive, Slack und Trello, firmenweite Links (unter Einrichtung gepflegt) und ein Generator für Dateinamen nach dem Schema `YYYY-MM-DD_KÜRZEL_thema_v01`. Das CRM liegt unter `/#/crm`, alte Adressen wie `/#/firmen/…` leiten weiter. |
 | **Suche** | Überall mit `⌘K` / `Strg+K` oder über die Seitenleiste: Firmen, Kontakte und Deals nach Name, Domain, Kürzel, E-Mail, Telefon oder Ort. Umlaute egal („muenchen“ findet „München“), Pfeiltasten + Enter öffnen die Firmenakte. |
 | **Mein Tag** | Überfällige und heutige Wiedervorlagen und Deal-Schritte, nächste 7 Tage, Deals ohne nächsten Schritt, Kennzahlen (Pipeline-Wert, gewichtet, Angebote, gewonnen im Monat). Umschaltbar zwischen „Meine“ und „Alle“. |
 | **Pipeline** | Kanban nach Phase (Neu → Qualifiziert → Kontaktiert → Gespräch → Angebot → Gewonnen/Verloren), Drag & Drop, Summen je Spalte, Filter nach Zuständigem. |

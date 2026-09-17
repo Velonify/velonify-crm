@@ -21,11 +21,11 @@ export function FirmaNeuPage() {
           listen={db.listen}
           alleFirmen={db.firmen}
           submitLabel="Firma anlegen"
-          onCancel={() => navigate('/firmen')}
+          onCancel={() => navigate('/crm/firmen')}
           onSubmit={async (values) => {
             const firma = await mutate((s) => s.createFirma(values));
             toast.show(`${firma.name} angelegt`);
-            navigate(`/firmen/${firma.id}`, { replace: true });
+            navigate(`/crm/firmen/${firma.id}`, { replace: true });
           }}
         />
       ) : (

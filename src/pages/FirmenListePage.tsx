@@ -106,10 +106,10 @@ export function FirmenListePage() {
         subtitle={db ? `${visible.length} von ${activeCount} aktiven Firmen` : undefined}
         actions={
           <>
-            <Link to="/import" className="button">
+            <Link to="/crm/import" className="button">
               CSV importieren
             </Link>
-            <Link to="/firmen/neu" className="button primary">
+            <Link to="/crm/firmen/neu" className="button primary">
               Firma anlegen
             </Link>
           </>
@@ -196,9 +196,9 @@ export function FirmenListePage() {
             </thead>
             <tbody>
               {visible.map(({ firma: f, phase }) => (
-                <tr key={f.id} className={f.archiviert ? 'is-archived' : undefined} onClick={() => navigate(`/firmen/${f.id}`)}>
+                <tr key={f.id} className={f.archiviert ? 'is-archived' : undefined} onClick={() => navigate(`/crm/firmen/${f.id}`)}>
                   <td>
-                    <Link to={`/firmen/${f.id}`} className="row-title" onClick={(e) => e.stopPropagation()}>
+                    <Link to={`/crm/firmen/${f.id}`} className="row-title" onClick={(e) => e.stopPropagation()}>
                       {f.name}
                     </Link>
                     <div className="row-sub">
@@ -235,10 +235,10 @@ export function FirmenListePage() {
                 <>
                   <p>Noch keine Firmen angelegt.</p>
                   <div className="empty-actions">
-                    <Link to="/import" className="button">
+                    <Link to="/crm/import" className="button">
                       Leads aus CSV importieren
                     </Link>
-                    <Link to="/firmen/neu" className="button primary">
+                    <Link to="/crm/firmen/neu" className="button primary">
                       Erste Firma anlegen
                     </Link>
                   </div>

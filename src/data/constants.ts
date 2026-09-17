@@ -64,6 +64,17 @@ export const EINSTELLUNG = {
   dealTitel: 'deal_titel_standard',
 } as const;
 
+export const SLACK_STANDARD_URL = 'https://velonify.slack.com';
+
+/** Company-wide links on the start page, stored under these keys in "einstellungen". */
+export const FIRMEN_LINKS = [
+  { einstellung: 'link_drive', label: 'Google Drive', hinweis: 'Shared Drive „Velonify“' },
+  { einstellung: 'link_helpcenter', label: 'Helpcenter', hinweis: 'Google Doc „00_Helpcenter – Wo gehört was hin“' },
+  { einstellung: 'link_slack', label: 'Slack', hinweis: `Leer lassen für ${SLACK_STANDARD_URL}` },
+  { einstellung: 'link_trello', label: 'Trello', hinweis: 'Workspace mit allen Boards' },
+  { einstellung: 'link_notion', label: 'Notion', hinweis: 'Velonify-Workspace' },
+] as const;
+
 /** Folder names in the shared drive, used by "Ordner automatisch suchen". */
 export const DRIVE_ORDNER_NAMEN = {
   leads: '01_Leads',

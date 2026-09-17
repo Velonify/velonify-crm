@@ -49,7 +49,7 @@ function AufgabenListe({ titel, aufgaben, heute, leer, onDeal, klasse = '' }: {
                 <span>{a.titel}</span>
               )}
               <div className="row-sub">
-                {a.firma && <Link to={`/firmen/${a.firma.id}`}>{a.firma.name}</Link>}
+                {a.firma && <Link to={`/crm/firmen/${a.firma.id}`}>{a.firma.name}</Link>}
                 {a.deal && <> · {a.deal.titel}</>}
                 {a.deal && a.art === 'deal' && (
                   <>
@@ -179,7 +179,7 @@ export function MeinTagPage() {
                           {d.titel}
                         </button>
                         <div className="row-sub">
-                          {firma && <Link to={`/firmen/${firma.id}`}>{firma.name}</Link>} <PhaseBadge phase={d.phase} />
+                          {firma && <Link to={`/crm/firmen/${firma.id}`}>{firma.name}</Link>} <PhaseBadge phase={d.phase} />
                           {d.zustaendig && <> · {d.zustaendig}</>}
                         </div>
                       </div>
