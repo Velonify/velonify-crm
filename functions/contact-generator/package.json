@@ -1,0 +1,27 @@
+{
+  "name": "contact-generator",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Google Cloud Function für den Contact Generator: prüft das Velonify-Login und lässt Claude Anschreiben formulieren.",
+  "type": "module",
+  "main": "dist/index.js",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc",
+    "gcp-build": "tsc",
+    "start": "functions-framework --target=contactGenerator",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.126.0",
+    "@google-cloud/functions-framework": "^5.0.5",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}
