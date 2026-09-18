@@ -33,6 +33,9 @@ import { kontaktName } from '../data/rules';
 import type { ContactDaten, Database } from '../data/types';
 import { errorMessage, fieldOf } from '../lib/errors';
 import { useIch } from '../lib/useIch';
+import { useAudits } from '../audit/useAudits';
+import { aufhaengerVon, istVeraltet, neuestesAuditFuer } from '../data/audit';
+import { formatDateTime } from '../lib/format';
 import { useContactDaten, useGenerator } from './useContactDaten';
 
 const ABSENDER_KEY = 'velonify-crm.absender';
@@ -107,6 +110,9 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
   const [manuell, setManuell] = useState({ titel: '', beschreibung: '' });
   const [absender, setAbsender] = useState(() => lies(ABSENDER_KEY) || vornameAus(user?.name ?? '', user?.email ?? ''));
   const [aufhaenger, setAufhaenger] = useState(() => params.get('aufhaenger') ?? '');
+  // Hooks from the newest shop audit; null = the default (first hook per chosen service).
+  const [auditAuswahl, setAuditAuswahl] = useState<string[] | null>(() => (params.get('aufhaenger') ? [] : null));
+  const audits = useAudits();
   const [modus, setModus] = useState<Modus>(() => (lies(MODUS_KEY) === 'easy' ? 'easy' : 'komplex'));
 
   const [varianten, setVarianten] = useState<Variante[]>([]);
@@ -133,6 +139,15 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
     ...(manuellAn ? [{ art: 'manuell', ...manuell } as const] : []),
   ];
   const titel = leistungenTitel(wahlen);
+  const audit = audits.data && firmaId ? neuestesAuditFuer(audits.data, firmaId) : undefined;
+  const auditAufhaenger = audit ? aufhaengerVon(audit).filter((a) => leistungIds.includes(a.leistung_id)) : [];
+  const gewaehlteAufhaenger =
+    auditAuswahl ?? leistungIds.flatMap((id) => auditAufhaenger.find((a) => a.leistung_id === id)?.text ?? []);
+  // Chosen audit hooks and the free text go to Claude together, as the team's observations.
+  const aufhaengerGesamt = [...auditAufhaenger.map((a) => a.text).filter((t) => gewaehlteAufhaenger.includes(t)), aufhaenger.trim()]
+    .filter(Boolean)
+    .join('\n')
+    .slice(0, 1000);
   const voll = wahlen.length >= MAX_LEISTUNGEN;
   const shop = shopUrl(firma?.domain ?? '');
   const info = kanalInfo(kanal)!;
@@ -151,11 +166,14 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
   const wechsleFirma = (id: string) => {
     const v = vorschlag(id);
     setFirmaId(id);
+    setAuditAuswahl(null);
     setKontaktId(v.kontaktId);
     setDealId(v.dealId);
   };
 
   const schalteLeistung = (id: string) => setLeistungIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  const schalteAufhaenger = (text: string) =>
+    setAuditAuswahl(gewaehlteAufhaenger.includes(text) ? gewaehlteAufhaenger.filter((t) => t !== text) : [...gewaehlteAufhaenger, text]);
 
   const wechsleModus = (wert: Modus) => {
     setModus(wert);
@@ -175,7 +193,7 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
     if (!generator) return setFehler(new Error('Die Adresse des Contact Generators fehlt (VITE_CONTACT_GENERATOR_URL).'));
     setBusy(true);
     try {
-      const anfrage = baueAnfrage({ kanal, sprache, anrede, absender, firma, kontakt, leistungen: wahlen, aufhaenger, hinweis: mitHinweis ? hinweis : '', modus });
+      const anfrage = baueAnfrage({ kanal, sprache, anrede, absender, firma, kontakt, leistungen: wahlen, aufhaenger: aufhaengerGesamt, hinweis: mitHinweis ? hinweis : '', modus });
       merke(ABSENDER_KEY, absender.trim());
       const neu = await generator.generiere(anfrage);
       setVarianten(neu);
@@ -232,7 +250,7 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
             leistung: titel,
             sprache,
             anrede,
-            aufhaenger,
+            aufhaenger: aufhaengerGesamt,
             betreff: variante.betreff,
             text: istEmail ? mitSignatur(variante.text, signatur) : variante.text,
           },
@@ -361,7 +379,28 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
               <Field label="Absender" hint="Vorname, mit dem die Nachricht unterschrieben wird" invalid={invalid === 'absender'}>
                 <input value={absender} onChange={(e) => setAbsender(e.target.value)} autoComplete="given-name" />
               </Field>
-              <Field label="Aufhänger (optional)" hint="Was nicht im CRM steht: Beobachtung im Shop, Post, Messe, gemeinsamer Kontakt" wide>
+              {auditAufhaenger.length > 0 && audit && (
+                <fieldset className="plain leistungen-wahl">
+                  <legend>Aufhänger aus dem Shop-Audit</legend>
+                  <div className="leistungen-liste audit-aufhaenger-wahl">
+                    {auditAufhaenger.map((a) => (
+                      <label key={`${a.leistung_id}-${a.text}`} className="checkbox">
+                        <input type="checkbox" checked={gewaehlteAufhaenger.includes(a.text)} onChange={() => schalteAufhaenger(a.text)} />
+                        {a.text}
+                      </label>
+                    ))}
+                  </div>
+                  <small className={`field-hint${istVeraltet(audit, new Date()) ? ' warn-text' : ''}`}>
+                    Geprüft {formatDateTime(audit.geprueft_am)}. <Link to={`/audit/${audit.id}`}>Audit ansehen</Link>
+                  </small>
+                </fieldset>
+              )}
+              {firma?.domain && audits.data && !audit && (
+                <p className="small muted leistungen-wahl">
+                  Noch kein Shop-Audit für diese Firma. In der <Link to={`/crm/firmen/${firma.id}`}>Firmenakte</Link> prüfen, dann gibt es hier Aufhänger mit echten Messwerten.
+                </p>
+              )}
+              <Field label={auditAufhaenger.length > 0 ? 'Weiterer Aufhänger (optional)' : 'Aufhänger (optional)'} hint="Was nicht im CRM steht: Beobachtung im Shop, Post, Messe, gemeinsamer Kontakt" wide>
                 <textarea rows={3} value={aufhaenger} onChange={(e) => setAufhaenger(e.target.value)} placeholder="z. B. Neue Herbstkollektion online, Ladezeit der Startseite über 5 Sekunden" />
               </Field>
             </div>
