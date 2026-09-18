@@ -9,7 +9,7 @@ const basis = {
   absender: { vorname: 'Lukas' },
   firma: { name: 'Musterfirma GmbH', domain: 'muster-shop.example', plattform: 'magento2', version: '2.4.6', eol: 'eol' },
   kontakt: { vorname: 'Max', nachname: 'Beispiel', rolle: 'Head of E-Commerce' },
-  leistung: { titel: 'Datenmigration', unterpunkte: ['Produkte', '301-Redirects'], anlass: 'Version ohne Support' },
+  leistungen: [{ titel: 'Datenmigration', unterpunkte: ['Produkte', '301-Redirects'], anlass: 'Version ohne Support' }],
 };
 
 describe('AnfrageSchema', () => {
@@ -26,8 +26,10 @@ describe('AnfrageSchema', () => {
     expect(AnfrageSchema.safeParse({ ...basis, modus: 'mittel' }).success).toBe(false);
   });
 
-  it('rejects unknown channels and missing company names', () => {
+  it('rejects unknown channels, missing company names and an empty or too long service list', () => {
     expect(AnfrageSchema.safeParse({ ...basis, kanal: 'fax' }).success).toBe(false);
+    expect(AnfrageSchema.safeParse({ ...basis, leistungen: [] }).success).toBe(false);
+    expect(AnfrageSchema.safeParse({ ...basis, leistungen: Array(5).fill({ titel: 'X' }) }).success).toBe(false);
     expect(AnfrageSchema.safeParse({ ...basis, firma: { name: '  ' } }).success).toBe(false);
   });
 });
@@ -43,6 +45,14 @@ describe('nutzerNachricht', () => {
     expect(text).not.toContain('Ort:');
     expect(text).not.toContain('<aufhaenger>');
     expect(text).not.toContain('Zusätzlicher Wunsch');
+    expect(text).not.toContain('zusammenhängendes Angebot');
+  });
+
+  it('adds one block per service and asks for a single offer when there are several', () => {
+    const text = nutzerNachricht(AnfrageSchema.parse({ ...basis, leistungen: [...basis.leistungen, { titel: 'Klaviyo Setup', nutzen: 'Mehr Umsatz aus Bestandskunden' }] }), 'heute');
+    expect(text.match(/<leistung>/g)).toHaveLength(2);
+    expect(text).toContain('Titel: Klaviyo Setup');
+    expect(text).toContain('Leistungen: 2. Stell sie als ein zusammenhängendes Angebot vor');
   });
 
   it('omits the contact block when there is no contact', () => {

@@ -80,7 +80,7 @@ function block(tag: string, zeilen: [string, string][]): string {
 
 /** The user turn: the task first, then the data about company, contact and service. */
 export function nutzerNachricht(anfrage: Anfrage, heute: string): string {
-  const { firma, kontakt, leistung } = anfrage;
+  const { firma, kontakt, leistungen } = anfrage;
   const regel = KANAL_REGELN[anfrage.kanal];
 
   const auftrag = [
@@ -91,6 +91,11 @@ export function nutzerNachricht(anfrage: Anfrage, heute: string): string {
     `Sprache: ${anfrage.sprache === 'de' ? 'Deutsch' : 'Englisch'}`,
     `Anrede: ${anfrage.anrede === 'sie' ? 'Sie' : 'Du'}`,
     `Absender: ${sauber(anfrage.absender.vorname)} von Velonify`,
+    ...(leistungen.length > 1
+      ? [
+          `Leistungen: ${leistungen.length}. Stell sie als ein zusammenhängendes Angebot vor, das zu dieser Firma passt, statt sie aufzuzählen. Wo der Platz knapp ist, führ mit der Leistung, die am besten zur Firma passt, und nenn die übrigen nur kurz.`,
+        ]
+      : []),
     ...(anfrage.hinweis ? [`Zusätzlicher Wunsch für diese Fassung: ${sauber(anfrage.hinweis)}`] : []),
     '</auftrag>',
   ].join('\n');
@@ -107,14 +112,16 @@ export function nutzerNachricht(anfrage: Anfrage, heute: string): string {
       ['Notiz des Teams', firma.notiz],
     ]),
     kontakt ? block('kontakt', [['Vorname', kontakt.vorname], ['Nachname', kontakt.nachname], ['Rolle', kontakt.rolle]]) : '',
-    block('leistung', [
-      ['Titel', leistung.titel],
-      ['Beschreibung', leistung.beschreibung],
-      ['Bestandteile', leistung.unterpunkte.filter(Boolean).join(' · ')],
-      ['Typischer Anlass', leistung.anlass],
-      ['Nutzen für den Kunden', leistung.nutzen],
-      ['Beleg', leistung.beleg],
-    ]),
+    ...leistungen.map((leistung) =>
+      block('leistung', [
+        ['Titel', leistung.titel],
+        ['Beschreibung', leistung.beschreibung],
+        ['Bestandteile', leistung.unterpunkte.filter(Boolean).join(' · ')],
+        ['Typischer Anlass', leistung.anlass],
+        ['Nutzen für den Kunden', leistung.nutzen],
+        ['Beleg', leistung.beleg],
+      ]),
+    ),
     block('aufhaenger', [['Beobachtung des Teams', anfrage.aufhaenger]]),
   ].filter(Boolean);
 

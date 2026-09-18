@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { aktiveLeistungen, baueAnfrage, mailtoLink, mitSignatur, prepareAnschreiben, verlaufText, vornameAus, zeichen, type AnschreibenInput } from './anschreiben';
+import { aktiveLeistungen, baueAnfrage, leistungenIds, leistungenTitel, mailtoLink, shopUrl, mitSignatur, prepareAnschreiben, verlaufText, vornameAus, zeichen, type AnschreibenInput } from './anschreiben';
 import { DemoGenerator } from './contactGenerator';
 import { CrmService } from './crm';
 import { MemoryCalendar, MemoryDrive } from './demo/memoryGoogle';
@@ -31,7 +31,7 @@ describe('Anfrage an den Contact Generator', () => {
       absender: ' Lukas ',
       firma,
       kontakt,
-      leistung: { art: 'liste', leistung: { ...migration, beleg: 'Referenz' } },
+      leistungen: [{ art: 'liste', leistung: { ...migration, beleg: 'Referenz' } }],
       aufhaenger: '',
       modus: 'easy',
     });
@@ -39,8 +39,9 @@ describe('Anfrage an den Contact Generator', () => {
     expect(anfrage.modus).toBe('easy');
     expect(anfrage.firma).toMatchObject({ name: firma.name, version: '2.4.6', eol: 'eol' });
     expect(anfrage.kontakt).toEqual({ vorname: 'Mara', nachname: 'Holm', rolle: 'Head of E-Commerce' });
-    expect(anfrage.leistung).toMatchObject({ titel: 'Shopify Migration', anlass: migration.anlass, nutzen: migration.nutzen, beleg: 'Referenz', beschreibung: migration.beschreibung });
-    expect(anfrage.leistung.anlass).toContain('Magento');
+    expect(anfrage.leistungen).toHaveLength(1);
+    expect(anfrage.leistungen[0]).toMatchObject({ titel: 'Shopify Migration', anlass: migration.anlass, nutzen: migration.nutzen, beleg: 'Referenz', beschreibung: migration.beschreibung });
+    expect(anfrage.leistungen[0].anlass).toContain('Magento');
     const text = JSON.stringify(anfrage);
     for (const privat of [firma.email_allgemein, firma.telefon_allgemein, firma.register, kontakt.email, kontakt.telefon]) {
       expect(text).not.toContain(privat);
@@ -50,18 +51,31 @@ describe('Anfrage an den Contact Generator', () => {
   it('accepts a manual service and requires sender and title', () => {
     const firma = db.firmen[0];
     const basis = { kanal: 'instagram', sprache: 'de', anrede: 'du', absender: 'Lukas', firma, aufhaenger: '', modus: 'komplex' } as const;
-    const anfrage = baueAnfrage({ ...basis, leistung: { art: 'manuell', titel: 'Media Buying', beschreibung: 'Meta und TikTok' } });
+    const anfrage = baueAnfrage({ ...basis, leistungen: [{ art: 'manuell', titel: 'Media Buying', beschreibung: 'Meta und TikTok' }] });
     expect(anfrage.kontakt).toBeNull();
-    expect(baueAnfrage({ ...basis, firma: { ...firma, notiz: 'ä'.repeat(2500) }, leistung: { art: 'manuell', titel: 'X', beschreibung: '' } }).firma.notiz).toHaveLength(2000);
-    expect(anfrage.leistung).toMatchObject({ titel: 'Media Buying', beschreibung: 'Meta und TikTok', unterpunkte: [] });
-    expect(() => baueAnfrage({ ...basis, absender: ' ', leistung: { art: 'manuell', titel: 'X', beschreibung: '' } })).toThrow(ValidationError);
-    expect(() => baueAnfrage({ ...basis, leistung: { art: 'manuell', titel: ' ', beschreibung: '' } })).toThrow(ValidationError);
+    expect(baueAnfrage({ ...basis, firma: { ...firma, notiz: 'ä'.repeat(2500) }, leistungen: [{ art: 'manuell', titel: 'X', beschreibung: '' }] }).firma.notiz).toHaveLength(2000);
+    expect(anfrage.leistungen[0]).toMatchObject({ titel: 'Media Buying', beschreibung: 'Meta und TikTok', unterpunkte: [] });
+    expect(() => baueAnfrage({ ...basis, absender: ' ', leistungen: [{ art: 'manuell', titel: 'X', beschreibung: '' }] })).toThrow(ValidationError);
+    expect(() => baueAnfrage({ ...basis, leistungen: [{ art: 'manuell', titel: ' ', beschreibung: '' }] })).toThrow(ValidationError);
+    expect(() => baueAnfrage({ ...basis, leistungen: [] })).toThrow(ValidationError);
+  });
+
+  it('sends several services in order and names them together', () => {
+    const [a, b] = aktiveLeistungen(contact.leistungen);
+    const wahlen = [{ art: 'liste', leistung: a }, { art: 'liste', leistung: b }, { art: 'manuell', titel: 'Newsletter-Design', beschreibung: '' }] as const;
+    const basis = { kanal: 'email', sprache: 'de', anrede: 'sie', absender: 'Lukas', firma: db.firmen[0], aufhaenger: '', modus: 'easy' } as const;
+    const anfrage = baueAnfrage({ ...basis, leistungen: [...wahlen] });
+    expect(anfrage.leistungen.map((l) => l.titel)).toEqual([a.titel, b.titel, 'Newsletter-Design']);
+    expect(leistungenTitel(wahlen)).toBe(`${a.titel} + ${b.titel} + Newsletter-Design`);
+    expect(leistungenIds(wahlen)).toBe(`${a.id},${b.id}`);
+    const fuenf = Array.from({ length: 5 }, () => ({ art: 'manuell', titel: 'X', beschreibung: '' }) as const);
+    expect(() => baueAnfrage({ ...basis, leistungen: fuenf })).toThrow(ValidationError);
   });
 
   it('keeps demo texts for LinkedIn notes within 300 characters', async () => {
     const anfrage = baueAnfrage({
       kanal: 'linkedin_notiz', sprache: 'de', anrede: 'sie', absender: 'Lukas', firma: db.firmen[0], aufhaenger: 'x'.repeat(400), modus: 'easy',
-      leistung: { art: 'manuell', titel: 'Datenmigration', beschreibung: '' },
+      leistungen: [{ art: 'manuell', titel: 'Datenmigration', beschreibung: '' }],
     });
     const varianten = await new DemoGenerator().generiere(anfrage);
     expect(varianten).toHaveLength(3);
@@ -74,6 +88,9 @@ describe('Hilfen', () => {
     expect(mailtoLink('mara@shop.example', 'Frage & Idee', 'Zeile 1\nZeile 2')).toBe('mailto:mara@shop.example?subject=Frage%20%26%20Idee&body=Zeile%201%0AZeile%202');
     expect(mitSignatur('Viele Grüße\n', ' Lukas\nVelonify ')).toBe('Viele Grüße\n\nLukas\nVelonify');
     expect(mitSignatur('Text', '  ')).toBe('Text');
+    expect(shopUrl(' shop.example ')).toBe('https://shop.example');
+    expect(shopUrl('http://shop.example/de')).toBe('http://shop.example/de');
+    expect(shopUrl('')).toBe('');
     expect(vornameAus('Lukas Hanke', 'lukas@velonify.de')).toBe('Lukas');
     expect(vornameAus('', 'julian.muster@velonify.de')).toBe('Julian');
     expect(zeichen('Grüße 👋')).toBe(7);

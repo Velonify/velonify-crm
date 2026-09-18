@@ -551,6 +551,10 @@ input[type='checkbox']:indeterminate::before { transform: scale(1); height: 3px;
 .contact-optionen-reihe { display: flex; gap: var(--space-4); flex-wrap: wrap; }
 .contact-optionen .segmented { align-self: flex-start; }
 .contact-modus { margin: calc(var(--space-2) * -1) 0 0; }
+.leistungen-wahl { grid-column: 1 / -1; }
+.leistungen-liste { display: flex; flex-direction: column; gap: 8px; }
+.leistungen-liste .checkbox { white-space: normal; align-items: flex-start; color: var(--ink); }
+.leistungen-liste .checkbox input { flex: none; margin-top: 1px; }
 .contact-ergebnis .card-header { flex-wrap: wrap; gap: var(--space-2); }
 .contact-text { display: flex; flex-direction: column; gap: var(--space-2); }
 .nachricht-text { font-size: 15px; line-height: 1.6; min-height: 220px; }
