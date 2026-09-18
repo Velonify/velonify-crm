@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { erkenneMerkmale, erkennePlattform, findeProduktUrl, hatSitemap, istProduktseite, produktLinksNachKlasse, produktSitemapAusIndex, robotsSperrtAlles } from './merkmale.js';
+import { erkenneMerkmale, erkennePlattform, findeProduktUrl, hatNewsletterFormular, hatSitemap, istProduktseite, produktLinksNachKlasse, produktSitemapAusIndex, robotsSperrtAlles } from './merkmale.js';
 import { fehlt, MAGENTO_HOME, PRODUKT_MIT_MARKUP, PRODUKT_OHNE_MARKUP, seite } from './testhilfen.js';
 
 const home = seite('https://muster-shop.example/', MAGENTO_HOME);
@@ -48,6 +48,21 @@ describe('erkenneMerkmale', () => {
     const m = erkenneMerkmale(home, { magentoVersion: null, produkt: seite('p', PRODUKT_MIT_MARKUP), sitemap: null, robots: null });
     expect(m.seo.product_markup).toBe(true);
     expect(m.seo.product_bewertungen).toBe(true);
+  });
+});
+
+describe('hatNewsletterFormular', () => {
+  it('finds forms that tools render with JavaScript', () => {
+    expect(hatNewsletterFormular('<footer><div class="klaviyo-form-AbC123"></div></footer>')).toBe(true);
+    expect(hatNewsletterFormular('<form id="mc-embedded-subscribe-form"></form>')).toBe(true);
+    expect(hatNewsletterFormular('<form action="/newsletter/subscriber/new/"><input name="email"></form>')).toBe(true);
+    expect(hatNewsletterFormular('<input type="hidden" name="contact[tags]" value="newsletter"><input type="email" name="contact[email]">')).toBe(true);
+  });
+
+  it('accepts an e-mail field with an English or German signup word, but not a login field alone', () => {
+    expect(hatNewsletterFormular('<input type="email" placeholder="E-Mail"><button>Subscribe</button>')).toBe(true);
+    expect(hatNewsletterFormular('<input type="email"><button>Jetzt anmelden</button>')).toBe(true);
+    expect(hatNewsletterFormular('<form action="/login"><input type="email"><button>Einloggen</button></form>')).toBe(false);
   });
 });
 
