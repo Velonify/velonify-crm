@@ -41,14 +41,16 @@ export class DemoGenerator implements GeneratorApi {
     const gruss = anfrage.kontakt?.vorname ? `${du ? 'Hi' : 'Hallo'} ${du ? anfrage.kontakt.vorname : `${anfrage.kontakt.vorname} ${anfrage.kontakt.nachname}`.trim()},` : du ? 'Hi zusammen,' : 'Guten Tag,';
     const ihr = du ? 'euer' : 'Ihr';
     const system = [anfrage.firma.plattform, anfrage.firma.version].filter(Boolean).join(' ');
+    const titel = anfrage.leistungen.map((l) => l.titel).join(' und ');
+    const nutzen = anfrage.leistungen[0]?.nutzen;
     const kurz = kanalInfo(anfrage.kanal)?.zeichenLimit === 300;
     const texte = [
-      `${gruss} ${ihr} Shop ${anfrage.firma.domain || anfrage.firma.name} ist mir aufgefallen${system ? ` – er läuft noch auf ${system}` : ''}. Wir helfen Händlern bei „${anfrage.leistung.titel}“. Passt ein kurzer Austausch?`,
-      `${gruss} kurze Frage zu ${anfrage.firma.name}: Ist „${anfrage.leistung.titel}“ bei ${du ? 'euch' : 'Ihnen'} gerade ein Thema? ${anfrage.aufhaenger || 'Wir haben dazu ein paar konkrete Ideen.'}`,
-      `${gruss} ich bin ${anfrage.absender.vorname} von Velonify. ${anfrage.leistung.nutzen || `Bei „${anfrage.leistung.titel}“ können wir ${du ? 'euch' : 'Sie'} entlasten.`} Wäre ein 15-minütiges Gespräch interessant?`,
+      `${gruss} ${ihr} Shop ${anfrage.firma.domain || anfrage.firma.name} ist mir aufgefallen${system ? ` – er läuft noch auf ${system}` : ''}. Wir helfen Händlern bei „${titel}“. Passt ein kurzer Austausch?`,
+      `${gruss} kurze Frage zu ${anfrage.firma.name}: Ist „${titel}“ bei ${du ? 'euch' : 'Ihnen'} gerade ein Thema? ${anfrage.aufhaenger || 'Wir haben dazu ein paar konkrete Ideen.'}`,
+      `${gruss} ich bin ${anfrage.absender.vorname} von Velonify. ${nutzen || `Bei „${titel}“ können wir ${du ? 'euch' : 'Sie'} entlasten.`} Wäre ein 15-minütiges Gespräch interessant?`,
     ];
     return texte.map((text, i) => ({
-      betreff: anfrage.kanal === 'email' ? [`${anfrage.leistung.titel} für ${anfrage.firma.name}`, `Frage zu ${anfrage.firma.domain || anfrage.firma.name}`, 'Kurzer Gedanke zu Ihrem Shop'][i] : '',
+      betreff: anfrage.kanal === 'email' ? [`${titel} für ${anfrage.firma.name}`, `Frage zu ${anfrage.firma.domain || anfrage.firma.name}`, 'Kurzer Gedanke zu Ihrem Shop'][i] : '',
       text: kurz ? text.slice(0, 300) : `${text}\n\n(Beispieltext aus dem Demo-Modus)`,
     }));
   }

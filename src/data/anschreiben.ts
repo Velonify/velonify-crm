@@ -34,6 +34,12 @@ export type LeistungsWahl = { art: 'liste'; leistung: OutreachLeistung } | { art
 
 export const leistungsTitel = (wahl: LeistungsWahl) => (wahl.art === 'liste' ? wahl.leistung.titel : wahl.titel.trim());
 
+/** Title for history, deal and the "gesendet" list: "Shopify Migration + Klaviyo Setup". */
+export const leistungenTitel = (wahlen: readonly LeistungsWahl[]) => wahlen.map(leistungsTitel).filter(Boolean).join(' + ');
+
+/** Comma-separated ids for `anschreiben.leistung_id`; a manual service has none. */
+export const leistungenIds = (wahlen: readonly LeistungsWahl[]) => wahlen.flatMap((w) => (w.art === 'liste' ? [w.leistung.id] : [])).join(',');
+
 /** Active services in list order. */
 export const aktiveLeistungen = (leistungen: readonly OutreachLeistung[]) =>
   leistungen
@@ -53,7 +59,8 @@ export interface GeneratorEingabe {
   absender: string;
   firma: Firma;
   kontakt?: Kontakt;
-  leistung: LeistungsWahl;
+  /** One or more services, in list order; the message presents them as one offer. */
+  leistungen: LeistungsWahl[];
   aufhaenger: string;
   hinweis?: string;
   modus: Modus;
@@ -67,7 +74,7 @@ export interface GeneratorAnfrage {
   absender: { vorname: string };
   firma: Pick<Firma, 'name' | 'domain' | 'ort' | 'plattform' | 'version' | 'eol' | 'tech_info' | 'notiz'>;
   kontakt: Pick<Kontakt, 'vorname' | 'nachname' | 'rolle'> | null;
-  leistung: { titel: string; unterpunkte: string[]; anlass: string; nutzen: string; beleg: string; beschreibung: string };
+  leistungen: { titel: string; unterpunkte: string[]; anlass: string; nutzen: string; beleg: string; beschreibung: string }[];
   aufhaenger: string;
   hinweis: string;
   modus: Modus;
@@ -77,6 +84,9 @@ export interface Variante {
   betreff: string;
   text: string;
 }
+
+/** As many services as the Cloud Function accepts in one request. */
+export const MAX_LEISTUNGEN = 4;
 
 /** Cuts CRM text to the length the Cloud Function accepts, so a long note does not block generating. */
 // String length as zod counts it (UTF-16 units), not characters.
@@ -89,8 +99,9 @@ const kurz = (wert: string, max: number) => wert.trim().slice(0, max);
 export function baueAnfrage(e: GeneratorEingabe): GeneratorAnfrage {
   const absender = e.absender.trim();
   if (!absender) throw new ValidationError('absender', 'Bitte den Vornamen des Absenders angeben.');
-  const titel = leistungsTitel(e.leistung);
-  if (!titel) throw new ValidationError('leistung', 'Bitte eine Leistung wählen oder manuell beschreiben.');
+  if (e.leistungen.length === 0) throw new ValidationError('leistung', 'Bitte mindestens eine Leistung wählen oder manuell beschreiben.');
+  if (e.leistungen.length > MAX_LEISTUNGEN) throw new ValidationError('leistung', `Bitte höchstens ${MAX_LEISTUNGEN} Leistungen wählen.`);
+  if (e.leistungen.some((w) => !leistungsTitel(w))) throw new ValidationError('leistung', 'Bitte der manuellen Leistung einen Titel geben.');
 
   // Limits as in functions/contact-generator/src/anfrage.ts.
   const f = e.firma;
@@ -110,17 +121,18 @@ export function baueAnfrage(e: GeneratorEingabe): GeneratorAnfrage {
       notiz: kurz(f.notiz, 2000),
     },
     kontakt: e.kontakt ? { vorname: kurz(e.kontakt.vorname, 60), nachname: kurz(e.kontakt.nachname, 60), rolle: kurz(e.kontakt.rolle, 120) } : null,
-    leistung:
-      e.leistung.art === 'liste'
+    leistungen: e.leistungen.map((w) =>
+      w.art === 'liste'
         ? {
-            titel: kurz(titel, 200),
+            titel: kurz(w.leistung.titel, 200),
             unterpunkte: [],
-            anlass: kurz(e.leistung.leistung.anlass, 1000),
-            nutzen: kurz(e.leistung.leistung.nutzen, 1000),
-            beleg: kurz(e.leistung.leistung.beleg, 1000),
-            beschreibung: kurz(e.leistung.leistung.beschreibung, 2000),
+            anlass: kurz(w.leistung.anlass, 1000),
+            nutzen: kurz(w.leistung.nutzen, 1000),
+            beleg: kurz(w.leistung.beleg, 1000),
+            beschreibung: kurz(w.leistung.beschreibung, 2000),
           }
-        : { titel: kurz(titel, 200), unterpunkte: [], anlass: '', nutzen: '', beleg: '', beschreibung: kurz(e.leistung.beschreibung, 2000) },
+        : { titel: kurz(w.titel, 200), unterpunkte: [], anlass: '', nutzen: '', beleg: '', beschreibung: kurz(w.beschreibung, 2000) },
+    ),
     aufhaenger: kurz(e.aufhaenger, 1000),
     hinweis: kurz(e.hinweis ?? '', 500),
     modus: e.modus,
@@ -131,6 +143,13 @@ export function baueAnfrage(e: GeneratorEingabe): GeneratorAnfrage {
 export const zeichen = (text: string) => [...text].length;
 
 export const mitSignatur = (text: string, signatur: string) => (signatur.trim() ? `${text.trimEnd()}\n\n${signatur.trim()}` : text);
+
+/** "shop.example" or "https://shop.example/" → opening address; empty when there is no domain. */
+export function shopUrl(domain: string): string {
+  const d = domain.trim();
+  if (!d) return '';
+  return /^https?:\/\//i.test(d) ? d : `https://${d}`;
+}
 
 export const mailtoLink = (email: string, betreff: string, text: string) =>
   `mailto:${email.trim()}?subject=${encodeURIComponent(betreff)}&body=${encodeURIComponent(text)}`;

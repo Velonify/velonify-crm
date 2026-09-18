@@ -8,11 +8,14 @@ import {
   baueAnfrage,
   KANAELE,
   kanalInfo,
-  MODI,
-  leistungsTitel,
+  leistungenIds,
+  leistungenTitel,
   mailtoLink,
+  MAX_LEISTUNGEN,
+  MODI,
   mitSignatur,
   offeneDeals,
+  shopUrl,
   signaturSchluessel,
   vornameAus,
   zeichen,
@@ -98,7 +101,8 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
   const [kanal, setKanal] = useState<Kanal>(() => (kanalInfo(lies(KANAL_KEY))?.wert ?? 'linkedin_notiz'));
   const [anrede, setAnrede] = useState<Anrede>(() => kanalInfo(kanal)?.anrede ?? 'sie');
   const [sprache, setSprache] = useState<'de' | 'en'>('de');
-  const [leistungWert, setLeistungWert] = useState('');
+  const [leistungIds, setLeistungIds] = useState<string[]>([]);
+  const [manuellAn, setManuellAn] = useState(false);
   const [manuell, setManuell] = useState({ titel: '', beschreibung: '' });
   const [absender, setAbsender] = useState(() => lies(ABSENDER_KEY) || vornameAus(user?.name ?? '', user?.email ?? ''));
   const [aufhaenger, setAufhaenger] = useState('');
@@ -122,12 +126,14 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
   const kontakte = db.kontakte.filter((k) => k.firma_id === firmaId && !k.archiviert);
   const kontakt = kontakte.find((k) => k.id === kontaktId);
   const deals = offeneDeals(db.deals, firmaId);
-  const gewaehlteLeistung = leistungen.find((l) => l.id === leistungWert);
-  const wahl: LeistungsWahl | null = gewaehlteLeistung
-    ? { art: 'liste', leistung: gewaehlteLeistung }
-    : leistungWert === 'manuell'
-      ? { art: 'manuell', ...manuell }
-      : null;
+  // List order, the manual service last.
+  const wahlen: LeistungsWahl[] = [
+    ...leistungen.filter((l) => leistungIds.includes(l.id)).map((leistung): LeistungsWahl => ({ art: 'liste', leistung })),
+    ...(manuellAn ? [{ art: 'manuell', ...manuell } as const] : []),
+  ];
+  const titel = leistungenTitel(wahlen);
+  const voll = wahlen.length >= MAX_LEISTUNGEN;
+  const shop = shopUrl(firma?.domain ?? '');
   const info = kanalInfo(kanal)!;
   const variante = varianten[aktiv];
   const istEmail = kanal === 'email';
@@ -148,6 +154,8 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
     setDealId(v.dealId);
   };
 
+  const schalteLeistung = (id: string) => setLeistungIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+
   const wechsleModus = (wert: Modus) => {
     setModus(wert);
     merke(MODUS_KEY, wert);
@@ -162,11 +170,11 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
   const generieren = async (mitHinweis = false) => {
     setFehler(undefined);
     if (!firma) return setFehler(Object.assign(new Error('Bitte eine Firma wählen.'), { field: 'firma_id' }));
-    if (!wahl) return setFehler(Object.assign(new Error('Bitte eine Leistung wählen oder manuell beschreiben.'), { field: 'leistung' }));
+    if (wahlen.length === 0) return setFehler(Object.assign(new Error('Bitte mindestens eine Leistung wählen oder manuell beschreiben.'), { field: 'leistung' }));
     if (!generator) return setFehler(new Error('Die Adresse des Contact Generators fehlt (VITE_CONTACT_GENERATOR_URL).'));
     setBusy(true);
     try {
-      const anfrage = baueAnfrage({ kanal, sprache, anrede, absender, firma, kontakt, leistung: wahl, aufhaenger, hinweis: mitHinweis ? hinweis : '', modus });
+      const anfrage = baueAnfrage({ kanal, sprache, anrede, absender, firma, kontakt, leistungen: wahlen, aufhaenger, hinweis: mitHinweis ? hinweis : '', modus });
       merke(ABSENDER_KEY, absender.trim());
       const neu = await generator.generiere(anfrage);
       setVarianten(neu);
@@ -208,7 +216,7 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
   };
 
   const alsGesendet = async () => {
-    if (!firma || !wahl || !variante) return;
+    if (!firma || wahlen.length === 0 || !variante) return;
     setSendet(true);
     setFehler(undefined);
     try {
@@ -219,15 +227,15 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
             kontakt_id: kontaktId,
             deal_id: dealId,
             kanal,
-            leistung_id: wahl.art === 'liste' ? wahl.leistung.id : '',
-            leistung: leistungsTitel(wahl),
+            leistung_id: leistungenIds(wahlen),
+            leistung: titel,
             sprache,
             anrede,
             aufhaenger,
             betreff: variante.betreff,
             text: istEmail ? mitSignatur(variante.text, signatur) : variante.text,
           },
-          !dealId && deals.length === 0 && neuerDeal ? { neuerDeal: { titel: leistungsTitel(wahl), zustaendig: firma.zustaendig || ich || '' } } : {},
+          !dealId && deals.length === 0 && neuerDeal ? { neuerDeal: { titel, zustaendig: firma.zustaendig || ich || '' } } : {},
         ),
       );
       setGesendet(true);
@@ -242,7 +250,7 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
 
   const laenge = variante ? zeichen(variante.text) : 0;
   const zuLang = Boolean(info.zeichenLimit && laenge > info.zeichenLimit);
-  const outreachLeer = wahl?.art === 'liste' && !wahl.leistung.anlass && !wahl.leistung.nutzen && !wahl.leistung.beleg;
+  const ohneOutreach = wahlen.flatMap((w) => (w.art === 'liste' && !w.leistung.anlass && !w.leistung.nutzen && !w.leistung.beleg ? [w.leistung.titel] : []));
   const dealVorher = db.deals.find((d) => d.id === dealId);
 
   return (
@@ -292,9 +300,18 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
             {firma && (
               <p className="small muted contact-daten">
                 An Claude gehen: {[firma.name, firma.domain, firma.ort, [firma.plattform, firma.version].filter(Boolean).join(' '), firma.tech_info && 'Technik', firma.notiz && 'Notiz'].filter(Boolean).join(' · ')}
-                {kontakt && ` · ${kontaktName(kontakt)}${kontakt.rolle ? ` (${kontakt.rolle})` : ''}`}. Keine E-Mail-Adressen, Telefonnummern oder Deal-Werte.{' '}
-                <Link to={`/crm/firmen/${firma.id}`}>Firmenakte</Link>
+                {kontakt && ` · ${kontaktName(kontakt)}${kontakt.rolle ? ` (${kontakt.rolle})` : ''}`}. Keine E-Mail-Adressen, Telefonnummern oder Deal-Werte.
               </p>
+            )}
+            {firma && (
+              <div className="contact-links">
+                {shop && (
+                  <a href={shop} target="_blank" rel="noopener noreferrer">
+                    Shop öffnen ({firma.domain.replace(/^https?:\/\//i, '').replace(/\/$/, '')})
+                  </a>
+                )}
+                <Link to={`/crm/firmen/${firma.id}`}>Firmenakte</Link>
+              </div>
             )}
           </Card>
 
@@ -309,18 +326,28 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
               <p className="small muted contact-modus">{MODI.find((m) => m.wert === modus)?.hinweis}</p>
             </div>
             <div className="grid">
-              <Field label="Leistung" invalid={invalid === 'leistung'} wide>
-                <select value={leistungWert} onChange={(e) => setLeistungWert(e.target.value)}>
-                  <option value="">Bitte wählen …</option>
-                  {leistungen.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.titel}
-                    </option>
-                  ))}
-                  <option value="manuell">Manuell</option>
-                </select>
-              </Field>
-              {leistungWert === 'manuell' && (
+              <fieldset className={`plain leistungen-wahl${invalid === 'leistung' ? ' invalid' : ''}`}>
+                <legend>Leistungen</legend>
+                <div className="leistungen-liste">
+                  {leistungen.map((l) => {
+                    const an = leistungIds.includes(l.id);
+                    return (
+                      <label key={l.id} className={`checkbox${!an && voll ? ' is-disabled' : ''}`}>
+                        <input type="checkbox" checked={an} disabled={!an && voll} onChange={() => schalteLeistung(l.id)} />
+                        {l.titel}
+                      </label>
+                    );
+                  })}
+                  <label className={`checkbox${!manuellAn && voll ? ' is-disabled' : ''}`}>
+                    <input type="checkbox" checked={manuellAn} disabled={!manuellAn && voll} onChange={(e) => setManuellAn(e.target.checked)} />
+                    Manuell
+                  </label>
+                </div>
+                <small className="field-hint">
+                  {wahlen.length > 1 ? `Claude stellt die ${wahlen.length} Leistungen als ein Angebot vor.` : `Mehrere möglich, höchstens ${MAX_LEISTUNGEN}.`}
+                </small>
+              </fieldset>
+              {manuellAn && (
                 <>
                   <Field label="Titel" wide>
                     <input value={manuell.titel} onChange={(e) => setManuell((m) => ({ ...m, titel: e.target.value }))} placeholder="z. B. Media Buying für Meta und TikTok" autoComplete="off" />
@@ -342,9 +369,9 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
                 Noch keine Leistungen hinterlegt. <Link to="/contact/leistungen">Startliste übernehmen</Link> oder „Manuell“ wählen.
               </p>
             )}
-            {outreachLeer && (
+            {ohneOutreach.length > 0 && (
               <p className="hint-box">
-                Für „{wahl.leistung.titel}“ sind noch kein Anlass, Nutzen oder Beleg hinterlegt. Claude arbeitet dann nur mit Titel und Beschreibung.{' '}
+                Für {ohneOutreach.map((t) => `„${t}“`).join(', ')} sind noch kein Anlass, Nutzen oder Beleg hinterlegt. Claude arbeitet dann nur mit Titel und Beschreibung.{' '}
                 <Link to="/contact/leistungen">Leistungen pflegen</Link>
               </p>
             )}
@@ -449,10 +476,10 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
                 </div>
 
                 <div className="contact-senden">
-                  {!dealId && deals.length === 0 && firma && wahl && (
+                  {!dealId && deals.length === 0 && firma && titel && (
                     <label className="checkbox">
                       <input type="checkbox" checked={neuerDeal} onChange={(e) => setNeuerDeal(e.target.checked)} />
-                      Deal „{leistungsTitel(wahl)}“ anlegen
+                      Deal „{titel}“ anlegen
                     </label>
                   )}
                   <p className="small muted">
