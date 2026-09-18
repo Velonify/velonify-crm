@@ -1,7 +1,7 @@
 import { ConflictError, NotFoundError, SchemaError } from '../errors';
-import { ENTITY_TABS, ANGEBOTS_TABS, CONTACT_TABS, LISTEN_DEFAULTS, SCHEMA, type EntityTab, type TabSchema } from '../schema';
+import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, LISTEN_DEFAULTS, SCHEMA, type EntityTab, type TabSchema } from '../schema';
 import type { RecordUpdate, Store } from '../store';
-import type { AngebotsDaten, ContactDaten, Database, Einstellungen, EntityMap, Listen } from '../types';
+import type { AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Listen } from '../types';
 import { columnLetter, recordToRow, rowToRecord } from './rows';
 import { quoteTab, type SheetsApi, type ValueWrite } from './sheetsClient';
 
@@ -109,6 +109,17 @@ export class SheetStore implements Store {
       return table;
     });
     return { leistungen: entityRows('outreach_leistungen', tables[0]), anschreiben: entityRows('anschreiben', tables[1]) };
+  }
+
+  async loadAudits(): Promise<Audit[]> {
+    const info = await this.api.getSpreadsheet();
+    if (!info.sheets?.some((sheet) => sheet.properties.title === AUDIT_TABS[0])) {
+      throw new SchemaError('Das Shop-Audit ist noch nicht eingerichtet. Bitte unter „Einrichtung“ auf „Einrichten“ klicken.');
+    }
+    const table = splitHeader(await this.api.getValues(fullRange('audits')));
+    assertColumns(SCHEMA.audits, table.header);
+    this.headers.set('audits', table.header);
+    return entityRows('audits', table);
   }
 
   private async header(tab: string): Promise<string[]> {

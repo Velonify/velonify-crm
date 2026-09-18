@@ -31,6 +31,7 @@ jobs:
           VITE_SPREADSHEET_ID: ${{ vars.SPREADSHEET_ID }}
           VITE_ALLOWED_DOMAIN: ${{ vars.ALLOWED_DOMAIN }}
           VITE_CONTACT_GENERATOR_URL: ${{ vars.CONTACT_GENERATOR_URL }}
+          VITE_SHOP_AUDIT_URL: ${{ vars.SHOP_AUDIT_URL }}
       - if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v4
         with:

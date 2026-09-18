@@ -5,6 +5,7 @@ interface ImportMetaEnv {
   readonly VITE_SPREADSHEET_ID?: string;
   readonly VITE_ALLOWED_DOMAIN?: string;
   readonly VITE_CONTACT_GENERATOR_URL?: string;
+  readonly VITE_SHOP_AUDIT_URL?: string;
 }
 
 interface ImportMeta {

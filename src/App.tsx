@@ -1,5 +1,8 @@
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AngebotePage } from './angebote/AngebotePage';
+import { AuditDetailPage } from './audit/AuditDetailPage';
+import { AuditNeuPage } from './audit/AuditNeuPage';
+import { AuditUebersichtPage } from './audit/AuditUebersichtPage';
 import { AngebotPage } from './angebote/AngebotPage';
 import { LeistungenPage } from './angebote/LeistungenPage';
 import { useAuth } from './auth/AuthContext';
@@ -58,6 +61,11 @@ export function App() {
                 <Route index element={<ContactGeneratorPage />} />
                 <Route path="gesendet" element={<GesendetPage />} />
                 <Route path="leistungen" element={<OutreachLeistungenPage />} />
+              </Route>
+              <Route path="audit">
+                <Route index element={<AuditUebersichtPage />} />
+                <Route path="neu" element={<AuditNeuPage />} />
+                <Route path=":id" element={<AuditDetailPage />} />
               </Route>
               <Route path="einrichtung" element={<EinrichtungPage />} />
               <Route path="pipeline" element={<AlteCrmAdresse />} />

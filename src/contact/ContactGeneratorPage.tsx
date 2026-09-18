@@ -101,11 +101,12 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
   const [kanal, setKanal] = useState<Kanal>(() => (kanalInfo(lies(KANAL_KEY))?.wert ?? 'linkedin_notiz'));
   const [anrede, setAnrede] = useState<Anrede>(() => kanalInfo(kanal)?.anrede ?? 'sie');
   const [sprache, setSprache] = useState<'de' | 'en'>('de');
-  const [leistungIds, setLeistungIds] = useState<string[]>([]);
+  // From the shop audit: /contact?firma=…&leistung=…&aufhaenger=…
+  const [leistungIds, setLeistungIds] = useState<string[]>(() => (params.get('leistung') ? [params.get('leistung')!] : []));
   const [manuellAn, setManuellAn] = useState(false);
   const [manuell, setManuell] = useState({ titel: '', beschreibung: '' });
   const [absender, setAbsender] = useState(() => lies(ABSENDER_KEY) || vornameAus(user?.name ?? '', user?.email ?? ''));
-  const [aufhaenger, setAufhaenger] = useState('');
+  const [aufhaenger, setAufhaenger] = useState(() => params.get('aufhaenger') ?? '');
   const [modus, setModus] = useState<Modus>(() => (lies(MODUS_KEY) === 'easy' ? 'easy' : 'komplex'));
 
   const [varianten, setVarianten] = useState<Variante[]>([]);
