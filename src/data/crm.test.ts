@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { EINSTELLUNG } from './constants';
-import { CrmService } from './crm';
+import { CrmService, type TerminEingabe } from './crm';
 import { MemoryCalendar, MemoryDrive } from './demo/memoryGoogle';
 import { MemorySheets } from './demo/memorySheets';
 import { createDemoBackend } from './demo/seed';
@@ -205,23 +205,52 @@ describe('CrmService', () => {
     expect((await crm.legeLeadOrdnerAn(firma.id, 'ABC')).drive_ordner_id).toBe(vorhanden.id);
   });
 
+  const terminEingabe = (extra: Partial<TerminEingabe> = {}): TerminEingabe => ({
+    firma_id: '', kontakt_ids: [], weitere_emails: [], titel: 'Kickoff', ganztaegig: false,
+    von_datum: addDays(heute, 2), von_zeit: '10:00', bis_datum: addDays(heute, 2), bis_zeit: '10:45',
+    ort: '', beschreibung: '', meet: true, einladungSenden: true, ...extra,
+  });
+
   it('schedules a meeting with contacts and finds it again', async () => {
     const firma = await crm.createFirma(firmaInput({ name: 'Shop' }));
     const kontakt = await crm.saveKontakt(firma.id, { ...EMPTY_KONTAKT_INPUT, vorname: 'Mara', nachname: 'Holm', email: 'Mara@Shop.example' });
-    await expect(
-      crm.planeTermin({ firma_id: firma.id, kontakt_ids: [], weitere_emails: [], titel: 'Kickoff', start: '2030-01-10T10:00', dauer_min: 30, beschreibung: '', einladungSenden: true }),
-    ).rejects.toThrow(ValidationError);
+    await expect(crm.planeTermin(terminEingabe({ titel: ' ' }))).rejects.toThrow(ValidationError);
+    await expect(crm.planeTermin(terminEingabe({ bis_zeit: '09:00' }))).rejects.toThrow('Das Ende muss nach dem Beginn liegen.');
+    await expect(crm.planeTermin(terminEingabe({ weitere_emails: ['kein-mail'] }))).rejects.toThrow(ValidationError);
 
-    const termin = await crm.planeTermin({
-      firma_id: firma.id, kontakt_ids: [kontakt.id], weitere_emails: ['julian@velonify.de'], titel: 'Kickoff',
-      start: `${addDays(heute, 2)}T10:00`, dauer_min: 45, beschreibung: '', einladungSenden: true,
-    });
+    const termin = await crm.planeTermin(terminEingabe({ firma_id: firma.id, kontakt_ids: [kontakt.id], weitere_emails: ['julian@velonify.de'] }));
     expect(termin.teilnehmer).toEqual(['mara@shop.example', 'julian@velonify.de']);
+    expect(termin.meetLink).toBeTruthy();
     expect(new Date(termin.ende).getTime() - new Date(termin.start).getTime()).toBe(45 * 60_000);
 
     const db = await crm.load();
     expect(db.aktivitaeten[0]).toMatchObject({ typ: 'meeting', kalender_termin_id: termin.id, kontakt_id: kontakt.id });
     expect((await crm.termineMitFirma(db, firma.id)).map((t) => t.id)).toEqual([termin.id]);
+  });
+
+  it('adds own appointments without firm, guests or Meet, and all-day ones with an exclusive end', async () => {
+    const blocker = await crm.planeTermin(terminEingabe({ titel: 'Fokuszeit', meet: false, ort: 'Büro' }));
+    expect(blocker).toMatchObject({ titel: 'Fokuszeit', ort: 'Büro', teilnehmer: [], meetLink: undefined, bearbeitbar: true });
+    const urlaub = await crm.planeTermin(terminEingabe({ titel: 'Urlaub', ganztaegig: true, von_datum: '2030-07-01', bis_datum: '2030-07-03', meet: false }));
+    expect(urlaub).toMatchObject({ ganztaegig: true, start: '2030-07-01', ende: '2030-07-04' });
+    await expect(crm.planeTermin(terminEingabe({ ganztaegig: true, von_datum: '2030-07-03', bis_datum: '2030-07-01' }))).rejects.toThrow(ValidationError);
+    expect((await crm.load()).aktivitaeten).toEqual([]);
+  });
+
+  it('changes and deletes own appointments but not those of others', async () => {
+    const termin = await crm.planeTermin(terminEingabe({ meet: false }));
+    const geaendert = await crm.aendereTermin(termin, terminEingabe({ titel: 'Kickoff (verschoben)', von_zeit: '14:00', bis_zeit: '15:00', meet: true, weitere_emails: ['julian@velonify.de'] }));
+    expect(geaendert).toMatchObject({ id: termin.id, titel: 'Kickoff (verschoben)', teilnehmer: ['julian@velonify.de'] });
+    expect(geaendert.meetLink).toBeTruthy();
+    expect(new Date(geaendert.start).getHours()).toBe(14);
+    expect((await crm.aendereTermin(geaendert, terminEingabe({ meet: false }))).meetLink).toBeUndefined();
+
+    const fremd = { ...geaendert, bearbeitbar: false };
+    await expect(crm.aendereTermin(fremd, terminEingabe())).rejects.toThrow(ValidationError);
+    await expect(crm.loescheTermin(fremd, true)).rejects.toThrow(ValidationError);
+
+    await crm.loescheTermin(geaendert, true);
+    expect(calendar.events).toEqual([]);
   });
 
   it('imports a lead CSV: new firms with contact and deal, fills empty fields of existing ones, skips tiers', async () => {

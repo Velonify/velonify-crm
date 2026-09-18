@@ -13,7 +13,22 @@ export function useTermine(von: string, bis: string) {
   return useLoad(() => (service ? service.termine(von, bis) : new Promise<CalendarEvent[]>(() => {})), [service, von, bis]);
 }
 
-export function TerminEintrag({ event, tag, db, jetzt, kompakt = false }: { event: CalendarEvent; tag: string; db: Database; jetzt: Date; kompakt?: boolean }) {
+export function TerminEintrag({
+  event,
+  tag,
+  db,
+  jetzt,
+  kompakt = false,
+  onBearbeiten,
+}: {
+  event: CalendarEvent;
+  tag: string;
+  db: Database;
+  jetzt: Date;
+  kompakt?: boolean;
+  /** Own appointments open this instead of Google. */
+  onBearbeiten?(event: CalendarEvent): void;
+}) {
   const { userEmail } = useAuth();
   const firma = firmaFuerTermin(db, event, userEmail());
   const klassen = ['termin', event.ganztaegig && 'is-ganztaegig', istVorbei(event, jetzt) && 'is-vorbei', event.antwort === 'declined' && 'is-abgelehnt']
@@ -30,7 +45,11 @@ export function TerminEintrag({ event, tag, db, jetzt, kompakt = false }: { even
         {event.antwort === 'needsAction' && ' · offen'}
       </div>
       <div className="termin-titel">
-        {link ? (
+        {onBearbeiten && event.bearbeitbar ? (
+          <button type="button" className="termin-bearbeiten" onClick={() => onBearbeiten(event)} title="Termin bearbeiten">
+            {event.titel}
+          </button>
+        ) : link ? (
           <a href={link} target="_blank" rel="noreferrer noopener">
             {event.titel}
           </a>

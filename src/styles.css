@@ -542,6 +542,16 @@ input[type='checkbox']:indeterminate::before { transform: scale(1); height: 3px;
 .termin-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 3px; font-size: 12px; }
 .termin-meet { font-weight: 700; }
 .termin-liste { display: flex; flex-direction: column; gap: 6px; }
+.termin-bearbeiten { all: unset; cursor: pointer; color: var(--ink); overflow-wrap: anywhere; }
+.termin-bearbeiten:hover { text-decoration: underline; text-underline-offset: 3px; }
+.termin-bearbeiten:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* Fills the free space of a day; shows its label on hover so the week stays calm. */
+.kalender-neu { flex: 1 1 auto; min-height: 40px; display: flex; align-items: flex-start; justify-content: center; padding-top: 8px; border: 1px dashed transparent; background: none; color: transparent; font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; cursor: pointer; transition: color 0.15s ease, border-color 0.15s ease; }
+.kalender-neu:hover, .kalender-neu:focus-visible { color: var(--ink-muted); border-color: var(--line); }
+.termin-optionen { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: var(--space-3) 0; }
+.termin-zeiten { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: var(--space-3); }
+@media (hover: none) { .kalender-neu { color: var(--ink-muted); border-color: var(--line); min-height: 36px; flex-grow: 0; padding: 8px 0; } }
+@media (max-width: 640px) { .termin-zeiten { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* ─── Contact Generator ─────────────────────────────────────────────────── */
 .contact-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: var(--space-4); align-items: start; }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MemoryCalendar } from './demo/memoryGoogle';
 import type { CalendarEvent } from './google/calendar';
-import { firmaFuerTermin, googleKalenderUrl, istVorbei, terminTage, termineJeTag, wocheText, wochenStart, wochenTage, zeitText } from './kalender';
+import { bekannteKollegen, firmaFuerTermin, googleKalenderUrl, neueTerminZeit, terminZeit, verschiebeBeginn, istVorbei, terminTage, termineJeTag, wocheText, wochenStart, wochenTage, zeitText } from './kalender';
 import { EMPTY_FIRMA_INPUT, EMPTY_KONTAKT_INPUT, type Database, type Firma, type Kontakt } from './types';
 
 /** Local time as ISO timestamp, so the tests do not depend on the machine's time zone. */
@@ -63,5 +63,27 @@ describe('Kalender', () => {
     const ids = async (von: string, bis: string) => (await calendar.listEvents(lokal(von, '00:00'), lokal(bis, '00:00'))).map((e) => e.id);
     expect(await ids('2026-09-17', '2026-09-18')).toEqual(['a']);
     expect(await ids('2026-09-14', '2026-09-21')).toEqual(['a', 'b']);
+  });
+});
+
+describe('Termin-Formular', () => {
+  it('turns events into form values and back to inclusive all-day ends', () => {
+    expect(terminZeit(termin({}))).toEqual({ ganztaegig: false, von_datum: '2026-09-17', von_zeit: '10:00', bis_datum: '2026-09-17', bis_zeit: '11:00' });
+    expect(terminZeit(termin({ ganztaegig: true, start: '2026-09-18', ende: '2026-09-21' }))).toMatchObject({ von_datum: '2026-09-18', bis_datum: '2026-09-20' });
+  });
+
+  it('suggests the next full hour today and keeps the duration when the start moves', () => {
+    const jetzt = new Date('2026-09-17T13:20:00');
+    expect(neueTerminZeit('2026-09-17', jetzt)).toMatchObject({ von_zeit: '14:00', bis_zeit: '15:00' });
+    expect(neueTerminZeit('2026-09-18', jetzt)).toMatchObject({ von_zeit: '10:00', bis_zeit: '11:00' });
+    const zeit = neueTerminZeit('2026-09-18', jetzt, '23:30');
+    expect(zeit).toMatchObject({ bis_datum: '2026-09-19', bis_zeit: '00:30' });
+    expect(verschiebeBeginn(neueTerminZeit('2026-09-18', jetzt, '10:00', 30), '2026-09-21', '15:00')).toMatchObject({ bis_datum: '2026-09-21', bis_zeit: '15:30' });
+  });
+
+  it('knows colleagues from signatures and loaded events', () => {
+    const db = { einstellungen: { 'signatur_johannes@velonify.de': 'x', link_drive: '' } } as unknown as Database;
+    const events = [termin({ teilnehmer: ['lugge@velonify.de', 'Julian@velonify.de', 'kunde@shop.example'] })];
+    expect(bekannteKollegen(db, events, 'lugge@velonify.de')).toEqual(['johannes@velonify.de', 'julian@velonify.de']);
   });
 });
