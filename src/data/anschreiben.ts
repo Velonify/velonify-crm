@@ -12,6 +12,13 @@ export const KANAELE = [
 export type Kanal = (typeof KANAELE)[number]['wert'];
 export type Anrede = 'sie' | 'du';
 
+/** Thinking effort in the Cloud Function: "komplex" = medium, "easy" = low. */
+export const MODI = [
+  { wert: 'komplex', label: 'Komplex', hinweis: 'Mehr Denkaufwand für wichtige Kunden, ca. 10 ct je Generieren' },
+  { wert: 'easy', label: 'Easy', hinweis: 'Weniger Denkaufwand, schneller und etwa halb so teuer' },
+] as const;
+export type Modus = (typeof MODI)[number]['wert'];
+
 export const kanalInfo = (wert: string) => KANAELE.find((k) => k.wert === wert);
 export const kanalLabel = (wert: string) => kanalInfo(wert)?.label ?? (wert || '–');
 
@@ -49,6 +56,7 @@ export interface GeneratorEingabe {
   leistung: LeistungsWahl;
   aufhaenger: string;
   hinweis?: string;
+  modus: Modus;
 }
 
 /** Request body of the Cloud Function; mirrors `AnfrageSchema` in functions/contact-generator/src/anfrage.ts. */
@@ -62,6 +70,7 @@ export interface GeneratorAnfrage {
   leistung: { titel: string; unterpunkte: string[]; anlass: string; nutzen: string; beleg: string; beschreibung: string };
   aufhaenger: string;
   hinweis: string;
+  modus: Modus;
 }
 
 export interface Variante {
@@ -114,6 +123,7 @@ export function baueAnfrage(e: GeneratorEingabe): GeneratorAnfrage {
         : { titel: kurz(titel, 200), unterpunkte: [], anlass: '', nutzen: '', beleg: '', beschreibung: kurz(e.leistung.beschreibung, 2000) },
     aufhaenger: kurz(e.aufhaenger, 1000),
     hinweis: kurz(e.hinweis ?? '', 500),
+    modus: e.modus,
   };
 }
 

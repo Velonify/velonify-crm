@@ -20,6 +20,12 @@ describe('AnfrageSchema', () => {
     expect(anfrage.aufhaenger).toBe('');
   });
 
+  it('defaults to the thorough mode and accepts the quick one', () => {
+    expect(AnfrageSchema.parse(basis).modus).toBe('komplex');
+    expect(AnfrageSchema.parse({ ...basis, modus: 'easy' }).modus).toBe('easy');
+    expect(AnfrageSchema.safeParse({ ...basis, modus: 'mittel' }).success).toBe(false);
+  });
+
   it('rejects unknown channels and missing company names', () => {
     expect(AnfrageSchema.safeParse({ ...basis, kanal: 'fax' }).success).toBe(false);
     expect(AnfrageSchema.safeParse({ ...basis, firma: { name: '  ' } }).success).toBe(false);

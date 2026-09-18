@@ -3,6 +3,9 @@ import { z } from 'zod';
 export const KANAELE = ['instagram', 'linkedin_notiz', 'linkedin_nachricht', 'email'] as const;
 export type Kanal = (typeof KANAELE)[number];
 
+/** How much thinking Claude puts in: "komplex" for important customers, "easy" for quick, cheaper texts. */
+export const MODI = ['komplex', 'easy'] as const;
+
 /** Optional text field: trimmed, capped, empty when missing. */
 const feld = (max: number) => z.string().trim().max(max).default('');
 const pflicht = (max: number) => z.string().trim().min(1).max(max);
@@ -42,6 +45,7 @@ export const AnfrageSchema = z.object({
   aufhaenger: feld(1000),
   /** Extra instruction when regenerating, e.g. "kürzer". */
   hinweis: feld(500),
+  modus: z.enum(MODI).default('komplex'),
 });
 
 export type Anfrage = z.infer<typeof AnfrageSchema>;

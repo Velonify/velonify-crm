@@ -8,6 +8,7 @@ import {
   baueAnfrage,
   KANAELE,
   kanalInfo,
+  MODI,
   leistungsTitel,
   mailtoLink,
   mitSignatur,
@@ -18,6 +19,7 @@ import {
   type Anrede,
   type Kanal,
   type LeistungsWahl,
+  type Modus,
   type Variante,
 } from '../data/anschreiben';
 import { useCrm } from '../data/CrmContext';
@@ -32,6 +34,7 @@ import { useContactDaten, useGenerator } from './useContactDaten';
 
 const ABSENDER_KEY = 'velonify-crm.absender';
 const KANAL_KEY = 'velonify-crm.kanal';
+const MODUS_KEY = 'velonify-crm.modus';
 
 function lies(key: string): string {
   try {
@@ -99,6 +102,7 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
   const [manuell, setManuell] = useState({ titel: '', beschreibung: '' });
   const [absender, setAbsender] = useState(() => lies(ABSENDER_KEY) || vornameAus(user?.name ?? '', user?.email ?? ''));
   const [aufhaenger, setAufhaenger] = useState('');
+  const [modus, setModus] = useState<Modus>(() => (lies(MODUS_KEY) === 'easy' ? 'easy' : 'komplex'));
 
   const [varianten, setVarianten] = useState<Variante[]>([]);
   const [aktiv, setAktiv] = useState(0);
@@ -144,6 +148,11 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
     setDealId(v.dealId);
   };
 
+  const wechsleModus = (wert: Modus) => {
+    setModus(wert);
+    merke(MODUS_KEY, wert);
+  };
+
   const wechsleKanal = (wert: Kanal) => {
     setKanal(wert);
     setAnrede(kanalInfo(wert)?.anrede ?? 'sie');
@@ -157,7 +166,7 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
     if (!generator) return setFehler(new Error('Die Adresse des Contact Generators fehlt (VITE_CONTACT_GENERATOR_URL).'));
     setBusy(true);
     try {
-      const anfrage = baueAnfrage({ kanal, sprache, anrede, absender, firma, kontakt, leistung: wahl, aufhaenger, hinweis: mitHinweis ? hinweis : '' });
+      const anfrage = baueAnfrage({ kanal, sprache, anrede, absender, firma, kontakt, leistung: wahl, aufhaenger, hinweis: mitHinweis ? hinweis : '', modus });
       merke(ABSENDER_KEY, absender.trim());
       const neu = await generator.generiere(anfrage);
       setVarianten(neu);
@@ -295,7 +304,9 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
               <div className="contact-optionen-reihe">
                 <Segmented<"de" | "en"> label="Sprache" werte={SPRACHEN} wert={sprache} onChange={setSprache} />
                 <Segmented<Anrede> label="Anrede" werte={ANREDEN} wert={anrede} onChange={setAnrede} />
+                <Segmented<Modus> label="Aufwand" werte={MODI} wert={modus} onChange={wechsleModus} />
               </div>
+              <p className="small muted contact-modus">{MODI.find((m) => m.wert === modus)?.hinweis}</p>
             </div>
             <div className="grid">
               <Field label="Leistung" invalid={invalid === 'leistung'} wide>
