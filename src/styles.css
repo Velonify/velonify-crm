@@ -808,3 +808,6 @@ fieldset.plain.invalid legend { color: var(--danger); }
 .hint-box progress { width: 100%; margin-top: var(--space-2); accent-color: var(--accent); }
 .audit-fehler { margin: var(--space-2) 0 0; padding-left: var(--space-4); }
 .auswahl-spalte { width: 36px; }
+.audit-aufhaenger-wahl { display: grid; gap: var(--space-2); }
+.audit-aufhaenger-wahl .checkbox { font-weight: 400; font-size: 14px; }
+.audit-aufhaenger-wahl .checkbox input { margin-top: 3px; flex-shrink: 0; }
