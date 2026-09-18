@@ -6,6 +6,7 @@ import { Limit, pruefeGoogleToken, ZugriffsFehler } from './auth.js';
 import { AUSGABE_SCHEMA, nutzerNachricht, SYSTEM_PROMPT } from './prompt.js';
 
 const MODELL = 'claude-opus-5';
+const AUFWAND = { komplex: 'medium', easy: 'low' } as const;
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 const DOMAIN = process.env.ALLOWED_DOMAIN ?? 'velonify.de';
@@ -68,7 +69,7 @@ functions.http('contactGenerator', async (req, res) => {
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
       thinking: { type: 'adaptive' },
-      output_config: { effort: 'medium', format: { type: 'json_schema', schema: AUSGABE_SCHEMA } },
+      output_config: { effort: AUFWAND[anfrage.data.modus], format: { type: 'json_schema', schema: AUSGABE_SCHEMA } },
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: nutzerNachricht(anfrage.data, heute) }],
     });
@@ -92,7 +93,7 @@ functions.http('contactGenerator', async (req, res) => {
       text: v.text.trim(),
     }));
     // Log usage only, never the message content or company data.
-    console.log(JSON.stringify({ email, kanal: anfrage.data.kanal, modell: antwort.model, usage: antwort.usage }));
+    console.log(JSON.stringify({ email, kanal: anfrage.data.kanal, modus: anfrage.data.modus, modell: antwort.model, usage: antwort.usage }));
     res.json({ varianten, modell: antwort.model });
   } catch (error) {
     if (error instanceof Anthropic.RateLimitError) return fehler(429, 'Claude ist gerade ausgelastet. Bitte gleich noch einmal versuchen.');

@@ -33,8 +33,10 @@ describe('Anfrage an den Contact Generator', () => {
       kontakt,
       leistung: { art: 'liste', leistung: { ...migration, beleg: 'Referenz' } },
       aufhaenger: '',
+      modus: 'easy',
     });
     expect(anfrage.absender).toEqual({ vorname: 'Lukas' });
+    expect(anfrage.modus).toBe('easy');
     expect(anfrage.firma).toMatchObject({ name: firma.name, version: '2.4.6', eol: 'eol' });
     expect(anfrage.kontakt).toEqual({ vorname: 'Mara', nachname: 'Holm', rolle: 'Head of E-Commerce' });
     expect(anfrage.leistung).toMatchObject({ titel: 'Shopify Migration', anlass: migration.anlass, nutzen: migration.nutzen, beleg: 'Referenz', beschreibung: migration.beschreibung });
@@ -47,7 +49,7 @@ describe('Anfrage an den Contact Generator', () => {
 
   it('accepts a manual service and requires sender and title', () => {
     const firma = db.firmen[0];
-    const basis = { kanal: 'instagram', sprache: 'de', anrede: 'du', absender: 'Lukas', firma, aufhaenger: '' } as const;
+    const basis = { kanal: 'instagram', sprache: 'de', anrede: 'du', absender: 'Lukas', firma, aufhaenger: '', modus: 'komplex' } as const;
     const anfrage = baueAnfrage({ ...basis, leistung: { art: 'manuell', titel: 'Media Buying', beschreibung: 'Meta und TikTok' } });
     expect(anfrage.kontakt).toBeNull();
     expect(baueAnfrage({ ...basis, firma: { ...firma, notiz: 'ä'.repeat(2500) }, leistung: { art: 'manuell', titel: 'X', beschreibung: '' } }).firma.notiz).toHaveLength(2000);
@@ -58,7 +60,7 @@ describe('Anfrage an den Contact Generator', () => {
 
   it('keeps demo texts for LinkedIn notes within 300 characters', async () => {
     const anfrage = baueAnfrage({
-      kanal: 'linkedin_notiz', sprache: 'de', anrede: 'sie', absender: 'Lukas', firma: db.firmen[0], aufhaenger: 'x'.repeat(400),
+      kanal: 'linkedin_notiz', sprache: 'de', anrede: 'sie', absender: 'Lukas', firma: db.firmen[0], aufhaenger: 'x'.repeat(400), modus: 'easy',
       leistung: { art: 'manuell', titel: 'Datenmigration', beschreibung: '' },
     });
     const varianten = await new DemoGenerator().generiere(anfrage);
