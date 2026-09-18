@@ -1,5 +1,5 @@
 import { NotFoundError } from '../errors';
-import type { CalendarApi, CalendarEvent, MeetingRequest } from '../google/calendar';
+import type { CalendarApi, CalendarEvent, TerminDaten } from '../google/calendar';
 import { FOLDER_MIME, type DriveApi, type DriveFile } from '../google/drive';
 
 let counter = 0;
@@ -58,23 +58,40 @@ export class MemoryDrive implements DriveApi {
   }
 }
 
+function alsTermin(daten: TerminDaten, bisher?: CalendarEvent) {
+  return {
+    titel: daten.titel,
+    beschreibung: daten.beschreibung,
+    ort: daten.ort || undefined,
+    start: daten.start,
+    ende: daten.ende,
+    ganztaegig: daten.ganztaegig,
+    teilnehmer: [...daten.teilnehmer],
+    gaeste: daten.teilnehmer.map((email) => ({ email, antwort: 'needsAction' as const })),
+    meetLink: daten.meet ? (bisher?.meetLink ?? `https://meet.google.com/demo-${fakeId('')}`) : undefined,
+  };
+}
+
 /** In-memory calendar for demo mode and tests. No invitations are sent. */
 export class MemoryCalendar implements CalendarApi {
   readonly events: CalendarEvent[] = [];
 
-  async createMeeting(request: MeetingRequest): Promise<CalendarEvent> {
-    const event: CalendarEvent = {
-      id: fakeId('evt'),
-      titel: request.titel,
-      start: request.start,
-      ende: request.ende,
-      teilnehmer: [...request.teilnehmer],
-      meetLink: 'https://meet.google.com/demo-demo-demo',
-      abgesagt: false,
-      ganztaegig: false,
-    };
+  async createEvent(daten: TerminDaten): Promise<CalendarEvent> {
+    const event: CalendarEvent = { id: fakeId('evt'), abgesagt: false, bearbeitbar: true, ...alsTermin(daten) };
     this.events.push(event);
     return { ...event };
+  }
+
+  async updateEvent(bisher: CalendarEvent, daten: TerminDaten): Promise<CalendarEvent> {
+    const event = this.events.find((e) => e.id === bisher.id);
+    if (!event) throw new NotFoundError('Den Termin gibt es nicht mehr.');
+    Object.assign(event, alsTermin(daten, event));
+    return { ...event };
+  }
+
+  async deleteEvent(bisher: CalendarEvent): Promise<void> {
+    const index = this.events.findIndex((e) => e.id === bisher.id);
+    if (index >= 0) this.events.splice(index, 1);
   }
 
   async findEvents(email: string, von: string, bis: string): Promise<CalendarEvent[]> {

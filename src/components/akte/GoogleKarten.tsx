@@ -6,6 +6,7 @@ import { driveKonfiguration } from '../../data/selectors';
 import type { Database, Firma } from '../../data/types';
 import { isDemo } from '../../config';
 import { formatDateTime } from '../../lib/format';
+import type { CalendarEvent } from '../../data/google/calendar';
 import { useLoad } from '../../lib/useLoad';
 import { LeadOrdnerDialog } from '../dialogs/LeadOrdnerDialog';
 import { TerminDialog } from '../dialogs/TerminDialog';
@@ -104,7 +105,7 @@ export function DriveKarte({ firma, db }: { firma: Firma; db: Database }) {
 
 export function TermineKarte({ firma, db }: { firma: Firma; db: Database }) {
   const { service } = useCrm();
-  const [dialog, setDialog] = useState(false);
+  const [dialog, setDialog] = useState<{ termin?: CalendarEvent } | null>(null);
   const emails = db.kontakte
     .filter((k) => k.firma_id === firma.id && !k.archiviert && k.email)
     .map((k) => k.email)
@@ -118,7 +119,7 @@ export function TermineKarte({ firma, db }: { firma: Firma; db: Database }) {
     <Card
       title="Termine"
       actions={
-        <button type="button" className="button small" onClick={() => setDialog(true)} disabled={firma.archiviert}>
+        <button type="button" className="button small" onClick={() => setDialog({})} disabled={firma.archiviert}>
           + Termin
         </button>
       }
@@ -133,7 +134,14 @@ export function TermineKarte({ firma, db }: { firma: Firma; db: Database }) {
           <ul className="event-list">
             {kommend.map((t) => (
               <li key={t.id}>
-                <strong>{formatDateTime(t.start)}</strong> {t.titel}
+                <strong>{formatDateTime(t.start)}</strong>{' '}
+                {t.bearbeitbar ? (
+                  <button type="button" className="termin-bearbeiten" onClick={() => setDialog({ termin: t })} title="Termin bearbeiten">
+                    {t.titel}
+                  </button>
+                ) : (
+                  t.titel
+                )}
                 {t.meetLink && (
                   <>
                     {' · '}
@@ -156,7 +164,7 @@ export function TermineKarte({ firma, db }: { firma: Firma; db: Database }) {
           <p className="muted small">Aus deinem eigenen Google Kalender – Termine von Kolleg:innen siehst du im Verlauf.</p>
         </>
       )}
-      {dialog && <TerminDialog firma={firma} onClose={() => setDialog(false)} />}
+      {dialog && <TerminDialog firma={firma} termin={dialog.termin} onClose={() => setDialog(null)} onGespeichert={termine.reload} />}
     </Card>
   );
 }

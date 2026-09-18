@@ -1,8 +1,8 @@
 import { DEFAULT_DEAL_TITEL, EINSTELLUNG, isAbgeschlossen, phaseLabel, PHASEN, type Phase } from './constants';
 import { NotConfiguredError, NotFoundError, ValidationError } from './errors';
-import type { CalendarApi, CalendarEvent } from './google/calendar';
+import type { CalendarApi, CalendarEvent, TerminDaten } from './google/calendar';
 import { isFolder, SPREADSHEET_MIME, type DriveApi, type DriveFile } from './google/drive';
-import { addDays, ID_PREFIX, isoDate, newId } from './ids';
+import { addDays, ID_PREFIX, isIsoDate, isoDate, newId } from './ids';
 import { anzahlPosten, parseAuswahl, prepareAngebot, statusLabel } from './angebote';
 import { ANSCHREIBEN_STATUS, prepareAnschreiben, prepareOutreachLeistung, verlaufText, type AnschreibenInput } from './anschreiben';
 import type { ImportPlan } from './importCsv';
@@ -70,14 +70,21 @@ export interface KalkulationsErgebnis {
 export type OrdnerOrt = 'leads' | 'clients' | 'andere';
 
 export interface TerminEingabe {
+  /** Optional: a firm the appointment is about; new appointments are logged there. */
   firma_id: string;
   kontakt_ids: string[];
+  /** Colleagues and other guests */
   weitere_emails: string[];
   titel: string;
-  /** Local date-time as entered, e.g. "2026-09-17T10:00" */
-  start: string;
-  dauer_min: number;
+  ganztaegig: boolean;
+  /** Local dates and times as entered, e.g. "2026-09-17" and "10:00". All-day events use the dates only, both inclusive. */
+  von_datum: string;
+  von_zeit: string;
+  bis_datum: string;
+  bis_zeit: string;
+  ort: string;
   beschreibung: string;
+  meet: boolean;
   einladungSenden: boolean;
 }
 
@@ -748,41 +755,79 @@ export class CrmService {
 
   // ─── Google Kalender / Meet ────────────────────────────────────────────────
 
-  async planeTermin(eingabe: TerminEingabe): Promise<CalendarEvent> {
-    const db = await this.store.load();
-    const firma = CrmService.find(db.firmen, eingabe.firma_id);
+  private terminDaten(db: Database, eingabe: TerminEingabe) {
+    const firma = eingabe.firma_id ? CrmService.find(db.firmen, eingabe.firma_id) : undefined;
     const kontakte = eingabe.kontakt_ids.map((id) => CrmService.find(db.kontakte, id));
     const emails = [...new Set([...kontakte.map((k) => k.email), ...eingabe.weitere_emails].map((e) => e.trim().toLowerCase()).filter(Boolean))];
 
     if (!eingabe.titel.trim()) throw new ValidationError('titel', 'Bitte einen Titel angeben.');
     const ungueltig = emails.find((e) => !isValidEmail(e));
     if (ungueltig) throw new ValidationError('weitere_emails', `„${ungueltig}“ ist keine gültige E-Mail-Adresse.`);
-    if (emails.length === 0) throw new ValidationError('kontakt_ids', 'Bitte mindestens eine Person mit E-Mail-Adresse einladen.');
-    const start = new Date(eingabe.start);
-    if (Number.isNaN(start.getTime())) throw new ValidationError('start', 'Bitte Datum und Uhrzeit angeben.');
-    if (!(eingabe.dauer_min > 0)) throw new ValidationError('dauer_min', 'Bitte eine Dauer angeben.');
-    const ende = new Date(start.getTime() + eingabe.dauer_min * 60_000);
+    if (!isIsoDate(eingabe.von_datum)) throw new ValidationError('von_datum', 'Bitte ein Datum angeben.');
+    if (!isIsoDate(eingabe.bis_datum)) throw new ValidationError('bis_datum', 'Bitte ein Enddatum angeben.');
 
-    const termin = await this.calendar.createMeeting({
+    let start: string;
+    let ende: string;
+    if (eingabe.ganztaegig) {
+      if (eingabe.bis_datum < eingabe.von_datum) throw new ValidationError('bis_datum', 'Das Ende liegt vor dem Beginn.');
+      start = eingabe.von_datum;
+      // Google expects the day after the last day.
+      ende = addDays(eingabe.bis_datum, 1);
+    } else {
+      const von = new Date(`${eingabe.von_datum}T${eingabe.von_zeit}`);
+      const bis = new Date(`${eingabe.bis_datum}T${eingabe.bis_zeit}`);
+      if (!/^\d{2}:\d{2}$/.test(eingabe.von_zeit) || Number.isNaN(von.getTime())) throw new ValidationError('von_zeit', 'Bitte eine Uhrzeit angeben.');
+      if (!/^\d{2}:\d{2}$/.test(eingabe.bis_zeit) || Number.isNaN(bis.getTime())) throw new ValidationError('bis_zeit', 'Bitte eine Uhrzeit angeben.');
+      if (bis.getTime() <= von.getTime()) throw new ValidationError('bis_zeit', 'Das Ende muss nach dem Beginn liegen.');
+      start = von.toISOString();
+      ende = bis.toISOString();
+    }
+
+    const daten: TerminDaten = {
       titel: eingabe.titel.trim(),
-      start: start.toISOString(),
-      ende: ende.toISOString(),
       beschreibung: eingabe.beschreibung.trim(),
+      ort: eingabe.ort.trim(),
+      ganztaegig: eingabe.ganztaegig,
+      start,
+      ende,
       teilnehmer: emails,
-      einladungSenden: eingabe.einladungSenden,
-    });
+      meet: eingabe.meet,
+      einladungSenden: eingabe.einladungSenden && emails.length > 0,
+    };
+    return { daten, firma, kontakte };
+  }
 
-    const wann = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(start);
-    const mit = kontakte.map(kontaktName).concat(eingabe.weitere_emails.filter(Boolean)).join(', ');
+  /** Creates an appointment in the signed-in person's calendar; with a firm, it is also logged in the firm's history. */
+  async planeTermin(eingabe: TerminEingabe): Promise<CalendarEvent> {
+    const db = await this.store.load();
+    const { daten, firma, kontakte } = this.terminDaten(db, eingabe);
+    const termin = await this.calendar.createEvent(daten);
+    if (!firma) return termin;
+
+    const wann = eingabe.ganztaegig
+      ? new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium' }).format(new Date(`${eingabe.von_datum}T00:00`))
+      : new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(daten.start));
+    const personen = kontakte.map(kontaktName).concat(eingabe.weitere_emails.map((e) => e.trim()).filter(Boolean));
     await this.log({
       firma_id: firma.id,
       kontakt_id: kontakte[0]?.id ?? '',
       deal_id: '',
       typ: 'meeting',
-      text: `Termin „${termin.titel}“ am ${wann} mit ${mit}${termin.meetLink ? ` – ${termin.meetLink}` : ''}`,
+      text: `Termin „${termin.titel}“ am ${wann}${personen.length ? ` mit ${personen.join(', ')}` : ''}${termin.meetLink ? ` – ${termin.meetLink}` : ''}`,
       kalender_termin_id: termin.id,
     });
     return termin;
+  }
+
+  async aendereTermin(bisher: CalendarEvent, eingabe: TerminEingabe): Promise<CalendarEvent> {
+    if (bisher.bearbeitbar === false) throw new ValidationError('termin', 'Diesen Termin kann nur die Person ändern, die ihn angelegt hat.');
+    const db = await this.store.load();
+    return this.calendar.updateEvent(bisher, this.terminDaten(db, eingabe).daten);
+  }
+
+  async loescheTermin(bisher: CalendarEvent, benachrichtigen: boolean): Promise<void> {
+    if (bisher.bearbeitbar === false) throw new ValidationError('termin', 'Diesen Termin kann nur die Person löschen, die ihn angelegt hat.');
+    return this.calendar.deleteEvent(bisher, benachrichtigen && (bisher.gaeste ?? []).length > 0);
   }
 
   /** Everything in the signed-in person's primary calendar between two ISO timestamps. */

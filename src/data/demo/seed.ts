@@ -105,13 +105,19 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
     return d.toISOString();
   };
   const termin = (titel: string, start: string, ende: string, teilnehmer: string[], extra: Partial<(typeof calendar.events)[number]> = {}) =>
-    calendar.events.push({ id: `demo-${calendar.events.length}`, titel, start, ende, teilnehmer, abgesagt: false, ganztaegig: false, ...extra });
+    calendar.events.push({
+      id: `demo-${calendar.events.length}`, titel, start, ende, teilnehmer, abgesagt: false, ganztaegig: false,
+      // The first person organizes; the demo user is Lugge.
+      gaeste: teilnehmer.slice(1).map((email) => ({ email, antwort: 'accepted' as const })),
+      bearbeitbar: teilnehmer.length === 0 || teilnehmer[0] === 'lugge@velonify.de',
+      ...extra,
+    });
   termin('Team-Sync', um(0, 9, 30), um(0, 10), ['lugge@velonify.de', 'johannes@velonify.de', 'julian@velonify.de'], { meetLink: 'https://meet.google.com/demo-team-sync' });
   termin('Migrations-Call Nordlicht', um(0, 14), um(0, 15), ['lugge@velonify.de', 'mara.holm@nordlicht-outdoor.example'], { meetLink: 'https://meet.google.com/demo-nordlicht' });
   termin('Workshop Kleinod', um(1, 10), um(1, 12), ['julian@velonify.de', 'jonas@kleinod-schmuck.example'], { ort: 'Leipzig' });
   termin('Fokuszeit Angebot', um(2, 13), um(2, 16), ['lugge@velonify.de']);
   termin('E-Commerce-Messe', addDays(heute, 3), addDays(heute, 5), [], { ganztaegig: true, ort: 'Köln' });
-  termin('Abgelehnter Termin', um(1, 16), um(1, 17), ['lugge@velonify.de', 'extern@beispiel.example'], { antwort: 'declined' });
+  termin('Abgelehnter Termin', um(1, 16), um(1, 17), ['lugge@velonify.de', 'extern@beispiel.example'], { antwort: 'declined', bearbeitbar: false });
 
   seeding = false;
   return { service, sheets };

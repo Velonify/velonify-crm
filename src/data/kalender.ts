@@ -96,3 +96,54 @@ export function googleKalenderUrl(tag: string): string {
   const [y, m, d] = tag.split('-').map(Number);
   return `https://calendar.google.com/calendar/r/week/${y}/${m}/${d}`;
 }
+
+export interface TerminZeit {
+  ganztaegig: boolean;
+  von_datum: string;
+  von_zeit: string;
+  bis_datum: string;
+  bis_zeit: string;
+}
+
+const uhrzeit = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+/** The form values of an existing event; all-day end dates become inclusive again. */
+export function terminZeit(event: CalendarEvent): TerminZeit {
+  if (event.ganztaegig) {
+    const von = event.start.slice(0, 10);
+    return { ganztaegig: true, von_datum: von, von_zeit: '10:00', bis_datum: addDays(event.ende.slice(0, 10) || von, -1), bis_zeit: '11:00' };
+  }
+  const start = new Date(event.start);
+  const ende = new Date(event.ende || event.start);
+  return { ganztaegig: false, von_datum: isoDate(start), von_zeit: uhrzeit(start), bis_datum: isoDate(ende), bis_zeit: uhrzeit(ende) };
+}
+
+/** A new appointment of `dauerMin` minutes: at the given time, or at the next full hour when the day is today. */
+export function neueTerminZeit(tag: string, jetzt: Date, zeit?: string, dauerMin = 60): TerminZeit {
+  let beginn = zeit ?? '10:00';
+  if (!zeit && tag === isoDate(jetzt)) beginn = `${String(Math.min(jetzt.getHours() + 1, 23)).padStart(2, '0')}:00`;
+  const ende = new Date(new Date(`${tag}T${beginn}`).getTime() + dauerMin * 60_000);
+  return { ganztaegig: false, von_datum: tag, von_zeit: beginn, bis_datum: isoDate(ende), bis_zeit: uhrzeit(ende) };
+}
+
+/** Moving the start keeps the duration, as in Google Calendar. */
+export function verschiebeBeginn(alt: TerminZeit, von_datum: string, von_zeit: string): TerminZeit {
+  const vorher = new Date(`${alt.von_datum}T${alt.von_zeit}`).getTime();
+  const nachher = new Date(`${von_datum}T${von_zeit}`).getTime();
+  const bis = new Date(`${alt.bis_datum}T${alt.bis_zeit}`).getTime();
+  if ([vorher, nachher, bis].some(Number.isNaN)) return { ...alt, von_datum, von_zeit };
+  const ende = new Date(bis + (nachher - vorher));
+  return { ...alt, von_datum, von_zeit, bis_datum: isoDate(ende), bis_zeit: uhrzeit(ende) };
+}
+
+/** Colleague addresses for quick selection: people with a signature in the CRM and guests of the loaded events on the own domain. */
+export function bekannteKollegen(db: Database, events: readonly CalendarEvent[], eigeneEmail: string): string[] {
+  const eigene = eigeneEmail.toLowerCase();
+  const domain = eigene.split('@')[1];
+  if (!domain) return [];
+  const adressen = [
+    ...Object.keys(db.einstellungen).filter((k) => k.startsWith('signatur_')).map((k) => k.slice('signatur_'.length)),
+    ...events.flatMap((e) => e.teilnehmer),
+  ].map((e) => e.toLowerCase());
+  return [...new Set(adressen)].filter((e) => e !== eigene && e.split('@')[1] === domain).sort();
+}
