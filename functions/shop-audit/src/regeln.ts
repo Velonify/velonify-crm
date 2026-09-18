@@ -60,6 +60,8 @@ const NAMEN: Record<string, string> = {
   rapidmail: 'rapidmail', newsletter2go: 'Newsletter2Go', omnisend: 'Omnisend', mailerlite: 'MailerLite',
   hubspot: 'HubSpot', salesforce_mc: 'Salesforce Marketing Cloud', inxmail: 'Inxmail', episerver_campaign: 'Optimizely Campaign',
 };
+/** E-mail tools whose signup forms usually come as pop-ups or JavaScript embeds. */
+const POPUP_TOOLS = new Set(['klaviyo', 'omnisend', 'mailchimp', 'brevo', 'mailerlite', 'hubspot']);
 const name = (schluessel: string) => NAMEN[schluessel] ?? schluessel;
 const liste = (werte: string[]) => (werte.length <= 1 ? werte.join('') : `${werte.slice(0, -1).join(', ')} und ${werte.at(-1)}`);
 
@@ -149,7 +151,10 @@ export function befundeAus({ merkmale, mobil, desktop, heute }: Eingabe): Befund
           'kein onsite-tool');
       }
     } else {
-      if (!merkmale.newsletter_formular) add('email_keine_anmeldung', 'email', 'mittel', `${liste(tools.map(name))} ist eingebunden, aber auf der Startseite gibt es keine Newsletter-Anmeldung.`, tools.join(', '));
+      // Pop-up tools show their signup forms via JavaScript, invisible in the HTML; only the others can be judged.
+      if (!merkmale.newsletter_formular && !tools.some((t) => POPUP_TOOLS.has(t))) {
+        add('email_keine_anmeldung', 'email', 'hinweis', `${liste(tools.map(name))} ist eingebunden, aber im Seitencode der Startseite ist keine Newsletter-Anmeldung zu finden.`, tools.join(', '));
+      }
       if (!tools.includes('klaviyo')) add('email_anderes_tool', 'email', 'hinweis', `Für E-Mail-Marketing nutzt der Shop ${liste(tools.map(name))}.`, tools.join(', '));
     }
 

@@ -59,6 +59,14 @@ describe('befundeAus', () => {
     expect(ids2).not.toContain('tracking_keine_analyse');
   });
 
+  it('does not report a missing signup for tools that use pop-ups', () => {
+    const mitKlaviyo = { ...merkmale, email_tools: ['klaviyo'], newsletter_formular: false };
+    expect(befundeAus({ merkmale: mitKlaviyo, mobil: null, desktop: null, heute: HEUTE }).map((b) => b.id)).not.toContain('email_keine_anmeldung');
+    const mitCleverReach = { ...merkmale, email_tools: ['cleverreach'], newsletter_formular: false };
+    const befund = befundeAus({ merkmale: mitCleverReach, mobil: null, desktop: null, heute: HEUTE }).find((b) => b.id === 'email_keine_anmeldung');
+    expect(befund?.schwere).toBe('hinweis');
+  });
+
   it('turns nothing into findings when nothing was measured', () => {
     expect(befundeAus({ merkmale: null, mobil: null, desktop: null, heute: HEUTE })).toEqual([]);
     expect(kurzfassung([])).toBe('Keine auffälligen Befunde.');

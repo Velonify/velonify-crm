@@ -92,6 +92,21 @@ export const EMAIL_TOOLS: Record<string, string[]> = {
   episerver_campaign: ['optivo', 'broadmail'],
 };
 
+/**
+ * Signup forms that tools render with JavaScript into an empty container, so there is no e-mail field in the HTML.
+ * Klaviyo shows up only as <div class="klaviyo-form-XXXX">; its pop-ups leave no trace at all.
+ */
+const NEWSLETTER_EINBETTUNG = ['klaviyo-form-', 'mc-embedded-subscribe', 'sib-form', 'cr_form', 'omnisend-form', 'ml-embedded', 'newsletter/subscriber/new'];
+const NEWSLETTER_WORT = /newsletter|subscribe|abonnier|anmelden|sign[\s-]?up/i;
+
+export function hatNewsletterFormular(html: string): boolean {
+  const text = html.toLowerCase();
+  if (NEWSLETTER_EINBETTUNG.some((n) => text.includes(n))) return true;
+  // Shopify's own newsletter form tags the contact as "newsletter".
+  if (/name=["']contact\[tags\]["'][^>]*newsletter/i.test(html)) return true;
+  return /<input[^>]+type=["']email["']/i.test(html) && NEWSLETTER_WORT.test(html);
+}
+
 export const BEWERTUNGEN: Record<string, string[]> = {
   trustedshops: ['trustedshops', 'trusted shops'],
   trustpilot: ['trustpilot'],
@@ -248,7 +263,7 @@ export function erkenneMerkmale(home: Seite, extra: { magentoVersion: Seite | nu
     google_ads: /googleadservices|['"]AW-\d{6,}/.test(html),
     consent: treffer(text, CONSENT_TOOLS),
     email_tools: treffer(text, EMAIL_TOOLS),
-    newsletter_formular: /<input[^>]+type=["']email["']/i.test(html) && /newsletter/i.test(html),
+    newsletter_formular: hatNewsletterFormular(html),
     zahlarten: treffer(alles, ZAHLARTEN),
     bewertungen: treffer(alles, BEWERTUNGEN),
     sprachen: [...new Set([...html.matchAll(/hreflang=["']([a-z]{2})(?:-[a-z]{2})?["']/gi)].map((m) => m[1].toLowerCase()))].sort(),
