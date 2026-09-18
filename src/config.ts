@@ -6,6 +6,8 @@ export const config = {
   allowedDomain: (env.VITE_ALLOWED_DOMAIN || 'velonify.de').toLowerCase(),
   /** Cloud Function of the Contact Generator */
   contactGeneratorUrl: env.VITE_CONTACT_GENERATOR_URL || '',
+  /** Cloud Function of the shop audit */
+  shopAuditUrl: env.VITE_SHOP_AUDIT_URL || '',
 };
 
 /** Without a client ID and sheet ID the app runs on in-memory sample data. */

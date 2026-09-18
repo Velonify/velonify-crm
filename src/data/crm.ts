@@ -4,6 +4,7 @@ import type { CalendarApi, CalendarEvent, TerminDaten } from './google/calendar'
 import { isFolder, SPREADSHEET_MIME, type DriveApi, type DriveFile } from './google/drive';
 import { addDays, ID_PREFIX, isIsoDate, isoDate, newId } from './ids';
 import { anzahlPosten, parseAuswahl, prepareAngebot, statusLabel } from './angebote';
+import { auditVerlaufText, auditZeile, firmaAbgleich, type AuditErgebnis } from './audit';
 import { ANSCHREIBEN_STATUS, prepareAnschreiben, prepareOutreachLeistung, verlaufText, type AnschreibenInput } from './anschreiben';
 import type { ImportPlan } from './importCsv';
 import { baueKalkulation, kalkulationsThema } from './kalkulation';
@@ -25,6 +26,7 @@ import { STARTKATALOG } from './startkatalog';
 import type { Store } from './store';
 import type {
   Aktivitaet,
+  Audit,
   Angebot,
   AngebotInput,
   Anschreiben,
@@ -655,6 +657,37 @@ export class CrmService {
     if (!ANSCHREIBEN_STATUS.some((s) => s.wert === status)) throw new ValidationError('status', `Unbekannter Status „${status}“.`);
     const [anschreiben] = await this.store.update('anschreiben', [{ id, changes: { status, ...this.changed() }, expectedGeaendertAm }]);
     return anschreiben;
+  }
+
+  // ─── Shop-Audit ────────────────────────────────────────────────────────────
+
+  loadAudits(): Promise<Audit[]> {
+    return this.store.loadAudits();
+  }
+
+  /**
+   * Stores an audit result. For a company it also writes a history entry and updates platform, version and
+   * support status when the audit found something certain that differs.
+   */
+  async speichereAudit(ergebnis: AuditErgebnis, firmaId = ''): Promise<Audit> {
+    // Fails with SchemaError before anything is written while the tab is missing.
+    await this.store.loadAudits();
+    const firma = firmaId ? CrmService.find((await this.store.load()).firmen, firmaId) : undefined;
+    const audit: Audit = { ...auditZeile(ergebnis, firma?.id ?? ''), id: newId(ID_PREFIX.audits), von: this.currentUser(), archiviert: false, ...this.created() };
+    await this.store.insert('audits', [audit]);
+    if (firma) {
+      const abgleich = firmaAbgleich(firma, ergebnis);
+      if (abgleich) await this.updateFirma(firma.id, abgleich.changes, firma.geaendert_am);
+      await this.log({ firma_id: firma.id, kontakt_id: '', deal_id: '', typ: 'notiz', text: [auditVerlaufText(ergebnis), abgleich?.text].filter(Boolean).join('\n') });
+    }
+    return audit;
+  }
+
+  /** Links an audit of a domain that was not in the CRM to the company created for it. */
+  async ordneAuditZu(auditId: string, firmaId: string, expectedGeaendertAm: string): Promise<Audit> {
+    CrmService.find((await this.store.load()).firmen, firmaId);
+    const [audit] = await this.store.update('audits', [{ id: auditId, changes: { firma_id: firmaId, ...this.changed() }, expectedGeaendertAm }]);
+    return audit;
   }
 
   // ─── Google Drive ──────────────────────────────────────────────────────────

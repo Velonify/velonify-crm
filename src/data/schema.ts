@@ -85,6 +85,16 @@ export const SCHEMA = {
     ],
     boolean: ['archiviert'],
   },
+  audits: {
+    name: 'audits',
+    columns: [
+      'id', 'firma_id', 'domain', 'geprueft_am', 'von', 'status', 'plattform', 'version', 'eol',
+      'score_mobil', 'score_desktop', 'lcp_mobil_ms', 'cls', 'inp_ms', 'messquelle',
+      'merkmale', 'befunde', 'nicht_geprueft', 'zusammenfassung', 'aufhaenger', 'archiviert', ...META,
+    ],
+    numeric: ['score_mobil', 'score_desktop', 'lcp_mobil_ms', 'cls', 'inp_ms'],
+    boolean: ['archiviert'],
+  },
   listen: {
     name: 'listen',
     columns: ['liste', 'wert'],
@@ -103,7 +113,9 @@ export const ENTITY_TABS = ['firmen', 'kontakte', 'deals', 'aktivitaeten', 'wied
 export const ANGEBOTS_TABS = ['leistungskategorien', 'leistungen', 'angebote'] as const;
 /** Tabs of the Contact Generator, loaded only when it is opened. */
 export const CONTACT_TABS = ['outreach_leistungen', 'anschreiben'] as const;
-export type EntityTab = (typeof ENTITY_TABS)[number] | (typeof ANGEBOTS_TABS)[number] | (typeof CONTACT_TABS)[number];
+/** Tabs of the shop audit, loaded only when audits are shown. */
+export const AUDIT_TABS = ['audits'] as const;
+export type EntityTab = (typeof ENTITY_TABS)[number] | (typeof ANGEBOTS_TABS)[number] | (typeof CONTACT_TABS)[number] | (typeof AUDIT_TABS)[number];
 
 /** Editable select values, written to the "listen" tab on setup and maintained there afterwards. */
 export const LISTEN_DEFAULTS: Record<string, string[]> = {

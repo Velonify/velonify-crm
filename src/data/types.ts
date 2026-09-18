@@ -241,6 +241,39 @@ export interface ContactDaten {
   anschreiben: Anschreiben[];
 }
 
+/**
+ * One shop audit, stored as it came back from the Cloud Function. The newest per company counts; older ones stay as history.
+ * `merkmale`, `befunde`, `nicht_geprueft` and `aufhaenger` hold JSON (see src/data/audit.ts).
+ */
+export interface Audit extends Meta {
+  id: string;
+  /** Empty for a domain that is not (yet) in the CRM. */
+  firma_id: string;
+  domain: string;
+  /** ISO timestamp */
+  geprueft_am: string;
+  von: string;
+  /** ok / teilweise / fehler */
+  status: string;
+  plattform: string;
+  version: string;
+  /** eol / eol_soon / supported / unknown */
+  eol: string;
+  score_mobil: number | null;
+  score_desktop: number | null;
+  lcp_mobil_ms: number | null;
+  cls: number | null;
+  inp_ms: number | null;
+  /** feld (real users) / labor */
+  messquelle: string;
+  merkmale: string;
+  befunde: string;
+  nicht_geprueft: string;
+  zusammenfassung: string;
+  aufhaenger: string;
+  archiviert: boolean;
+}
+
 export type Listen = Record<string, string[]>;
 export type Einstellungen = Record<string, string>;
 
@@ -255,6 +288,7 @@ export interface EntityMap {
   angebote: Angebot;
   outreach_leistungen: OutreachLeistung;
   anschreiben: Anschreiben;
+  audits: Audit;
 }
 
 /** Everything the app knows, loaded in one go. */

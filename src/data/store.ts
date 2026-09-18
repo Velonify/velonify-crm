@@ -1,5 +1,5 @@
 import type { EntityTab } from './schema';
-import type { AngebotsDaten, ContactDaten, Database, Einstellungen, EntityMap } from './types';
+import type { AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap } from './types';
 
 export interface RecordUpdate<T> {
   id: string;
@@ -18,6 +18,8 @@ export interface Store {
   loadAngebotsDaten(): Promise<AngebotsDaten>;
   /** Services and sent messages of the Contact Generator. Throws SchemaError while its tabs are not set up. */
   loadContactDaten(): Promise<ContactDaten>;
+  /** All shop audits. Throws SchemaError while the tab is not set up. */
+  loadAudits(): Promise<Audit[]>;
   insert<K extends EntityTab>(tab: K, records: EntityMap[K][]): Promise<void>;
   /** All updates of one call are checked first and then written together. */
   update<K extends EntityTab>(tab: K, updates: RecordUpdate<EntityMap[K]>[]): Promise<EntityMap[K][]>;

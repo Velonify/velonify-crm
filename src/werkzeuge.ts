@@ -57,6 +57,16 @@ export const WERKZEUGE: Werkzeug[] = [
       { label: 'Leistungen', pfad: '/contact/leistungen' },
     ],
   },
+  {
+    id: 'audit',
+    name: 'Shop-Audit',
+    beschreibung: 'Shops prüfen und Aufhänger fürs Anschreiben finden',
+    pfad: '/audit',
+    navigation: [
+      { label: 'Übersicht', pfad: '/audit', end: true },
+      { label: 'Domain prüfen', pfad: '/audit/neu' },
+    ],
+  },
 ];
 
 export const istGeplant = (w: Werkzeug) => !w.pfad;

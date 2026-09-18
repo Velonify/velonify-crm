@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { AuditKarte } from '../audit/AuditKarte';
 import { DealsKarte, KontakteKarte, VerlaufKarte, WiedervorlagenKarte } from '../components/akte/AkteKarten';
 import { DriveKarte, TermineKarte } from '../components/akte/GoogleKarten';
 import { usePhaseChange } from '../components/dialogs/PhaseChange';
@@ -153,6 +154,7 @@ export function FirmaAktePage() {
         </div>
         <div className="akte-side">
           <KontakteKarte firma={f} db={db} />
+          <AuditKarte firma={f} />
           <TermineKarte firma={f} db={db} />
           <DriveKarte firma={f} db={db} />
           <Card title="Firmendaten">

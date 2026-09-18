@@ -12,6 +12,7 @@ export const ID_PREFIX = {
   angebote: 'AN',
   outreach_leistungen: 'OL',
   anschreiben: 'AS',
+  audits: 'SA',
 } as const;
 
 export function newId(prefix: string, length = 8): string {
