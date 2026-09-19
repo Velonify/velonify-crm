@@ -50,6 +50,7 @@ export function magentoEol(version: string, heute: Date): { status: EolStatus; d
 
 const komma = (n: number, stellen = 1) => n.toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen });
 const sekunden = (ms: number) => `${komma(ms / 1000)} s`;
+const kib = (bytes: number) => `${Math.round(bytes / 1024).toLocaleString('de-DE')} KiB`;
 const tag = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('de-DE', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' });
 const monat = (d: Date) => d.toLocaleDateString('de-DE', { timeZone: 'UTC', month: 'long', year: 'numeric' });
 const quelle = (m: Messung) => (m.quelle === 'feld' ? 'gemessen bei echten Nutzern' : 'Labormessung mit gedrosselter Mobilverbindung');
@@ -118,6 +119,27 @@ export function befundeAus({ merkmale, mobil, desktop, heute }: Eingabe): Befund
     if (mobil.inp_ms !== null && mobil.inp_ms > 500) {
       add('speed_inp', 'geschwindigkeit', 'mittel', `Die Seite reagiert mobil träge auf Eingaben (${mobil.inp_ms} ms, gut ist bis 200 ms).`, `${mobil.inp_ms} ms`);
     }
+    const ttfb = mobil.ttfb_ms;
+    if (ttfb !== null && ttfb > 800) {
+      add('speed_ttfb', 'geschwindigkeit', ttfb > 1800 ? 'hoch' : 'mittel',
+        `Der Server braucht ${sekunden(ttfb)}, bis er überhaupt antwortet (${quelle(mobil)}; gut ist unter 0,8 s).`, `${ttfb} ms`);
+    }
+    if (mobil.tbt_ms !== null && mobil.tbt_ms > 600) {
+      add('speed_tbt', 'geschwindigkeit', 'mittel', `Beim Laden ist die Seite mobil ${sekunden(mobil.tbt_ms)} lang blockiert und reagiert nicht auf Tippen (gut ist unter 0,2 s).`, `${mobil.tbt_ms} ms`);
+    }
+    // The two biggest savings Google names, with Google's own wording.
+    for (const b of mobil.bremsen.filter((x) => x.ms >= 300 || x.bytes >= 300 * 1024).slice(0, 2)) {
+      const gross = b.ms >= 1000 || b.bytes >= 1024 * 1024;
+      const ersparnis = [b.ms >= 100 && `ca. ${sekunden(b.ms)} schneller`, b.bytes >= 100 * 1024 && `${kib(b.bytes)} weniger`].filter(Boolean).join(', ');
+      add(`speed_bremse_${b.id}`, 'geschwindigkeit', gross ? 'mittel' : 'hinweis',
+        `Bremse laut Google: „${b.titel}“${ersparnis ? ` (${ersparnis})` : ''}.`, b.ms ? `${b.ms} ms` : `${b.bytes} Bytes`);
+    }
+    const fremd = mobil.drittanbieter.filter((d) => d.ms >= 50);
+    const fremdMs = fremd.reduce((summe, d) => summe + d.ms, 0);
+    if (fremdMs > 1000) {
+      add('speed_drittanbieter', 'geschwindigkeit', 'mittel',
+        `Fremd-Scripte beanspruchen mobil ${sekunden(fremdMs)} Rechenzeit, vor allem ${liste(fremd.slice(0, 3).map((d) => d.name))}.`, `${fremdMs} ms`);
+    }
   }
   if (desktop?.score != null && desktop.score < 50) {
     add('speed_score_desktop', 'geschwindigkeit', 'hinweis', `PageSpeed-Wert am Desktop: ${desktop.score} von 100.`, String(desktop.score));
@@ -125,9 +147,9 @@ export function befundeAus({ merkmale, mobil, desktop, heute }: Eingabe): Befund
 
   if (merkmale) {
     const { analyse, pixel, consent, email_tools: tools, seo } = merkmale;
-    if (!analyse.ga4 && !analyse.gtm && !analyse.universal_analytics) {
+    if (!analyse.ga4 && !analyse.gtm && !analyse.universal_analytics && analyse.andere.length === 0) {
       add('tracking_keine_analyse', 'tracking', 'hoch', 'Weder Google Analytics 4 noch der Google Tag Manager sind eingebunden.', 'kein ga4, kein gtm');
-    } else if (analyse.universal_analytics && !analyse.ga4 && !analyse.gtm) {
+    } else if (analyse.universal_analytics && !analyse.ga4 && !analyse.gtm && analyse.andere.length === 0) {
       add('tracking_universal_analytics', 'tracking', 'hoch', 'Eingebunden ist nur das alte Universal Analytics, das seit Juli 2023 keine Daten mehr erfasst.', 'universal analytics');
     }
     const direkt = [...pixel.map(name), ...(analyse.ga4 || analyse.universal_analytics ? ['Google Analytics'] : [])];

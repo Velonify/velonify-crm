@@ -66,6 +66,8 @@ export interface Seite {
   status: number;
   ok: boolean;
   headers: Record<string, string>;
+  /** Cookies the response sets, name → value (for technology detection). */
+  cookies: Record<string, string>;
   text: string;
   /** Why the page could not be loaded, for "nicht geprüft". */
   fehler?: string;
@@ -99,12 +101,18 @@ export async function ladeSeite(url: string): Promise<Seite> {
     antwort.headers.forEach((wert, name) => {
       headers[name.toLowerCase()] = wert;
     });
+    const cookies: Record<string, string> = {};
+    for (const zeile of antwort.headers.getSetCookie()) {
+      const [paar] = zeile.split(';');
+      const i = paar.indexOf('=');
+      if (i > 0) cookies[paar.slice(0, i).trim()] = paar.slice(i + 1).trim();
+    }
     const text = await lesen(antwort.body as ReadableStream<Uint8Array> | null);
-    return { url: antwort.url || url, status: antwort.status, ok: antwort.ok, headers, text };
+    return { url: antwort.url || url, status: antwort.status, ok: antwort.ok, headers, cookies, text };
   } catch (error) {
     const grund = error instanceof Error ? (error.cause instanceof Error ? error.cause.message : error.message) : String(error);
-    return { url, status: 0, ok: false, headers: {}, text: '', fehler: grund.slice(0, 200) };
+    return { url, status: 0, ok: false, headers: {}, cookies: {}, text: '', fehler: grund.slice(0, 200) };
   }
 }
 
-export const leereSeite = (url: string, fehler: string): Seite => ({ url, status: 0, ok: false, headers: {}, text: '', fehler });
+export const leereSeite = (url: string, fehler: string): Seite => ({ url, status: 0, ok: false, headers: {}, cookies: {}, text: '', fehler });

@@ -1,4 +1,5 @@
 import type { Seite } from './laden.js';
+import { VERSANDDIENSTE, type Technologie } from './technik.js';
 
 /*
  * Marker lists. Platform, payment and part of the marketing markers come from the lead qualifier
@@ -136,7 +137,8 @@ export interface Merkmale {
   plattform: Plattform;
   /** False when the shop ends up on an unencrypted http:// address after redirects. */
   https: boolean;
-  analyse: { ga4: boolean; gtm: boolean; universal_analytics: boolean };
+  /** `andere`: further analytics tools found by the technology detection (etracker, Matomo …). */
+  analyse: { ga4: boolean; gtm: boolean; universal_analytics: boolean; andere: string[] };
   pixel: string[];
   google_ads: boolean;
   consent: string[];
@@ -145,6 +147,8 @@ export interface Merkmale {
   zahlarten: string[];
   bewertungen: string[];
   sprachen: string[];
+  /** Everything the webappanalyzer fingerprints found on the homepage and in the scripts PageSpeed loaded. */
+  technologien: Technologie[];
   seo: {
     title: string;
     meta_description: boolean;
@@ -165,6 +169,16 @@ const treffer = (text: string, listen: Record<string, string[]>) =>
     .map(([name]) => name);
 
 const blob = (seite: Seite) => `${seite.text} ${Object.entries(seite.headers).map(([k, v]) => `${k}:${v}`).join(' ')}`.toLowerCase();
+
+/** When our own rules find no platform, the ecommerce system the fingerprints found (e.g. Shopware, Gambio). */
+function plattformMitTechnik(p: Plattform, technologien: Technologie[]): Plattform {
+  if (p.name !== 'unbekannt') return p;
+  const shop = technologien.find((t) => t.kategorien.includes('Ecommerce') && t.name !== 'Cart Functionality');
+  if (!shop) return p;
+  // Shopware 5 has a finding of its own, so its version decides the key.
+  const name = shop.name === 'Shopware' && /^[56]/.test(shop.version) ? `shopware${shop.version[0]}` : shop.name;
+  return { ...p, name, version: shop.version, sicherheit: 60, belege: ['webappanalyzer'] };
+}
 
 export function erkennePlattform(home: Seite, magentoVersion: Seite | null): Plattform {
   const p: Plattform = { name: 'unbekannt', sicherheit: 0, version: '', edition: '', deploy_ts: 0, belege: [] };
@@ -238,7 +252,21 @@ export function robotsSperrtAlles(seite: Seite | null): boolean | null {
   return false;
 }
 
-export function erkenneMerkmale(home: Seite, extra: { magentoVersion: Seite | null; produkt: Seite | null; sitemap: Seite | null; robots: Seite | null }): Merkmale {
+const norm = (s: string) => s.toLowerCase().replace(/sendinblue/, 'brevo').replace(/[^a-z0-9]/g, '');
+
+/** Our own keys plus names from the technology detection that are not the same tool under another spelling. */
+function vereinige(eigene: string[], weitere: string[]): string[] {
+  const da = eigene.map(norm);
+  return [...eigene, ...weitere.filter((w) => !da.some((d) => norm(w).startsWith(d) || d.startsWith(norm(w))))];
+}
+
+const inKategorie = (technologien: Technologie[], kategorie: string) => technologien.filter((t) => t.kategorien.includes(kategorie)).map((t) => t.name);
+
+export function erkenneMerkmale(
+  home: Seite,
+  extra: { magentoVersion: Seite | null; produkt: Seite | null; sitemap: Seite | null; robots: Seite | null; technologien?: Technologie[] },
+): Merkmale {
+  const technologien = extra.technologien ?? [];
   const html = home.text;
   const text = html.toLowerCase();
   const produkt = extra.produkt?.ok ? extra.produkt.text : null;
@@ -251,21 +279,23 @@ export function erkenneMerkmale(home: Seite, extra: { magentoVersion: Seite | nu
   const typenProdukt = produkt ? jsonLdTypen(produkt) : [];
 
   return {
-    plattform: erkennePlattform(home, extra.magentoVersion),
+    plattform: plattformMitTechnik(erkennePlattform(home, extra.magentoVersion), technologien),
     https: !home.url.startsWith('http://'),
     analyse: {
       // Measurement IDs are upper case; matching case-sensitively keeps class names like "g-recaptcha" out.
-      ga4: /gtag\/js\?id=G-|['"]G-[A-Z0-9]{8,12}['"]/.test(html),
+      ga4: /gtag\/js\?id=G-|['"]G-[A-Z0-9]{8,12}['"]/.test(html) || technologien.some((t) => t.name === 'Google Analytics'),
       gtm: /googletagmanager\.com\/gtm\.js|['"]GTM-[A-Z0-9]{4,9}['"]/.test(html),
       universal_analytics: /['"]UA-\d{4,}-\d+['"]|google-analytics\.com\/analytics\.js/.test(html),
+      andere: inKategorie(technologien, 'Analytics').filter((n) => !/^Google Analytics/.test(n)),
     },
-    pixel: treffer(text, PIXEL),
-    google_ads: /googleadservices|['"]AW-\d{6,}/.test(html),
-    consent: treffer(text, CONSENT_TOOLS),
-    email_tools: treffer(text, EMAIL_TOOLS),
+    pixel: vereinige(treffer(text, PIXEL), technologien.map((t) => t.name).filter((n) => /(facebook|meta) pixel|tiktok pixel|pinterest/i.test(n))),
+    google_ads: /googleadservices|['"]AW-\d{6,}/.test(html) || technologien.some((t) => /^Google Ads/.test(t.name)),
+    consent: vereinige(treffer(text, CONSENT_TOOLS), inKategorie(technologien, 'Cookie compliance')),
+    email_tools: vereinige(treffer(text, EMAIL_TOOLS), inKategorie(technologien, 'Email').filter((n) => !VERSANDDIENSTE.has(n))),
     newsletter_formular: hatNewsletterFormular(html),
     zahlarten: treffer(alles, ZAHLARTEN),
-    bewertungen: treffer(alles, BEWERTUNGEN),
+    bewertungen: vereinige(treffer(alles, BEWERTUNGEN), inKategorie(technologien, 'Reviews')),
+    technologien,
     sprachen: [...new Set([...html.matchAll(/hreflang=["']([a-z]{2})(?:-[a-z]{2})?["']/gi)].map((m) => m[1].toLowerCase()))].sort(),
     seo: {
       title,

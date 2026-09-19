@@ -1,12 +1,15 @@
 import type { Seite } from './laden.js';
 import { erkenneMerkmale, erkennePlattform, findeProduktUrl, istProduktseite, produktLinksNachKlasse, produktSitemapAusIndex, type Merkmale } from './merkmale.js';
-import type { Messung, Strategie } from './pagespeed.js';
+import type { Messung, PagespeedErgebnis, Strategie } from './pagespeed.js';
+import { erkenneTechnik, type Katalog } from './technik.js';
 import { befundeAus, magentoEol, type Befund, type EolStatus, type NichtGeprueft } from './regeln.js';
 
 export interface Abhaengigkeiten {
   laden: (url: string) => Promise<Seite>;
-  pagespeed: (url: string, strategie: Strategie) => Promise<Messung>;
+  pagespeed: (url: string, strategie: Strategie) => Promise<PagespeedErgebnis>;
   heute: Date;
+  /** webappanalyzer fingerprints; null skips the technology detection. */
+  katalog: Katalog | null;
 }
 
 export interface Messergebnis {
@@ -57,6 +60,7 @@ export async function messeShop(domain: string, deps: Abhaengigkeiten): Promise<
   const nichtGeprueft: NichtGeprueft[] = [];
   let merkmale: Merkmale | null = null;
   let produktUrl = '';
+  let seiten: { magentoVersion: Seite | null; produkt: Seite | null; sitemap: Seite | null; robots: Seite | null } | null = null;
 
   if (home.ok) {
     const origin = new URL(home.url).origin;
@@ -86,15 +90,22 @@ export async function messeShop(domain: string, deps: Abhaengigkeiten): Promise<
     }
     if (!produkt) nichtGeprueft.push({ bereich: 'produktseite', grund: kandidat ? 'Die gefundene Seite war keine Produktseite.' : 'Keine Produktseite gefunden.' });
 
-    merkmale = erkenneMerkmale(home, { magentoVersion, produkt, sitemap, robots });
+    seiten = { magentoVersion, produkt, sitemap, robots };
   } else {
     const grund = grundVon(home);
     for (const bereich of ['plattform', 'tracking', 'email', 'shop', 'seo'] as const) nichtGeprueft.push({ bereich, grund });
   }
 
   const [mobilErgebnis, desktopErgebnis] = await speed;
-  const mobil = mobilErgebnis.status === 'fulfilled' ? mobilErgebnis.value : null;
-  const desktop = desktopErgebnis.status === 'fulfilled' ? desktopErgebnis.value : null;
+  const mobil = mobilErgebnis.status === 'fulfilled' ? mobilErgebnis.value.messung : null;
+  const desktop = desktopErgebnis.status === 'fulfilled' ? desktopErgebnis.value.messung : null;
+
+  if (home.ok && seiten) {
+    // Scripts from the PageSpeed run also reveal tools the Tag Manager loads, which the raw HTML does not show.
+    const skripte = mobilErgebnis.status === 'fulfilled' ? mobilErgebnis.value.skripte : [];
+    const technologien = deps.katalog ? erkenneTechnik({ url: home.url, html: home.text, headers: home.headers, cookies: home.cookies, skripte }, deps.katalog) : [];
+    merkmale = erkenneMerkmale(home, { ...seiten, technologien });
+  }
   if (!mobil) {
     const grund = mobilErgebnis.status === 'rejected' ? String(mobilErgebnis.reason instanceof Error ? mobilErgebnis.reason.message : mobilErgebnis.reason) : '';
     nichtGeprueft.push({ bereich: 'geschwindigkeit', grund: `PageSpeed mobil fehlgeschlagen${grund ? `: ${grund.slice(0, 160)}` : ''}` });
