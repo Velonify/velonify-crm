@@ -101,6 +101,10 @@ export const SCHEMA = {
     numeric: ['versuche'],
     boolean: ['geloest'],
   },
+  monstera: {
+    name: 'monstera',
+    columns: ['id', 'datum', 'typ', 'von', ...META],
+  },
   listen: {
     name: 'listen',
     columns: ['liste', 'wert'],
@@ -123,12 +127,15 @@ export const CONTACT_TABS = ['outreach_leistungen', 'anschreiben'] as const;
 export const AUDIT_TABS = ['audits'] as const;
 /** Tab of the daily word game on the start page, loaded only by the game. */
 export const WORDLE_TABS = ['wordle'] as const;
+/** Tab of the team plant, loaded only by its card. */
+export const MONSTERA_TABS = ['monstera'] as const;
 export type EntityTab =
   | (typeof ENTITY_TABS)[number]
   | (typeof ANGEBOTS_TABS)[number]
   | (typeof CONTACT_TABS)[number]
   | (typeof AUDIT_TABS)[number]
-  | (typeof WORDLE_TABS)[number];
+  | (typeof WORDLE_TABS)[number]
+  | (typeof MONSTERA_TABS)[number];
 
 /** Editable select values, written to the "listen" tab on setup and maintained there afterwards. */
 export const LISTEN_DEFAULTS: Record<string, string[]> = {

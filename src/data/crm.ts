@@ -46,6 +46,7 @@ import type {
   Leistungskategorie,
   LeistungskategorieInput,
   Meta,
+  MonsteraEintrag,
   OutreachLeistung,
   OutreachLeistungInput,
   Wiedervorlage,
@@ -712,6 +713,24 @@ export class CrmService {
     const ergebnis: WordleErgebnis = { ...input, spieler, id: newId(ID_PREFIX.wordle), ...this.created() };
     await this.store.insert('wordle', [ergebnis]);
     return ergebnis;
+  }
+
+  // ─── Team-Monstera ─────────────────────────────────────────────────────────
+
+  loadMonstera(): Promise<MonsteraEintrag[]> {
+    return this.store.loadMonstera();
+  }
+
+  /** Waters the plant. Once per person and day: a second time returns the first entry. */
+  async giesseMonstera(von: string): Promise<MonsteraEintrag> {
+    const name = von.trim();
+    if (!name) throw new ValidationError('von', 'Bitte zuerst auswählen, wer gießt.');
+    const datum = this.today();
+    const vorhanden = (await this.store.loadMonstera()).find((e) => e.datum === datum && e.von === name && e.typ === 'giessen');
+    if (vorhanden) return vorhanden;
+    const eintrag: MonsteraEintrag = { id: newId(ID_PREFIX.monstera), datum, typ: 'giessen', von: name, ...this.created() };
+    await this.store.insert('monstera', [eintrag]);
+    return eintrag;
   }
 
   // ─── Google Drive ──────────────────────────────────────────────────────────

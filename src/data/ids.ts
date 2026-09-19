@@ -14,6 +14,7 @@ export const ID_PREFIX = {
   anschreiben: 'AS',
   audits: 'SA',
   wordle: 'WD',
+  monstera: 'MO',
 } as const;
 
 export function newId(prefix: string, length = 8): string {

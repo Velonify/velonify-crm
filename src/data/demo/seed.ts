@@ -127,6 +127,9 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   await wordle('Julian', 1, 'xxxxx/yxxyx/xgyxx/ggxgg/ggggg');
   await wordle('Julian', 3, 'xyxxx/xxgyx/gxgxx/gggxg/gggxg/gggxg', false);
 
+  // Team plant: Johannes has already watered today.
+  await service.giesseMonstera('Johannes');
+
   seeding = false;
   return { service, sheets };
 }
