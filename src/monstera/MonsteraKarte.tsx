@@ -3,12 +3,11 @@ import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/Toasts';
 import { Card } from '../components/ui';
 import { useCrm } from '../data/CrmContext';
-import { AuthExpiredError, SchemaError } from '../data/errors';
+import { AuthExpiredError } from '../data/errors';
 import { addDays } from '../data/ids';
 import { monsteraStand, NAME_SCHLUESSEL, PUNKTE, wuchsform, type MonsteraStand } from '../data/monstera';
-import type { Database } from '../data/types';
+import type { Database, MonsteraEintrag } from '../data/types';
 import { errorMessage } from '../lib/errors';
-import { useLoad } from '../lib/useLoad';
 import { Pflanze } from './Pflanze';
 
 function statusText(name: string, stand: MonsteraStand, heute: string): string {
@@ -26,20 +25,29 @@ function statusText(name: string, stand: MonsteraStand, heute: string): string {
 }
 
 /** The team plant: water it once a day, let it grow with real work. */
-export function MonsteraKarte({ db, ich, heute }: { db: Database; ich: string | null; heute: string }) {
+export function MonsteraKarte({
+  eintraege,
+  db,
+  ich,
+  heute,
+  neuLaden,
+}: {
+  eintraege: readonly MonsteraEintrag[];
+  db: Database;
+  ich: string | null;
+  heute: string;
+  neuLaden: () => void;
+}) {
   const { service, perform } = useCrm();
   const { expire } = useAuth();
   const toast = useToast();
-  const eintraege = useLoad(() => (service ? service.loadMonstera() : new Promise<never>(() => {})), [service]);
   const [giesst, setGiesst] = useState(false);
   const [gegossen, setGegossen] = useState(0);
   const [benennen, setBenennen] = useState(false);
   const [neuerName, setNeuerName] = useState('');
 
-  const stand = useMemo(() => monsteraStand(eintraege.data ?? [], db.firmen, db.deals, heute), [eintraege.data, db.firmen, db.deals, heute]);
+  const stand = useMemo(() => monsteraStand(eintraege, db.firmen, db.deals, heute), [eintraege, db.firmen, db.deals, heute]);
   const name = db.einstellungen[NAME_SCHLUESSEL] || 'Die Monstera';
-
-  if (eintraege.error instanceof SchemaError) return null;
 
   const schonGegossen = Boolean(ich && stand.heuteGegossen.includes(ich));
 
@@ -49,7 +57,7 @@ export function MonsteraKarte({ db, ich, heute }: { db: Database; ich: string | 
     try {
       await service.giesseMonstera(ich);
       setGegossen((n) => n + 1);
-      eintraege.reload();
+      neuLaden();
     } catch (err) {
       if (err instanceof AuthExpiredError) expire();
       toast.show(`Gießen ging nicht: ${errorMessage(err)}`, 'error');
@@ -98,13 +106,10 @@ export function MonsteraKarte({ db, ich, heute }: { db: Database; ich: string | 
           <Pflanze blaetter={stand.blaetter} zustand={stand.zustand} gegossen={gegossen} />
         </div>
         <div className="monstera-info">
-          {eintraege.error ? (
-            <p className="muted">Die Pflegedaten konnten nicht geladen werden.</p>
-          ) : (
-            <>
+          <>
               <p className={`monstera-status zustand-${stand.zustand}`}>{statusText(name, stand, heute)}</p>
               <p className="muted small">{stand.heuteGegossen.length > 0 ? `Heute gegossen von ${stand.heuteGegossen.join(', ')}.` : 'Heute hat noch niemand gegossen.'}</p>
-              <button type="button" className="button primary" onClick={giessen} disabled={!ich || schonGegossen || giesst || !eintraege.data}>
+              <button type="button" className="button primary" onClick={giessen} disabled={!ich || schonGegossen || giesst}>
                 {schonGegossen ? 'Heute schon gegossen' : giesst ? 'Gießt …' : 'Gießen'}
               </button>
               {!ich && <p className="hint">Wähle unter „Mein Tag“, wer du bist, dann kannst du gießen.</p>}
@@ -124,8 +129,7 @@ export function MonsteraKarte({ db, ich, heute }: { db: Database; ich: string | 
                 Wächst mit echter Arbeit: neuer Lead +{PUNKTE.lead}, gewonnener Deal +{PUNKTE.deal}, jeder Gießtag +{PUNKTE.giesstag}. Bisher {stand.quellen.leads} Leads,{' '}
                 {stand.quellen.deals} {stand.quellen.deals === 1 ? 'Deal' : 'Deals'} und {stand.quellen.giesstage} {stand.quellen.giesstage === 1 ? 'Gießtag' : 'Gießtage'}.
               </p>
-            </>
-          )}
+          </>
         </div>
       </div>
     </Card>
