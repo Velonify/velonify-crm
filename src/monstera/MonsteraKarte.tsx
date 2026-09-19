@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/Toasts';
 import { Card } from '../components/ui';
@@ -38,15 +38,6 @@ export function MonsteraKarte({ db, ich, heute }: { db: Database; ich: string | 
 
   const stand = useMemo(() => monsteraStand(eintraege.data ?? [], db.firmen, db.deals, heute), [eintraege.data, db.firmen, db.deals, heute]);
   const name = db.einstellungen[NAME_SCHLUESSEL] || 'Die Monstera';
-
-  // A leaf that appeared since the last render unfurls; the first render shows the plant as it is.
-  const bisher = useRef<number | null>(null);
-  const [neuesBlatt, setNeuesBlatt] = useState(false);
-  useEffect(() => {
-    if (!eintraege.data) return;
-    if (bisher.current !== null && stand.blaetter > bisher.current) setNeuesBlatt(true);
-    bisher.current = stand.blaetter;
-  }, [eintraege.data, stand.blaetter]);
 
   if (eintraege.error instanceof SchemaError) return null;
 
@@ -104,7 +95,7 @@ export function MonsteraKarte({ db, ich, heute }: { db: Database; ich: string | 
       )}
       <div className="monstera">
         <div className="monstera-bild">
-          <Pflanze blaetter={stand.blaetter} zustand={stand.zustand} neuesBlatt={neuesBlatt} gegossen={gegossen} />
+          <Pflanze blaetter={stand.blaetter} zustand={stand.zustand} gegossen={gegossen} />
         </div>
         <div className="monstera-info">
           {eintraege.error ? (
