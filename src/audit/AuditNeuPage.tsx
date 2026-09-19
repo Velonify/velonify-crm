@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Field, FormError, PageHeader } from '../components/ui';
 import { domainSchluessel } from '../data/audit';
 import { useCrm } from '../data/CrmContext';
@@ -9,7 +9,9 @@ export function AuditNeuPage() {
   const { db } = useCrm();
   const { pruefe, bereit } = useAuditPruefen();
   const navigate = useNavigate();
-  const [eingabe, setEingabe] = useState('');
+  // ?domain= prefills the field, e.g. from the lead finder.
+  const [params] = useSearchParams();
+  const [eingabe, setEingabe] = useState(params.get('domain') ?? '');
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState<unknown>();
 

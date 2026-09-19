@@ -67,6 +67,17 @@ export const WERKZEUGE: Werkzeug[] = [
       { label: 'Domain prüfen', pfad: '/audit/neu' },
     ],
   },
+  {
+    id: 'leads',
+    name: 'Lead-Finder',
+    beschreibung: 'Deutsche Shops mit Anlass finden, prüfen und gezielt ins CRM übernehmen',
+    pfad: '/leads',
+    navigation: [
+      { label: 'Backlog', pfad: '/leads', end: true },
+      { label: 'Manuell prüfen', pfad: '/leads/manuell' },
+      { label: 'Suche', pfad: '/leads/suche' },
+    ],
+  },
 ];
 
 export const istGeplant = (w: Werkzeug) => !w.pfad;

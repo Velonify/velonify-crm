@@ -86,7 +86,8 @@ export const PFLICHTSPALTEN = ['domain'];
 
 /**
  * The import format, identical to the flat output of the Magento lead qualifier (CRM_COLUMNS in src/qualify.py there).
- * Also read when present: ansprechpartner_rolle, letztes_deploy (into Technik) and score_gruende (into Notiz).
+ * Also read when present: ansprechpartner_rolle, letztes_deploy (into Technik), score_gruende (into Notiz) and
+ * quelle (instead of "Magento <lauf>", used by the lead finder).
  */
 export const IMPORT_SPALTEN = [
   'tier', 'score', 'domain', 'firma', 'plattform', 'version', 'eol', 'register', 'ust_id',
@@ -136,7 +137,7 @@ function firmaAusZeile(get: (column: string) => string): FirmaInput {
     tech_info: [technik, katalog && katalog !== '0' ? `${katalog} Katalog-URLs` : '', deploy ? `letztes Deploy ${deploy}` : '']
       .filter(Boolean)
       .join(' · '),
-    quelle: lauf ? `Magento ${lauf}` : 'CSV-Import',
+    quelle: get('quelle') || (lauf ? `Magento ${lauf}` : 'CSV-Import'),
     // Why the qualifier rated the lead – useful context before the first call.
     notiz: gruende ? `Lead-Scoring: ${gruende}` : '',
   };

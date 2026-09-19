@@ -95,6 +95,8 @@ export interface ImportErgebnis {
   ergaenzt: number;
   kontakte: number;
   deals: number;
+  /** Domain → id of the firm created or filled in, for callers that track what became of each row. */
+  firmen: Record<string, string>;
 }
 
 /**
@@ -897,6 +899,7 @@ export class CrmService {
     const updates: { id: string; changes: Partial<Firma> }[] = [];
     const dealTitel = plan.optionen.dealTitel.trim() || db.einstellungen[EINSTELLUNG.dealTitel] || DEFAULT_DEAL_TITEL;
     const alleFirmen = [...db.firmen];
+    const firmenNachDomain: Record<string, string> = {};
 
     for (const zeile of plan.zeilen) {
       if (zeile.aktion === 'neu' && zeile.firma) {
@@ -910,6 +913,7 @@ export class CrmService {
         const firma: Firma = { ...clean, id: newId(ID_PREFIX.firmen), archiviert: false, ...meta };
         firmen.push(firma);
         alleFirmen.push(firma);
+        firmenNachDomain[firma.domain] = firma.id;
         let kontaktId = '';
         if (zeile.kontakt) {
           const kontakt: Kontakt = { ...prepareKontakt(zeile.kontakt), id: newId(ID_PREFIX.kontakte), firma_id: firma.id, archiviert: false, ...meta };
@@ -927,6 +931,7 @@ export class CrmService {
       } else if (zeile.aktion === 'ergaenzen' && zeile.firmaId) {
         const aktuell = db.firmen.find((f) => f.id === zeile.firmaId);
         if (!aktuell) continue;
+        firmenNachDomain[zeile.domain] = aktuell.id;
         // Only fields that are still empty now – someone may have filled them since the preview.
         const nochLeer = Object.fromEntries(
           Object.entries(zeile.aenderungen ?? {}).filter(([feld]) => {
@@ -949,6 +954,6 @@ export class CrmService {
     await this.store.insert('kontakte', kontakte);
     await this.store.insert('deals', deals);
     await this.store.insert('aktivitaeten', aktivitaeten);
-    return { neu: firmen.length, ergaenzt: updates.length, kontakte: kontakte.length, deals: deals.length };
+    return { neu: firmen.length, ergaenzt: updates.length, kontakte: kontakte.length, deals: deals.length, firmen: firmenNachDomain };
   }
 }

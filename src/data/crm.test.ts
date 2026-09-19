@@ -272,9 +272,11 @@ describe('CrmService', () => {
     expect(plan.zeilen[1].aenderungen).toMatchObject({ tier: 'B', email_allgemein: 'info@bekannt.example', plattform: 'magento1' });
     expect(plan.zeilen[1].aenderungen).not.toHaveProperty('ort');
 
-    expect(await crm.importiere(plan)).toEqual({ neu: 1, ergaenzt: 1, kontakte: 1, deals: 1 });
+    const ergebnis = await crm.importiere(plan);
+    expect(ergebnis).toMatchObject({ neu: 1, ergaenzt: 1, kontakte: 1, deals: 1 });
     const nachher = await crm.load();
     const neu = nachher.firmen.find((f) => f.domain === 'neu.example')!;
+    expect(ergebnis.firmen).toEqual({ 'neu.example': neu.id, 'bekannt.example': vorhanden.id });
     expect(nachher.kontakte.find((k) => k.firma_id === neu.id)).toMatchObject({ vorname: 'Uwe', nachname: 'Beispiel', hauptkontakt: true });
     expect(nachher.deals.find((d) => d.firma_id === neu.id)).toMatchObject({ titel: 'Shopify-Migration', phase: 'neu', zustaendig: 'Lugge' });
     expect(nachher.firmen.find((f) => f.id === vorhanden.id)).toMatchObject({ ort: 'Berlin', tier: 'B' });
