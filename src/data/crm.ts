@@ -47,6 +47,7 @@ import type {
   LeistungskategorieInput,
   Meta,
   MonsteraEintrag,
+  SpieleDaten,
   OutreachLeistung,
   OutreachLeistungInput,
   Wiedervorlage,
@@ -719,6 +720,16 @@ export class CrmService {
 
   loadMonstera(): Promise<MonsteraEintrag[]> {
     return this.store.loadMonstera();
+  }
+
+  /** Word game and plant together, for the two cards on the start page. */
+  loadSpiele(): Promise<SpieleDaten> {
+    return this.store.loadSpiele();
+  }
+
+  /** Call after the setup, so newly created tabs are noticed right away. */
+  vergissStruktur(): void {
+    this.store.vergissStruktur();
   }
 
   /** Waters the plant. Once per person and day: a second time returns the first entry. */

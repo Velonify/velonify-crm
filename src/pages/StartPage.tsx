@@ -14,6 +14,7 @@ import type { Database } from '../data/types';
 import { dateiname } from '../lib/dateiname';
 import { faelligText, formatEuro } from '../lib/format';
 import { useIch } from '../lib/useIch';
+import { useLoad } from '../lib/useLoad';
 import { istGeplant, WERKZEUGE } from '../werkzeuge';
 import { MonsteraKarte } from '../monstera/MonsteraKarte';
 import { WordleKarte } from '../wordle/WordleKarte';
@@ -293,7 +294,9 @@ function Dateiname({ db, heute }: { db: Database; heute: string }) {
 }
 
 export function StartPage() {
-  const { db, loading, error, refresh } = useCrm();
+  const { db, service, loading, error, refresh } = useCrm();
+  // Word game and plant share one request, so opening the start page stays a small load for Google.
+  const spiele = useLoad(() => (service ? service.loadSpiele() : new Promise<never>(() => {})), [service]);
   const [ich] = useIch(db?.listen.team ?? []);
   const heute = isoDate(new Date());
 
@@ -322,12 +325,12 @@ export function StartPage() {
       <div className="start-grid">
         <div className="start-main">
           <HeuteDran db={db} ich={ich} heute={heute} />
-          <MonsteraKarte db={db} ich={ich} heute={heute} />
+          {spiele.data?.monstera && <MonsteraKarte eintraege={spiele.data.monstera} db={db} ich={ich} heute={heute} neuLaden={spiele.reload} />}
           <Kunden db={db} />
         </div>
         <div className="start-side">
           <Kalender db={db} heute={heute} />
-          <WordleKarte team={db.listen.team ?? []} ich={ich} heute={heute} />
+          {spiele.data?.wordle && <WordleKarte ergebnisse={spiele.data.wordle} team={db.listen.team ?? []} ich={ich} heute={heute} />}
           <Links db={db} />
           <Dateiname db={db} heute={heute} />
         </div>

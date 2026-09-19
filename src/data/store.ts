@@ -1,5 +1,5 @@
 import type { EntityTab } from './schema';
-import type { AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, MonsteraEintrag, WordleErgebnis } from './types';
+import type { AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, MonsteraEintrag, SpieleDaten, WordleErgebnis } from './types';
 
 export interface RecordUpdate<T> {
   id: string;
@@ -24,6 +24,10 @@ export interface Store {
   loadWordle(): Promise<WordleErgebnis[]>;
   /** All care entries of the team plant. Throws SchemaError while the tab is not set up. */
   loadMonstera(): Promise<MonsteraEintrag[]>;
+  /** Both games of the start page in one request. */
+  loadSpiele(): Promise<SpieleDaten>;
+  /** Forget which tabs exist, after the setup created new ones. */
+  vergissStruktur(): void;
   insert<K extends EntityTab>(tab: K, records: EntityMap[K][]): Promise<void>;
   /** All updates of one call are checked first and then written together. */
   update<K extends EntityTab>(tab: K, updates: RecordUpdate<EntityMap[K]>[]): Promise<EntityMap[K][]>;

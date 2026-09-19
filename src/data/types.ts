@@ -297,6 +297,12 @@ export interface MonsteraEintrag extends Meta {
   von: string;
 }
 
+/** Both games of the start page; null means the tab is not set up yet. */
+export interface SpieleDaten {
+  wordle: WordleErgebnis[] | null;
+  monstera: MonsteraEintrag[] | null;
+}
+
 export type Listen = Record<string, string[]>;
 export type Einstellungen = Record<string, string>;
 

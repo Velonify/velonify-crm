@@ -13,7 +13,7 @@ import { errorMessage } from '../lib/errors';
 import { useLoad } from '../lib/useLoad';
 
 function SheetKarte() {
-  const { sheets, refresh } = useCrm();
+  const { sheets, service, refresh } = useCrm();
   const { expire } = useAuth();
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState<unknown>();
@@ -27,6 +27,8 @@ function SheetKarte() {
     setRunError(undefined);
     try {
       await runSetup(sheets);
+      // The store still remembers the old list of tabs.
+      service?.vergissStruktur();
       status.reload();
       await refresh();
     } catch (err) {

@@ -20,11 +20,21 @@ const TABS: TabSchema[] = Object.values(SCHEMA);
 const PROTECTION_NOTE = 'Bitte nur über das CRM bearbeiten – sonst können Daten kaputtgehen.';
 
 /** Header cells up to the last non-empty one. */
-async function readHeader(api: SheetsApi, tab: string): Promise<string[]> {
-  const [row = []] = await api.getValues(`${quoteTab(tab)}!1:1`);
+function headerAus(werte: unknown[][]): string[] {
+  const [row = []] = werte;
   const header = row.map((cell) => String(cell ?? '').trim());
   while (header.length > 0 && header[header.length - 1] === '') header.pop();
   return header;
+}
+
+/**
+ * First row of every named tab in a single request. Asking tab by tab used to run into Google's rate limit
+ * on sheets with many tabs.
+ */
+async function readHeaders(api: SheetsApi, tabs: string[]): Promise<Map<string, string[]>> {
+  if (tabs.length === 0) return new Map();
+  const werte = await api.batchGetValues(tabs.map((tab) => `${quoteTab(tab)}!1:1`));
+  return new Map(tabs.map((tab, i) => [tab, headerAus(werte[i] ?? [])]));
 }
 
 function findSheet(info: SpreadsheetInfo, title: string) {
@@ -33,26 +43,23 @@ function findSheet(info: SpreadsheetInfo, title: string) {
 
 export async function checkSetup(api: SheetsApi): Promise<SetupStatus> {
   const info = await api.getSpreadsheet();
-  const tabs: TabStatus[] = [];
-  let listenRows = 0;
+  const vorhanden = TABS.filter((tab) => findSheet(info, tab.name));
+  const header = await readHeaders(api, vorhanden.map((tab) => tab.name));
 
-  for (const tab of TABS) {
+  const tabs: TabStatus[] = TABS.map((tab) => {
     const sheet = findSheet(info, tab.name);
-    if (!sheet) {
-      tabs.push({ name: tab.name, exists: false, missingColumns: [...tab.columns], isProtected: false });
-      continue;
-    }
-    const header = await readHeader(api, tab.name);
-    tabs.push({
+    if (!sheet) return { name: tab.name, exists: false, missingColumns: [...tab.columns], isProtected: false };
+    const spalten = header.get(tab.name) ?? [];
+    return {
       name: tab.name,
       exists: true,
-      missingColumns: tab.columns.filter((column) => !header.includes(column)),
+      missingColumns: tab.columns.filter((column) => !spalten.includes(column)),
       isProtected: (sheet.protectedRanges?.length ?? 0) > 0,
-    });
-    if (tab.name === SCHEMA.listen.name) {
-      listenRows = Math.max(0, (await api.getValues(`${quoteTab(tab.name)}!A2:A`)).length);
-    }
-  }
+    };
+  });
+
+  const listenTab = findSheet(info, SCHEMA.listen.name);
+  const listenRows = listenTab ? Math.max(0, (await api.getValues(`${quoteTab(SCHEMA.listen.name)}!A2:A`)).length) : 0;
 
   return {
     spreadsheetTitle: info.properties?.title ?? '',
@@ -83,13 +90,14 @@ export async function runSetup(api: SheetsApi): Promise<void> {
   const info = await api.getSpreadsheet();
   const structureRequests: unknown[] = [];
   const headerWrites: { range: string; values: string[][] }[] = [];
+  const headers = await readHeaders(api, TABS.map((tab) => tab.name));
 
   for (const tab of TABS) {
     const sheet = findSheet(info, tab.name);
     if (!sheet) throw new Error(`Tabellenblatt „${tab.name}“ konnte nicht angelegt werden.`);
     const { sheetId, gridProperties } = sheet.properties;
 
-    const header = await readHeader(api, tab.name);
+    const header = headers.get(tab.name) ?? [];
     const missing = tab.columns.filter((column) => !header.includes(column));
     if (missing.length > 0) {
       const needed = header.length + missing.length;
@@ -120,12 +128,13 @@ export async function runSetup(api: SheetsApi): Promise<void> {
   }
 
   await api.batchUpdate(structureRequests);
-  for (const write of headerWrites) await api.updateValues(write.range, write.values);
+  // All header rows in one write: one request per tab ran into Google's rate limit.
+  await api.batchUpdateValues(headerWrites);
 
   const listenTab = quoteTab(SCHEMA.listen.name);
   const listenRows = await api.getValues(`${listenTab}!A2:A`);
   if (listenRows.length === 0) {
-    const header = await readHeader(api, SCHEMA.listen.name);
+    const header = headerAus(await api.getValues(`${listenTab}!1:1`));
     const rows = Object.entries(LISTEN_DEFAULTS).flatMap(([liste, werte]) =>
       werte.map((wert) => header.map((column) => (column === 'liste' ? liste : column === 'wert' ? wert : ''))),
     );

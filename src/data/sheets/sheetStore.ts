@@ -1,9 +1,9 @@
 import { ConflictError, NotFoundError, SchemaError } from '../errors';
 import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, LISTEN_DEFAULTS, SCHEMA, MONSTERA_TABS, WORDLE_TABS, type EntityTab, type TabSchema } from '../schema';
 import type { RecordUpdate, Store } from '../store';
-import type { AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Listen, MonsteraEintrag, WordleErgebnis } from '../types';
+import type { AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Listen, MonsteraEintrag, SpieleDaten, WordleErgebnis } from '../types';
 import { columnLetter, recordToRow, rowToRecord } from './rows';
-import { quoteTab, type SheetsApi, type ValueWrite } from './sheetsClient';
+import { quoteTab, type SheetsApi, type SpreadsheetInfo, type ValueWrite } from './sheetsClient';
 
 const ALL_TABS: TabSchema[] = [...ENTITY_TABS.map((tab) => SCHEMA[tab]), SCHEMA.listen, SCHEMA.einstellungen];
 const fullRange = (tab: string) => `${quoteTab(tab)}!A1:ZZ`;
@@ -30,12 +30,29 @@ function assertColumns(schema: TabSchema, header: string[]): void {
 }
 
 /** Google Sheets as database: one request loads every tab; writes re-read only the affected tab. */
+/** How long the list of tabs may be reused; it only changes when someone runs the setup. */
+const STRUKTUR_GILT_MS = 60_000;
+
 export class SheetStore implements Store {
   private readonly api: SheetsApi;
   private readonly headers = new Map<string, string[]>();
+  private struktur?: { info: SpreadsheetInfo; zeit: number };
 
   constructor(api: SheetsApi) {
     this.api = api;
+  }
+
+  /** Which tabs exist. Cached briefly, so several views opening at once do not ask Google again and again. */
+  private async info(): Promise<SpreadsheetInfo> {
+    if (this.struktur && Date.now() - this.struktur.zeit < STRUKTUR_GILT_MS) return this.struktur.info;
+    const info = await this.api.getSpreadsheet();
+    this.struktur = { info, zeit: Date.now() };
+    return info;
+  }
+
+  /** After the setup created tabs, the cached structure is outdated. */
+  vergissStruktur(): void {
+    this.struktur = undefined;
   }
 
   async load(): Promise<Database> {
@@ -76,7 +93,7 @@ export class SheetStore implements Store {
   }
 
   async loadAngebotsDaten(): Promise<AngebotsDaten> {
-    const info = await this.api.getSpreadsheet();
+    const info = await this.info();
     const vorhanden = new Set(info.sheets?.map((sheet) => sheet.properties.title));
     if (ANGEBOTS_TABS.some((tab) => !vorhanden.has(tab))) {
       throw new SchemaError('Der Angebots-Rechner ist noch nicht eingerichtet. Bitte unter „Einrichtung“ auf „Einrichten“ klicken.');
@@ -96,7 +113,7 @@ export class SheetStore implements Store {
   }
 
   async loadContactDaten(): Promise<ContactDaten> {
-    const info = await this.api.getSpreadsheet();
+    const info = await this.info();
     const vorhanden = new Set(info.sheets?.map((sheet) => sheet.properties.title));
     if (CONTACT_TABS.some((tab) => !vorhanden.has(tab))) {
       throw new SchemaError('Der Contact Generator ist noch nicht eingerichtet. Bitte unter „Einrichtung“ auf „Einrichten“ klicken.');
@@ -112,7 +129,7 @@ export class SheetStore implements Store {
   }
 
   async loadAudits(): Promise<Audit[]> {
-    const info = await this.api.getSpreadsheet();
+    const info = await this.info();
     if (!info.sheets?.some((sheet) => sheet.properties.title === AUDIT_TABS[0])) {
       throw new SchemaError('Das Shop-Audit ist noch nicht eingerichtet. Bitte unter „Einrichtung“ auf „Einrichten“ klicken.');
     }
@@ -123,7 +140,7 @@ export class SheetStore implements Store {
   }
 
   async loadWordle(): Promise<WordleErgebnis[]> {
-    const info = await this.api.getSpreadsheet();
+    const info = await this.info();
     if (!info.sheets?.some((sheet) => sheet.properties.title === WORDLE_TABS[0])) {
       throw new SchemaError('Das Wort des Tages ist noch nicht eingerichtet. Bitte unter „Einrichtung“ auf „Einrichten“ klicken.');
     }
@@ -134,7 +151,7 @@ export class SheetStore implements Store {
   }
 
   async loadMonstera(): Promise<MonsteraEintrag[]> {
-    const info = await this.api.getSpreadsheet();
+    const info = await this.info();
     if (!info.sheets?.some((sheet) => sheet.properties.title === MONSTERA_TABS[0])) {
       throw new SchemaError('Die Team-Monstera ist noch nicht eingerichtet. Bitte unter „Einrichtung“ auf „Einrichten“ klicken.');
     }
@@ -142,6 +159,24 @@ export class SheetStore implements Store {
     assertColumns(SCHEMA.monstera, table.header);
     this.headers.set('monstera', table.header);
     return entityRows('monstera', table);
+  }
+
+  /** Both games of the start page in a single request; a tab that is not set up yet comes back as null. */
+  async loadSpiele(): Promise<SpieleDaten> {
+    const info = await this.info();
+    const vorhanden = new Set(info.sheets?.map((sheet) => sheet.properties.title));
+    const tabs = [...WORDLE_TABS, ...MONSTERA_TABS].filter((tab) => vorhanden.has(tab));
+    if (tabs.length === 0) return { wordle: null, monstera: null };
+    const werte = await this.api.batchGetValues(tabs.map((tab) => fullRange(tab)));
+    const daten: SpieleDaten = { wordle: null, monstera: null };
+    tabs.forEach((tab, i) => {
+      const table = splitHeader(werte[i]);
+      assertColumns(SCHEMA[tab], table.header);
+      this.headers.set(tab, table.header);
+      if (tab === 'wordle') daten.wordle = entityRows('wordle', table);
+      else daten.monstera = entityRows('monstera', table);
+    });
+    return daten;
   }
 
   private async header(tab: string): Promise<string[]> {
