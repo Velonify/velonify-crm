@@ -8,6 +8,8 @@ import { DomainFehler, ladeSeite, normalisiereDomain } from './laden.js';
 import { pagespeed } from './pagespeed.js';
 import { katalog } from './technik.js';
 import { kurzfassung } from './regeln.js';
+import { AnfrageFehler, leadRoute, ROUTEN, type Route } from './leads/api.js';
+import { echteBq } from './leads/bq.js';
 
 const MODELL = 'claude-opus-5';
 
@@ -22,6 +24,10 @@ const ERLAUBTE_HERKUNFT = (process.env.ALLOWED_ORIGINS ?? 'https://crm.velonify.
 // Reads ANTHROPIC_API_KEY, which Cloud Functions injects from Secret Manager.
 const client = new Anthropic();
 const limit = new Limit(60, 10 * 60 * 1000);
+// The lead finder checks hundreds of shops in a row; each check is ~10 plain page loads, no PageSpeed, no Claude.
+const leadLimit = new Limit(2000, 10 * 60 * 1000);
+const LEADS_DATASET = process.env.LEADS_DATASET ?? 'velonify-crm.leads';
+let bq: ReturnType<typeof echteBq> | null = null;
 
 const feld = (max: number) => z.string().trim().max(max).default('');
 
@@ -66,6 +72,34 @@ functions.http('shopAudit', async (req, res) => {
     if (error instanceof ZugriffsFehler) return fehler(error.status, error.message);
     console.error('Token-Prüfung fehlgeschlagen', error);
     return fehler(502, 'Die Anmeldung konnte nicht geprüft werden.');
+  }
+
+  const leadPfad = /^\/leads\/([a-z]+)\/?$/.exec(req.path);
+  if (leadPfad) {
+    const route = leadPfad[1] as Route;
+    if (!(ROUTEN as readonly string[]).includes(route)) return fehler(404, 'Unbekannte Route.');
+    if (!leadLimit.erlaubt(email)) return fehler(429, 'Zu viele Anfragen in kurzer Zeit. Bitte in ein paar Minuten erneut versuchen.');
+    const start = Date.now();
+    try {
+      bq ??= echteBq(LEADS_DATASET);
+      const antwort = await leadRoute(route, req.body, {
+        bq,
+        dataset: LEADS_DATASET,
+        email,
+        pruefDeps: {
+          laden: ladeSeite,
+          heute: new Date(),
+          katalog: katalog(),
+          pagespeed: PAGESPEED_KEY ? (url, strategie) => pagespeed(url, strategie, PAGESPEED_KEY) : undefined,
+        },
+      });
+      console.log(JSON.stringify({ email, route, dauer_ms: Date.now() - start, domain: (req.body as { domain?: string })?.domain }));
+      return res.json(antwort);
+    } catch (error) {
+      if (error instanceof AnfrageFehler) return fehler(error.status, error.message);
+      console.error(`Lead-Route ${route} fehlgeschlagen`, error);
+      return fehler(500, `Lead-Finder: ${route} ist fehlgeschlagen.`);
+    }
   }
 
   if (!limit.erlaubt(email)) return fehler(429, 'Zu viele Prüfungen in kurzer Zeit. Bitte in ein paar Minuten erneut versuchen.');

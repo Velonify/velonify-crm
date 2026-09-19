@@ -5,6 +5,10 @@ import { AuditNeuPage } from './audit/AuditNeuPage';
 import { AuditUebersichtPage } from './audit/AuditUebersichtPage';
 import { AngebotPage } from './angebote/AngebotPage';
 import { LeistungenPage } from './angebote/LeistungenPage';
+import { BacklogPage } from './leads/BacklogPage';
+import { LeadDetailPage } from './leads/LeadDetailPage';
+import { ManuellPage } from './leads/ManuellPage';
+import { SuchePage } from './leads/SuchePage';
 import { useAuth } from './auth/AuthContext';
 import { ContactGeneratorPage } from './contact/ContactGeneratorPage';
 import { GesendetPage } from './contact/GesendetPage';
@@ -66,6 +70,12 @@ export function App() {
                 <Route index element={<AuditUebersichtPage />} />
                 <Route path="neu" element={<AuditNeuPage />} />
                 <Route path=":id" element={<AuditDetailPage />} />
+              </Route>
+              <Route path="leads">
+                <Route index element={<BacklogPage />} />
+                <Route path="manuell" element={<ManuellPage />} />
+                <Route path="suche" element={<SuchePage />} />
+                <Route path="shop/:domain" element={<LeadDetailPage />} />
               </Route>
               <Route path="einrichtung" element={<EinrichtungPage />} />
               <Route path="pipeline" element={<AlteCrmAdresse />} />

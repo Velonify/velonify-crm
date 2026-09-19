@@ -811,3 +811,16 @@ fieldset.plain.invalid legend { color: var(--danger); }
 .audit-aufhaenger-wahl { display: grid; gap: var(--space-2); }
 .audit-aufhaenger-wahl .checkbox { font-weight: 400; font-size: 14px; }
 .audit-aufhaenger-wahl .checkbox input { margin-top: 3px; flex-shrink: 0; }
+
+/* ─── Lead-Finder ────────────────────────────────────────────────────────── */
+.lead-badges { display: inline-flex; flex-wrap: wrap; gap: 4px; vertical-align: middle; }
+.lead-leiste { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; justify-content: space-between; margin-bottom: var(--space-3); }
+.lead-aktionen { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.lead-zeilen-aktionen { white-space: nowrap; text-align: right; }
+.lead-zeilen-aktionen .button + .button { margin-left: var(--space-1); }
+.lead-anlaesse { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+.lead-live { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; gap: 4px; }
+.table td.zahl, .table th.zahl { text-align: right; font-variant-numeric: tabular-nums; }
+.ok-text { color: var(--ok); }
+.field.inline { display: inline-flex; align-items: center; gap: var(--space-1); margin: 0; }
+.field.inline select { width: auto; }
