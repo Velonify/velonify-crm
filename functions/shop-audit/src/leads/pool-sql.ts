@@ -19,6 +19,7 @@ import {
   VORAB_ANLAESSE,
   type VorabAnlass,
 } from './systeme.js';
+import { technikSql } from './kanaele.js';
 
 export const HTTP_ARCHIVE = '`httparchive.crawl.pages`';
 export const CRUX = '`chrome-ux-report.materialized.country_summary`';
@@ -225,6 +226,7 @@ function anlassBedingung(anlass: VorabAnlass): string {
 export function prioViewSql(dataset: string): string {
   const anlaesse = (Object.keys(VORAB_ANLAESSE) as VorabAnlass[]).map((a) => ({ a, bedingung: anlassBedingung(a), gewicht: VORAB_ANLAESSE[a].gewicht }));
   const reichweite = REICHWEITE_PUNKTE.map(([rang, punkte]) => `WHEN rang_de <= ${rang} THEN ${punkte}`).join(' ');
+  const reichweitePunkte = `CASE ${reichweite} ELSE 0 END`;
   return `
 CREATE OR REPLACE VIEW \`${dataset}.pool_prio\` AS
 SELECT
@@ -233,6 +235,10 @@ SELECT
     ${anlaesse.map(({ a, bedingung }) => `IF(${bedingung}, ${text(a)}, NULL)`).join(',\n    ')}
   ]) a WHERE a IS NOT NULL) AS vorab_anlaesse,
   (${anlaesse.map(({ bedingung, gewicht }) => `IF(IFNULL(${bedingung}, FALSE), ${gewicht}, 0)`).join(' + ')})
-    + CASE ${reichweite} ELSE 0 END AS prioritaet
+    + ${reichweitePunkte} AS prioritaet,
+  -- Media buying: shops that already advertise first, then big ones without any pixel.
+  IF(${technikSql('werbung')}, 30, IF(rang_de <= 100000, 20, 0)) + ${reichweitePunkte} AS prioritaet_ads,
+  -- Klaviyo: other e-mail tools first (switch), then Klaviyo users (management), then big shops without any tool.
+  IF(${technikSql('anderes_email')}, 35, IF(${technikSql('klaviyo')}, 20, IF(rang_de <= 500000, 10, 0))) + ${reichweitePunkte} AS prioritaet_klaviyo
 FROM \`${dataset}.pool\``;
 }

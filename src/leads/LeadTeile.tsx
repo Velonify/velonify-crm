@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Dialog } from '../components/Dialog';
 import { useToast } from '../components/Toasts';
 import { useCrm } from '../data/CrmContext';
-import { ANLASS_LABEL, AUSSCHLUSS_LABEL, type LeadFinderApi } from '../data/leadFinder';
+import { ANLASS_BEREICH, ANLASS_LABEL, AUSSCHLUSS_LABEL, BEREICHE, type Bereich, type LeadFinderApi } from '../data/leadFinder';
 import { useIch } from '../lib/useIch';
 import { useUebernahme, type UebernahmeErgebnis, type Ziel } from './useLeadFinder';
 
@@ -18,7 +18,27 @@ export function Item({ label, children }: { label: string; children: ReactNode }
 }
 
 /** Strong reasons (end of support) in red, time-bound ones in amber, the rest neutral. */
-const ANLASS_KLASSE: Record<string, string> = { system_ohne_support: 'schwere-hoch', support_endet: 'schwere-mittel', langsam: 'schwere-mittel' };
+const ANLASS_KLASSE: Record<string, string> = {
+  system_ohne_support: 'schwere-hoch', support_endet: 'schwere-mittel', langsam: 'schwere-mittel',
+  ads_aktiv: 'schwere-hoch', klaviyo_wechsel: 'schwere-hoch', klaviyo_ausbau: 'schwere-mittel', ads_ungenutzt: 'schwere-mittel', kein_email_tool: 'schwere-mittel',
+};
+
+/** Tools as small neutral badges, e.g. the ad pixels of a shop. */
+export function ToolBadges({ tools, gtm }: { tools: string[] | null | undefined; gtm?: boolean }) {
+  const liste = [...(tools ?? []), ...(gtm ? ['GTM'] : [])];
+  if (liste.length === 0) return <span className="muted">–</span>;
+  return (
+    <span className="lead-badges">
+      {liste.map((t) => (
+        <span key={t} className={`badge ${t === 'GTM' ? 'subtle' : 'schwere-hinweis'}`}>
+          {t}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+export const anlassBereich = (id: string): Bereich => ANLASS_BEREICH[id] ?? 'migration';
 
 export function AnlassBadges({ anlaesse }: { anlaesse: string[] }) {
   return (
@@ -52,7 +72,8 @@ type Offen = null | { art: 'uebernehmen'; ziel: Ziel } | { art: 'ablehnen' };
  * The four decisions for a selection of backlog shops: into the pipeline (firm + deal), only into the firm list,
  * reject for good, or postpone for three months.
  */
-export function EntscheidungsLeiste({ api, domains, onErledigt, disabled }: { api: LeadFinderApi | null; domains: string[]; onErledigt: (entschieden: string[]) => void; disabled?: boolean }) {
+export function EntscheidungsLeiste({ api, domains, bereich, onErledigt, disabled }: { api: LeadFinderApi | null; domains: string[]; bereich: Bereich; onErledigt: (entschieden: string[]) => void; disabled?: boolean }) {
+  const deal = BEREICHE.find((b) => b.id === bereich)?.deal ?? '';
   const { db } = useCrm();
   const toast = useToast();
   const uebernehmen = useUebernahme(api);
@@ -79,7 +100,7 @@ export function EntscheidungsLeiste({ api, domains, onErledigt, disabled }: { ap
     setFehler('');
     try {
       if (offen.art === 'uebernehmen') {
-        const e = await uebernehmen(domains, offen.ziel, zustaendig);
+        const e = await uebernehmen(domains, offen.ziel, zustaendig, bereich);
         setErgebnis(e);
         const dubletten = new Set(e.dubletten.map((d) => d.domain));
         onErledigt(domains.filter((d) => !dubletten.has(d)));
@@ -159,7 +180,7 @@ export function EntscheidungsLeiste({ api, domains, onErledigt, disabled }: { ap
         >
           <p>
             {offen.ziel === 'pipeline'
-              ? 'Legt je Shop eine Firma (Lead) mit Geschäftsführung als Ansprechpartner und einen Deal „Shopify-Migration“ in Phase „Neu“ an.'
+              ? `Legt je Shop eine Firma (Lead) mit Geschäftsführung als Ansprechpartner und einen Deal „${deal}“ in Phase „Neu“ an.`
               : 'Legt je Shop eine Firma (Lead) mit Geschäftsführung als Ansprechpartner an, ohne Deal.'}{' '}
             Firmen, die es schon gibt, werden nicht überschrieben, nur leere Felder ergänzt. Mögliche Dubletten bleiben im Backlog.
           </p>

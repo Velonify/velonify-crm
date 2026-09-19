@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Dialog } from '../components/Dialog';
 import { Card, ErrorBox, Loading, PageHeader } from '../components/ui';
 import { useToast } from '../components/Toasts';
-import { AUSSCHLUSS_LABEL, systemLabel } from '../data/leadFinder';
+import { AUSSCHLUSS_LABEL, BEREICHE, systemLabel, type Bereich } from '../data/leadFinder';
 import { useLoad } from '../lib/useLoad';
 import { AnlassBadges } from './LeadTeile';
 import { NICHT_EINGERICHTET, useLeadFinderApi, useLeadStapel } from './useLeadFinder';
@@ -19,6 +19,7 @@ export function SuchePage() {
   const { reload } = statistik;
   const stapel = useLeadStapel(api, useCallback(() => reload(), [reload]));
   const [menge, setMenge] = useState(200);
+  const [bereich, setBereich] = useState<Bereich>('migration');
   const [importOffen, setImportOffen] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
   const [importFehler, setImportFehler] = useState('');
@@ -89,9 +90,16 @@ export function SuchePage() {
 
       <Card title="Shops prüfen">
         <p>
-          Prüft die nächsten Shops live: Shopsystem, Impressum, Kontakt, Sortiment, Zahlarten. Etwa 3 Sekunden je Shop, sechs gleichzeitig; 200 Shops dauern rund zwei Minuten.
-          Qualifizierte landen im Backlog, <strong>nicht</strong> im CRM.
+          Prüft die nächsten Shops live: Shopsystem, Impressum, Kontakt, Sortiment, Werbe-Pixel, E-Mail-Tool. Etwa 3 Sekunden je Shop, sechs gleichzeitig; 200 Shops dauern rund zwei
+          Minuten. Jede Prüfung bewertet alle drei Ansichten; die Auswahl bestimmt nur, welche Shops zuerst drankommen. Qualifizierte landen im Backlog, <strong>nicht</strong> im CRM.
         </p>
+        <div className="chips lead-ansicht" role="group" aria-label="Zuerst prüfen für">
+          {BEREICHE.map((b) => (
+            <button key={b.id} type="button" className={`chip ${bereich === b.id ? 'is-active' : ''}`} aria-pressed={bereich === b.id} disabled={stapel.laeuft} onClick={() => setBereich(b.id)}>
+              {b.label}
+            </button>
+          ))}
+        </div>
         <div className="lead-leiste">
           <label className="field inline">
             <span className="field-label">Anzahl</span>
@@ -108,7 +116,7 @@ export function SuchePage() {
               Anhalten
             </button>
           ) : (
-            <button type="button" className="button primary" disabled={!api} onClick={() => void stapel.starte(menge)}>
+            <button type="button" className="button primary" disabled={!api} onClick={() => void stapel.starte(menge, bereich)}>
               Nächste {menge} prüfen
             </button>
           )}

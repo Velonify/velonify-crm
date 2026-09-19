@@ -20,6 +20,9 @@ const daten = (extra: Partial<Pruefdaten> = {}): Pruefdaten => ({
   sitemap: { gefunden: true, urls: 1200, produkt_urls: 1000, neuestes_lastmod: '2026-09-01' },
   zahlarten: ['paypal', 'klarna', 'rechnung'],
   marketing: ['GA4'],
+  werbung: [],
+  email_tools: [],
+  newsletter_formular: false,
   pool: { rang_de: 50_000, lcp_ms: 1800, system_seit: '2023-01-01', system_vorher: null },
   pagespeed_mobil: null,
   heute: HEUTE,
@@ -117,6 +120,48 @@ describe('qualifiziere', () => {
     const gross = qualifiziere(daten({ pool: { rang_de: 1_000, lcp_ms: 1800, system_seit: null, system_vorher: null } }));
     const klein = qualifiziere(daten());
     expect(gross.score).toBeGreaterThan(klein.score);
+  });
+});
+
+describe('Ansichten Media Buying und Klaviyo', () => {
+  const aktuell = { support: supportStatus('shopware', '6.6', HEUTE) };
+  const bekannt = { rang_de: 50_000, lcp_ms: 1800, system_seit: null, system_vorher: null, technik_bekannt: true };
+
+  it('nimmt Shops mit Werbung in die Ansicht Media Buying, auch ohne Migrations-Anlass', () => {
+    const e = qualifiziere(daten({ ...aktuell, werbung: ['Meta'] }));
+    expect(e.qualifiziert).toBe(true);
+    expect(e.bereiche).toEqual(['ads']);
+    expect(ids(e.anlaesse)).toEqual(['ads_aktiv', 'ads_ein_kanal']);
+    expect(e.scores.migration).toBe(0);
+    expect(e.scores.ads).toBeGreaterThan(0);
+  });
+
+  it('meldet Reichweite ohne Pixel nur, wenn HTTP Archive den Shop kennt', () => {
+    const gross = { ...bekannt, rang_de: 10_000 };
+    expect(ids(qualifiziere(daten({ ...aktuell, pool: gross })).anlaesse)).toContain('ads_ungenutzt');
+    expect(ids(qualifiziere(daten({ ...aktuell, pool: { ...gross, technik_bekannt: false } })).anlaesse)).not.toContain('ads_ungenutzt');
+    expect(ids(qualifiziere(daten({ ...aktuell, pool: { ...bekannt, rang_de: 500_000 } })).anlaesse)).not.toContain('ads_ungenutzt');
+  });
+
+  it('unterscheidet Klaviyo-Wechsel, Klaviyo-Betreuung und kein E-Mail-Tool', () => {
+    expect(qualifiziere(daten({ ...aktuell, email_tools: ['Mailchimp'] })).anlaesse.map((a) => a.text)).toContain('nutzt Mailchimp, Wechsel zu Klaviyo möglich');
+    expect(ids(qualifiziere(daten({ ...aktuell, email_tools: ['Klaviyo', 'Brevo'] })).anlaesse)).toEqual(['klaviyo_ausbau']);
+    const ohne = qualifiziere(daten({ ...aktuell, newsletter_formular: true, pool: bekannt }));
+    expect(ids(qualifiziere(daten({ ...aktuell, pool: { ...bekannt, rang_de: 500_000 } })).anlaesse)).not.toContain('kein_email_tool');
+    expect(ohne.anlaesse.map((a) => a.text)).toContain('kein E-Mail-Marketing-Tool erkennbar trotz Newsletter-Anmeldung');
+    // Top 50,000 without any pixel is a media buying lead as well.
+    expect(ohne.bereiche).toEqual(['ads', 'klaviyo']);
+  });
+
+  it('bewertet jede Ansicht mit eigenem Score, der Gesamtscore ist der höchste', () => {
+    const e = qualifiziere(daten({ werbung: ['Meta', 'Google Ads'], email_tools: ['CleverReach'] }));
+    expect(e.bereiche).toEqual(['migration', 'ads', 'klaviyo']);
+    expect(e.scores.klaviyo).toBeGreaterThan(e.scores.ads);
+    expect(e.score).toBe(Math.max(e.scores.migration, e.scores.ads, e.scores.klaviyo));
+  });
+
+  it('schließt nur aus, wenn keine Ansicht passt', () => {
+    expect(ids(qualifiziere(daten({ ...aktuell, werbung: [], email_tools: [] })).ausschluss)).toEqual(['kein_anlass']);
   });
 });
 

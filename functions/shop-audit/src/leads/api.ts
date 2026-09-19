@@ -23,10 +23,11 @@ const PoolSchema = z.object({
   version: z.string().max(40).nullable(),
   system_seit: z.string().max(10).nullable(),
   system_vorher: z.string().max(40).nullable(),
+  technik: z.array(z.string().max(120)).max(400).nullable().optional(),
 });
 
 const Schemas = {
-  naechste: z.object({ n: z.number().int().min(1).max(500).default(200) }),
+  naechste: z.object({ n: z.number().int().min(1).max(500).default(200), bereich: z.enum(['migration', 'ads', 'klaviyo']).default('migration') }),
   pruefen: z.object({ domain: z.string().trim().min(3).max(300), pool: PoolSchema.nullable().default(null) }),
   detail: z.object({ domain: z.string().trim().min(3).max(300) }),
   details: z.object({ domains: z.array(z.string().trim().min(3).max(300)).min(1).max(500) }),
@@ -77,6 +78,13 @@ export function pruefZeile(k: Kandidat, von: string): Record<string, unknown> {
     von,
     qualifiziert: k.qualifiziert,
     score: k.score,
+    bereiche: k.bereiche,
+    score_migration: k.scores.migration,
+    score_ads: k.scores.ads,
+    score_klaviyo: k.scores.klaviyo,
+    werbung: k.werbung,
+    gtm: k.gtm,
+    email_tools: k.email_tools,
     ausschluss: k.ausschluss.map((a) => a.id),
     anlaesse: k.anlaesse.map((a) => a.id),
     anlass_texte: k.anlaesse.map((a) => a.text),
@@ -95,8 +103,8 @@ export async function leadRoute(route: Route, body: unknown, ctx: Kontext): Prom
   const { bq, dataset } = ctx;
   switch (route) {
     case 'naechste': {
-      const { n } = parse(Schemas.naechste, body);
-      return { kandidaten: await bq.query(naechsteSql(dataset), { n }) };
+      const { n, bereich } = parse(Schemas.naechste, body);
+      return { kandidaten: await bq.query(naechsteSql(dataset, bereich), { n }) };
     }
     case 'pruefen': {
       const anfrage = parse(Schemas.pruefen, body);

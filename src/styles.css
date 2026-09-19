@@ -824,3 +824,8 @@ fieldset.plain.invalid legend { color: var(--danger); }
 .ok-text { color: var(--ok); }
 .field.inline { display: inline-flex; align-items: center; gap: var(--space-1); margin: 0; }
 .field.inline select { width: auto; }
+.lead-ansicht { margin-bottom: var(--space-3); }
+.lead-anlass-gruppe + .lead-anlass-gruppe { margin-top: var(--space-3); }
+.lead-anlass-gruppe h3 { margin: 0 0 var(--space-1); }
+.lead-website { color: inherit; text-decoration: none; }
+.lead-website:hover { text-decoration: underline; }

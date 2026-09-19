@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ErrorBox, Loading, PageHeader } from '../components/ui';
-import { ANLASS_LABEL, reichweiteLabel, systemLabel, tierVon, type ListenZeile } from '../data/leadFinder';
+import { ANLASS_BEREICH, ANLASS_LABEL, anlaesseIn, BEREICHE, bereichVon, reichweiteLabel, scoreIn, systemLabel, tierVon, type ListenZeile } from '../data/leadFinder';
 import { useLoad } from '../lib/useLoad';
-import { AnlassBadges, EntscheidungsLeiste } from './LeadTeile';
+import { AnlassBadges, EntscheidungsLeiste, ToolBadges } from './LeadTeile';
 import { NICHT_EINGERICHTET, useLeadFinderApi } from './useLeadFinder';
 
 const REICHWEITEN = [10_000, 50_000, 100_000, 500_000];
@@ -18,16 +18,22 @@ export function BacklogPage() {
   const [erledigt, setErledigt] = useState<Set<string>>(new Set());
   const [anzahl, setAnzahl] = useState(SEITE);
 
+  const ansicht = bereichVon(params.get('ansicht') ?? 'migration');
   const filter = { q: params.get('q') ?? '', system: params.get('system') ?? '', anlass: params.get('anlass') ?? '', reichweite: params.get('reichweite') ?? '', plz: params.get('plz') ?? '' };
-  const setFilter = (key: keyof typeof filter, value: string) => {
+  const setFilter = (key: keyof typeof filter | 'ansicht', value: string) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
     else next.delete(key);
+    // Reasons differ per view, so a reason filter does not carry over.
+    if (key === 'ansicht') next.delete('anlass');
     setParams(next, { replace: true });
     setAnzahl(SEITE);
+    if (key === 'ansicht') setAuswahl(new Set());
   };
 
-  const zeilen = useMemo(() => (liste.data ?? []).filter((z) => !erledigt.has(z.domain)), [liste.data, erledigt]);
+  const alle = useMemo(() => (liste.data ?? []).filter((z) => !erledigt.has(z.domain)), [liste.data, erledigt]);
+  const zeilen = useMemo(() => alle.filter((z) => z.bereiche.includes(ansicht)).sort((a, b) => scoreIn(b, ansicht) - scoreIn(a, ansicht) || a.domain.localeCompare(b.domain)), [alle, ansicht]);
+  const zahlJe = useMemo(() => Object.fromEntries(BEREICHE.map((b) => [b.id, alle.filter((z) => z.bereiche.includes(b.id)).length])), [alle]);
   const systeme = useMemo(() => [...new Set(zeilen.map((z) => z.system))].sort(), [zeilen]);
   const sichtbar = useMemo(() => {
     const q = filter.q.trim().toLowerCase();
@@ -58,6 +64,8 @@ export function BacklogPage() {
     setAuswahl(new Set());
   };
 
+  const anlassOptionen = Object.entries(ANLASS_LABEL).filter(([id]) => ANLASS_BEREICH[id] === ansicht);
+
   return (
     <div className="page wide">
       <PageHeader
@@ -65,7 +73,7 @@ export function BacklogPage() {
         title="Backlog"
         subtitle={
           liste.data
-            ? `${zeilen.length.toLocaleString('de-DE')} geprüfte Shops mit Anlass. Ins CRM kommt nur, was ihr übernehmt.`
+            ? `${alle.length.toLocaleString('de-DE')} geprüfte Shops mit Anlass. Ins CRM kommt nur, was ihr übernehmt.`
             : 'Geprüfte Shops mit Anlass. Ins CRM kommt nur, was ihr übernehmt.'
         }
         actions={
@@ -80,6 +88,14 @@ export function BacklogPage() {
 
       {liste.data && (
         <>
+          <div className="chips lead-ansicht" role="tablist" aria-label="Ansicht">
+            {BEREICHE.map((b) => (
+              <button key={b.id} type="button" role="tab" aria-selected={ansicht === b.id} className={`chip ${ansicht === b.id ? 'is-active' : ''}`} onClick={() => setFilter('ansicht', b.id === 'migration' ? '' : b.id)}>
+                {b.label} ({(zahlJe[b.id] ?? 0).toLocaleString('de-DE')})
+              </button>
+            ))}
+          </div>
+
           <div className="filters" role="search">
             <input type="search" value={filter.q} onChange={(e) => setFilter('q', e.target.value)} placeholder="Firma, Domain oder Ort" aria-label="Suche" />
             <select value={filter.system} onChange={(e) => setFilter('system', e.target.value)} aria-label="System">
@@ -92,7 +108,7 @@ export function BacklogPage() {
             </select>
             <select value={filter.anlass} onChange={(e) => setFilter('anlass', e.target.value)} aria-label="Anlass">
               <option value="">Alle Anlässe</option>
-              {Object.entries(ANLASS_LABEL).map(([id, label]) => (
+              {anlassOptionen.map(([id, label]) => (
                 <option key={id} value={id}>
                   {label}
                 </option>
@@ -118,7 +134,7 @@ export function BacklogPage() {
 
           <div className="lead-leiste">
             <span className="muted small">{gewaehlt.length > 0 ? `${gewaehlt.length} ausgewählt` : 'Shops auswählen, dann entscheiden.'}</span>
-            <EntscheidungsLeiste api={api} domains={gewaehlt} onErledigt={entschieden} />
+            <EntscheidungsLeiste api={api} domains={gewaehlt} bereich={ansicht} onErledigt={entschieden} />
           </div>
 
           <div className="table-wrap">
@@ -129,7 +145,7 @@ export function BacklogPage() {
                     <input type="checkbox" aria-label="Alle angezeigten auswählen" checked={alleGewaehlt} onChange={() => setAuswahl(alleGewaehlt ? new Set() : new Set(gezeigt.map((z) => z.domain)))} />
                   </th>
                   <th>Firma</th>
-                  <th>System</th>
+                  <th>{ansicht === 'ads' ? 'Pixel & GTM' : ansicht === 'klaviyo' ? 'E-Mail-Tool' : 'System'}</th>
                   <th>Anlass</th>
                   <th className="hide-sm">Reichweite</th>
                   <th className="hide-md">Ort</th>
@@ -137,37 +153,54 @@ export function BacklogPage() {
                 </tr>
               </thead>
               <tbody>
-                {gezeigt.map((z) => (
-                  <tr key={z.domain} onClick={() => navigate(`/leads/shop/${z.domain}`)}>
-                    <td className="auswahl-spalte" onClick={(e) => e.stopPropagation()}>
-                      <input type="checkbox" aria-label={`${z.firma || z.domain} auswählen`} checked={auswahl.has(z.domain)} onChange={() => umschalten(z.domain)} />
-                    </td>
-                    <td>
-                      <Link to={`/leads/shop/${z.domain}`} className="row-title" onClick={(e) => e.stopPropagation()}>
-                        {z.firma || z.domain}
-                      </Link>
-                      <div className="row-sub">{z.domain}</div>
-                    </td>
-                    <td>{systemLabel(z.system, z.version)}</td>
-                    <td>
-                      <AnlassBadges anlaesse={z.anlaesse} />
-                      <div className="row-sub">{z.anlass_texte[0]}</div>
-                    </td>
-                    <td className="hide-sm">{reichweiteLabel(z.rang_de)}</td>
-                    <td className="hide-md">{z.ort ? `${z.plz} ${z.ort}` : <span className="muted">–</span>}</td>
-                    <td className="zahl">
-                      {z.score}
-                      <div className="row-sub">Tier {tierVon(z.score)}</div>
-                    </td>
-                  </tr>
-                ))}
+                {gezeigt.map((z) => {
+                  const anlaesse = anlaesseIn(z, ansicht);
+                  const score = scoreIn(z, ansicht);
+                  return (
+                    <tr key={z.domain} onClick={() => navigate(`/leads/shop/${z.domain}?ansicht=${ansicht}`)}>
+                      <td className="auswahl-spalte" onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox" aria-label={`${z.firma || z.domain} auswählen`} checked={auswahl.has(z.domain)} onChange={() => umschalten(z.domain)} />
+                      </td>
+                      <td>
+                        <Link to={`/leads/shop/${z.domain}?ansicht=${ansicht}`} className="row-title" onClick={(e) => e.stopPropagation()}>
+                          {z.firma || z.domain}
+                        </Link>
+                        <div className="row-sub">
+                          <a href={`https://${z.domain}/`} target="_blank" rel="noreferrer" className="lead-website" onClick={(e) => e.stopPropagation()} title="Website in neuem Tab öffnen">
+                            {z.domain} ↗
+                          </a>
+                        </div>
+                      </td>
+                      <td>
+                        {ansicht === 'ads' ? (
+                          <ToolBadges tools={z.werbung} gtm={z.gtm} />
+                        ) : ansicht === 'klaviyo' ? (
+                          <ToolBadges tools={z.email_tools} />
+                        ) : (
+                          systemLabel(z.system, z.version)
+                        )}
+                        {ansicht !== 'migration' && <div className="row-sub">{systemLabel(z.system, z.version)}</div>}
+                      </td>
+                      <td>
+                        <AnlassBadges anlaesse={anlaesse.map((a) => a.id)} />
+                        <div className="row-sub">{anlaesse[0]?.text}</div>
+                      </td>
+                      <td className="hide-sm">{reichweiteLabel(z.rang_de)}</td>
+                      <td className="hide-md">{z.ort ? `${z.plz} ${z.ort}` : <span className="muted">–</span>}</td>
+                      <td className="zahl">
+                        {score}
+                        <div className="row-sub">Tier {tierVon(score)}</div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             {sichtbar.length === 0 && (
               <div className="empty">
                 {zeilen.length === 0 ? (
                   <p>
-                    Der Backlog ist leer. Unter <Link to="/leads/suche">Suche</Link> weitere Shops prüfen lassen.
+                    In dieser Ansicht ist der Backlog leer. Unter <Link to="/leads/suche">Suche</Link> weitere Shops prüfen lassen.
                   </p>
                 ) : (
                   <p>Kein Shop passt zu den Filtern.</p>
