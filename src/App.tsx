@@ -27,6 +27,7 @@ import { LoginPage } from './pages/LoginPage';
 import { MeinTagPage } from './pages/MeinTagPage';
 import { PipelinePage } from './pages/PipelinePage';
 import { StartPage } from './pages/StartPage';
+import { WordlePage } from './wordle/WordlePage';
 
 /** Links from before the start page (/#/firmen/…) now live under /crm. */
 function AlteCrmAdresse() {
@@ -47,6 +48,7 @@ export function App() {
             <Route element={<Layout />}>
               <Route index element={<StartPage />} />
               <Route path="kalender" element={<KalenderPage />} />
+              <Route path="wort" element={<WordlePage />} />
               <Route path="crm">
                 <Route index element={<MeinTagPage />} />
                 <Route path="pipeline" element={<PipelinePage />} />

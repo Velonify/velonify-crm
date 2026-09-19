@@ -274,6 +274,18 @@ export interface Audit extends Meta {
   archiviert: boolean;
 }
 
+/** One player's game of the daily word; one row per player and day. */
+export interface WordleErgebnis extends Meta {
+  id: string;
+  /** YYYY-MM-DD of the puzzle */
+  datum: string;
+  spieler: string;
+  versuche: number;
+  geloest: boolean;
+  /** Colours per attempt ("xyxgx/ggggg"), never the letters. */
+  muster: string;
+}
+
 export type Listen = Record<string, string[]>;
 export type Einstellungen = Record<string, string>;
 
@@ -289,6 +301,7 @@ export interface EntityMap {
   outreach_leistungen: OutreachLeistung;
   anschreiben: Anschreiben;
   audits: Audit;
+  wordle: WordleErgebnis;
 }
 
 /** Everything the app knows, loaded in one go. */

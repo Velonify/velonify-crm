@@ -1,5 +1,5 @@
 import type { EntityTab } from './schema';
-import type { AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap } from './types';
+import type { AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, WordleErgebnis } from './types';
 
 export interface RecordUpdate<T> {
   id: string;
@@ -20,6 +20,8 @@ export interface Store {
   loadContactDaten(): Promise<ContactDaten>;
   /** All shop audits. Throws SchemaError while the tab is not set up. */
   loadAudits(): Promise<Audit[]>;
+  /** All results of the daily word game. Throws SchemaError while the tab is not set up. */
+  loadWordle(): Promise<WordleErgebnis[]>;
   insert<K extends EntityTab>(tab: K, records: EntityMap[K][]): Promise<void>;
   /** All updates of one call are checked first and then written together. */
   update<K extends EntityTab>(tab: K, updates: RecordUpdate<EntityMap[K]>[]): Promise<EntityMap[K][]>;

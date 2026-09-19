@@ -1,7 +1,7 @@
 import { ConflictError, NotFoundError, SchemaError } from '../errors';
-import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, LISTEN_DEFAULTS, SCHEMA, type EntityTab, type TabSchema } from '../schema';
+import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, LISTEN_DEFAULTS, SCHEMA, WORDLE_TABS, type EntityTab, type TabSchema } from '../schema';
 import type { RecordUpdate, Store } from '../store';
-import type { AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Listen } from '../types';
+import type { AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Listen, WordleErgebnis } from '../types';
 import { columnLetter, recordToRow, rowToRecord } from './rows';
 import { quoteTab, type SheetsApi, type ValueWrite } from './sheetsClient';
 
@@ -120,6 +120,17 @@ export class SheetStore implements Store {
     assertColumns(SCHEMA.audits, table.header);
     this.headers.set('audits', table.header);
     return entityRows('audits', table);
+  }
+
+  async loadWordle(): Promise<WordleErgebnis[]> {
+    const info = await this.api.getSpreadsheet();
+    if (!info.sheets?.some((sheet) => sheet.properties.title === WORDLE_TABS[0])) {
+      throw new SchemaError('Das Wort des Tages ist noch nicht eingerichtet. Bitte unter „Einrichtung“ auf „Einrichten“ klicken.');
+    }
+    const table = splitHeader(await this.api.getValues(fullRange('wordle')));
+    assertColumns(SCHEMA.wordle, table.header);
+    this.headers.set('wordle', table.header);
+    return entityRows('wordle', table);
   }
 
   private async header(tab: string): Promise<string[]> {

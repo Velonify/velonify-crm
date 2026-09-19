@@ -95,6 +95,12 @@ export const SCHEMA = {
     numeric: ['score_mobil', 'score_desktop', 'lcp_mobil_ms', 'cls', 'inp_ms'],
     boolean: ['archiviert'],
   },
+  wordle: {
+    name: 'wordle',
+    columns: ['id', 'datum', 'spieler', 'versuche', 'geloest', 'muster', ...META],
+    numeric: ['versuche'],
+    boolean: ['geloest'],
+  },
   listen: {
     name: 'listen',
     columns: ['liste', 'wert'],
@@ -115,7 +121,14 @@ export const ANGEBOTS_TABS = ['leistungskategorien', 'leistungen', 'angebote'] a
 export const CONTACT_TABS = ['outreach_leistungen', 'anschreiben'] as const;
 /** Tabs of the shop audit, loaded only when audits are shown. */
 export const AUDIT_TABS = ['audits'] as const;
-export type EntityTab = (typeof ENTITY_TABS)[number] | (typeof ANGEBOTS_TABS)[number] | (typeof CONTACT_TABS)[number] | (typeof AUDIT_TABS)[number];
+/** Tab of the daily word game on the start page, loaded only by the game. */
+export const WORDLE_TABS = ['wordle'] as const;
+export type EntityTab =
+  | (typeof ENTITY_TABS)[number]
+  | (typeof ANGEBOTS_TABS)[number]
+  | (typeof CONTACT_TABS)[number]
+  | (typeof AUDIT_TABS)[number]
+  | (typeof WORDLE_TABS)[number];
 
 /** Editable select values, written to the "listen" tab on setup and maintained there afterwards. */
 export const LISTEN_DEFAULTS: Record<string, string[]> = {

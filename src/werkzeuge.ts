@@ -17,10 +17,11 @@ export const WERKZEUGE: Werkzeug[] = [
     name: 'Home',
     beschreibung: 'Überblick, Kunden und Links',
     pfad: '/',
-    bereiche: ['/kalender'],
+    bereiche: ['/kalender', '/wort'],
     navigation: [
       { label: 'Übersicht', pfad: '/', end: true },
       { label: 'Kalender', pfad: '/kalender' },
+      { label: 'Wort des Tages', pfad: '/wort' },
     ],
   },
   {

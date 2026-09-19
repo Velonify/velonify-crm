@@ -50,6 +50,7 @@ import type {
   OutreachLeistungInput,
   Wiedervorlage,
   WiedervorlageInput,
+  WordleErgebnis,
 } from './types';
 
 export interface CrmDeps {
@@ -690,6 +691,27 @@ export class CrmService {
     CrmService.find((await this.store.load()).firmen, firmaId);
     const [audit] = await this.store.update('audits', [{ id: auditId, changes: { firma_id: firmaId, ...this.changed() }, expectedGeaendertAm }]);
     return audit;
+  }
+
+  // ─── Wort des Tages ────────────────────────────────────────────────────────
+
+  loadWordle(): Promise<WordleErgebnis[]> {
+    return this.store.loadWordle();
+  }
+
+  /**
+   * Stores a finished game. A player has one result per day: when one exists already (a second tab or device),
+   * that one stays and is returned.
+   */
+  async speichereWordle(input: Pick<WordleErgebnis, 'datum' | 'spieler' | 'versuche' | 'geloest' | 'muster'>): Promise<WordleErgebnis> {
+    if (!isIsoDate(input.datum)) throw new ValidationError('datum', 'Ungültiges Datum.');
+    const spieler = input.spieler.trim();
+    if (!spieler) throw new ValidationError('spieler', 'Bitte zuerst auswählen, wer spielt.');
+    const vorhanden = (await this.store.loadWordle()).find((e) => e.datum === input.datum && e.spieler === spieler);
+    if (vorhanden) return vorhanden;
+    const ergebnis: WordleErgebnis = { ...input, spieler, id: newId(ID_PREFIX.wordle), ...this.created() };
+    await this.store.insert('wordle', [ergebnis]);
+    return ergebnis;
   }
 
   // ─── Google Drive ──────────────────────────────────────────────────────────
