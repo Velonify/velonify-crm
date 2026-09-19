@@ -17,9 +17,73 @@ function zufall(n: number): number {
   return x - Math.floor(x);
 }
 
-/** Heart-shaped leaf with a notch at the stalk, pointing up from the origin. */
+/**
+ * A monstera leaf, drawn like the hand-drawn reference: a heart-shaped blade whose edge is cut by narrow,
+ * curved notches, plus the teardrop holes along the midrib. `reife` 0 = young and whole, 1 = old and deeply cut.
+ */
 const BLATT =
-  'M0 -0.05 C-0.18 -0.03 -0.42 0.02 -0.56 -0.18 C-0.76 -0.46 -0.5 -0.9 0 -1 C0.5 -0.9 0.76 -0.46 0.56 -0.18 C0.42 0.02 0.18 -0.03 0 -0.05 Z';
+  'M0 -0.04 C-0.08 0.06 -0.26 0.10 -0.38 0.00 C-0.52 -0.14 -0.50 -0.52 -0.34 -0.80 C-0.24 -0.98 -0.12 -1.06 0 -1.14 C0.12 -1.06 0.24 -0.98 0.34 -0.80 C0.50 -0.52 0.52 -0.14 0.38 0.00 C0.26 0.10 0.08 0.06 0 -0.04 Z';
+
+/** Height along the midrib where a notch cuts in, from the base upwards. */
+const SCHNITT_HOEHEN = [0.1, 0.32, 0.54, 0.74, 0.9];
+
+interface Punkt {
+  x: number;
+  y: number;
+}
+
+const zwischen = (a: Punkt, b: Punkt, t: number): Punkt => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+
+/** The outer part of a quadratic curve, so a second, wider stroke can widen the notch towards the edge. */
+function aussenStueck(a: Punkt, steuer: Punkt, e: Punkt, t: number): string {
+  const p1 = zwischen(a, steuer, t);
+  const p2 = zwischen(steuer, e, t);
+  const ende = zwischen(p1, p2, t);
+  return `M${a.x} ${a.y} Q${p1.x} ${p1.y} ${ende.x} ${ende.y}`;
+}
+
+function Schnitte({ reife, seed }: { reife: number; seed: number }) {
+  if (reife <= 0) return null;
+  const anzahl = Math.round(1 + reife * (SCHNITT_HOEHEN.length - 1));
+  // Young leaves are only notched at the edge; with age the notches reach almost to the midrib.
+  const innen = 0.28 - 0.21 * reife;
+  const teile = [];
+  for (let k = 0; k < anzahl; k++) {
+    for (const s of [-1, 1]) {
+      const streuung = 0.94 + 0.12 * zufall(seed + k * 5 + (s + 1) * 3);
+      const t = SCHNITT_HOEHEN[k] * streuung;
+      const ix = s * innen;
+      const iy = -t;
+      // Curved notch, wider where it opens at the edge and with a round end near the midrib.
+      const aussen = { x: s * 0.85, y: -(t + 0.34) };
+      const steuer = { x: s * 0.5, y: -(t + 0.16) };
+      const ende = { x: ix, y: iy };
+      teile.push(
+        <path key={`s${k}${s}`} d={`M${aussen.x} ${aussen.y} Q${steuer.x} ${steuer.y} ${ende.x} ${ende.y}`} fill="none" stroke="black" strokeWidth={0.055} strokeLinecap="round" />,
+        <path key={`b${k}${s}`} d={aussenStueck(aussen, steuer, ende, 0.55)} fill="none" stroke="black" strokeWidth={0.095} strokeLinecap="round" />,
+      );
+      // Teardrop holes between notch and midrib, the older the leaf the more of them.
+      if (reife > 0.45 && k < anzahl - 1 && zufall(seed + k * 3 + s) > 0.3) {
+        const th = (t + SCHNITT_HOEHEN[k + 1] * streuung) / 2;
+        teile.push(
+          <ellipse key={`l${k}${s}`} cx={s * 0.16} cy={-th - 0.05} rx={0.115} ry={0.045} fill="black" transform={`rotate(${s * -28} ${s * 0.16} ${-th - 0.05})`} />,
+        );
+      }
+    }
+  }
+  return <>{teile}</>;
+}
+
+/** Midrib plus a vein into every finger. */
+function adern(reife: number): string {
+  const anzahl = Math.round(1 + reife * (SCHNITT_HOEHEN.length - 1));
+  const teile = ['M0 -0.06 L0 -1.02'];
+  for (let k = 0; k < anzahl; k++) {
+    const t = SCHNITT_HOEHEN[k] + 0.1;
+    for (const s of [-1, 1]) teile.push(`M0 ${-t + 0.08} Q${s * 0.2} ${-(t + 0.04)} ${s * 0.36} ${-(t + 0.2)}`);
+  }
+  return teile.join(' ');
+}
 
 const HAENGEN: Record<Zustand, number> = { praechtig: 0, durstig: 14, welk: 32, sehr_welk: 52 };
 const VERBLASSEN: Record<Zustand, number> = { praechtig: 0, durstig: 12, welk: 38, sehr_welk: 62 };
@@ -31,8 +95,7 @@ interface BlattLage {
   basisX: number;
   winkel: number;
   groesse: number;
-  schlitze: number;
-  loecher: boolean;
+  reife: number;
   seite: number;
 }
 
@@ -62,24 +125,11 @@ function lagen(anzahl: number): BlattLage[] {
       // Leaves face the viewer rather than turning fully sideways.
       winkel: Math.max(-62, Math.min(62, (Math.atan2(x - kx, ky - y) * 180) / Math.PI)),
       groesse: pflanze * Math.min(1, 0.55 + alter * 0.09),
-      schlitze: Math.max(0, Math.min(5, Math.floor((alter - 1) / 1.5) + 1)),
-      loecher: alter >= 5,
+      // A young leaf is still whole; the cuts deepen as it matures.
+      reife: Math.max(0, Math.min(1, (alter - 1) / 6)),
       seite,
     };
   });
-}
-
-/** The cuts that make a monstera a monstera: wedges from the edge almost to the midrib, plus holes. */
-function Schlitze({ anzahl, loecher }: { anzahl: number; loecher: boolean }) {
-  const teile = [];
-  for (let k = 0; k < anzahl; k++) {
-    const y = -0.2 - k * 0.16;
-    for (const s of [-1, 1]) {
-      teile.push(<path key={`s${k}${s}`} d={`M${s * 0.95} ${y + 0.03} L${s * 0.13} ${y - 0.035} L${s * 0.95} ${y - 0.17} Z`} fill="black" />);
-      if (loecher && k < 3) teile.push(<ellipse key={`l${k}${s}`} cx={s * 0.3} cy={y - 0.11} rx={0.07} ry={0.035} fill="black" transform={`rotate(${s * -12} ${s * 0.3} ${y - 0.11})`} />);
-    }
-  }
-  return <>{teile}</>;
 }
 
 export function Pflanze({ blaetter, zustand, neuesBlatt, gegossen }: { blaetter: number; zustand: Zustand; neuesBlatt: boolean; gegossen: number }) {
@@ -109,10 +159,14 @@ export function Pflanze({ blaetter, zustand, neuesBlatt, gegossen }: { blaetter:
               <g style={{ transform: `translate(${b.x}px, ${b.y}px) rotate(${winkel}deg) scale(${b.groesse})` }} className="pflanze-lage">
                 <mask id={`${id}-${i}`} maskUnits="userSpaceOnUse" x={-1} y={-1.2} width={2} height={1.4}>
                   <rect x={-1} y={-1.2} width={2} height={1.4} fill="white" />
-                  <Schlitze anzahl={b.schlitze} loecher={b.loecher} />
+                  <Schnitte reife={b.reife} seed={i} />
                 </mask>
+                <clipPath id={`${id}-c${i}`}>
+                  <path d={BLATT} />
+                </clipPath>
                 <path d={BLATT} fill={farbe} mask={`url(#${id}-${i})`} className="pflanze-spreite" />
-                <path d="M0 0 L0 -0.9" className="pflanze-ader" />
+                {/* Veins stay inside the blade and stop at the cuts. */}
+                <path d={adern(b.reife)} className="pflanze-ader" clipPath={`url(#${id}-c${i})`} mask={`url(#${id}-${i})`} />
               </g>
             </g>
           </g>
