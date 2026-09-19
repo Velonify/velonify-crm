@@ -13,6 +13,7 @@ export const ID_PREFIX = {
   outreach_leistungen: 'OL',
   anschreiben: 'AS',
   audits: 'SA',
+  wordle: 'WD',
 } as const;
 
 export function newId(prefix: string, length = 8): string {

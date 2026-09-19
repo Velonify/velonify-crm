@@ -119,6 +119,14 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   termin('E-Commerce-Messe', addDays(heute, 3), addDays(heute, 5), [], { ganztaegig: true, ort: 'Köln' });
   termin('Abgelehnter Termin', um(1, 16), um(1, 17), ['lugge@velonify.de', 'extern@beispiel.example'], { antwort: 'declined', bearbeitbar: false });
 
+  // Word game: Johannes plays every day and has already solved today's word, Julian now and then.
+  const wordle = (spieler: string, tage: number, muster: string, geloest = true) =>
+    service.speichereWordle({ datum: addDays(heute, -tage), spieler, versuche: muster.split('/').length, geloest, muster });
+  for (let tag = 1; tag <= 6; tag++) await wordle('Johannes', tag, ['xyxxg', 'gxyxg', 'ggggg'].slice(tag % 2).join('/'));
+  await wordle('Johannes', 0, 'xxyxx/gyxxg/ggggg');
+  await wordle('Julian', 1, 'xxxxx/yxxyx/xgyxx/ggxgg/ggggg');
+  await wordle('Julian', 3, 'xyxxx/xxgyx/gxgxx/gggxg/gggxg/gggxg', false);
+
   seeding = false;
   return { service, sheets };
 }
