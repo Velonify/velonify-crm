@@ -15,6 +15,7 @@ import { dateiname } from '../lib/dateiname';
 import { faelligText, formatEuro } from '../lib/format';
 import { useIch } from '../lib/useIch';
 import { istGeplant, WERKZEUGE } from '../werkzeuge';
+import { MonsteraKarte } from '../monstera/MonsteraKarte';
 import { WordleKarte } from '../wordle/WordleKarte';
 
 const MAX_AUFGABEN = 5;
@@ -321,6 +322,7 @@ export function StartPage() {
       <div className="start-grid">
         <div className="start-main">
           <HeuteDran db={db} ich={ich} heute={heute} />
+          <MonsteraKarte db={db} ich={ich} heute={heute} />
           <Kunden db={db} />
         </div>
         <div className="start-side">

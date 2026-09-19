@@ -1,7 +1,7 @@
 import { ConflictError, NotFoundError, SchemaError } from '../errors';
-import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, LISTEN_DEFAULTS, SCHEMA, WORDLE_TABS, type EntityTab, type TabSchema } from '../schema';
+import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, LISTEN_DEFAULTS, SCHEMA, MONSTERA_TABS, WORDLE_TABS, type EntityTab, type TabSchema } from '../schema';
 import type { RecordUpdate, Store } from '../store';
-import type { AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Listen, WordleErgebnis } from '../types';
+import type { AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Listen, MonsteraEintrag, WordleErgebnis } from '../types';
 import { columnLetter, recordToRow, rowToRecord } from './rows';
 import { quoteTab, type SheetsApi, type ValueWrite } from './sheetsClient';
 
@@ -131,6 +131,17 @@ export class SheetStore implements Store {
     assertColumns(SCHEMA.wordle, table.header);
     this.headers.set('wordle', table.header);
     return entityRows('wordle', table);
+  }
+
+  async loadMonstera(): Promise<MonsteraEintrag[]> {
+    const info = await this.api.getSpreadsheet();
+    if (!info.sheets?.some((sheet) => sheet.properties.title === MONSTERA_TABS[0])) {
+      throw new SchemaError('Die Team-Monstera ist noch nicht eingerichtet. Bitte unter „Einrichtung“ auf „Einrichten“ klicken.');
+    }
+    const table = splitHeader(await this.api.getValues(fullRange('monstera')));
+    assertColumns(SCHEMA.monstera, table.header);
+    this.headers.set('monstera', table.header);
+    return entityRows('monstera', table);
   }
 
   private async header(tab: string): Promise<string[]> {

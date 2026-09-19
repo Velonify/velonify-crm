@@ -286,6 +286,17 @@ export interface WordleErgebnis extends Meta {
   muster: string;
 }
 
+/** Care of the team plant; one row per person and day. */
+export interface MonsteraEintrag extends Meta {
+  id: string;
+  /** YYYY-MM-DD */
+  datum: string;
+  /** giessen */
+  typ: string;
+  /** Team member, as in the "team" list */
+  von: string;
+}
+
 export type Listen = Record<string, string[]>;
 export type Einstellungen = Record<string, string>;
 
@@ -302,6 +313,7 @@ export interface EntityMap {
   anschreiben: Anschreiben;
   audits: Audit;
   wordle: WordleErgebnis;
+  monstera: MonsteraEintrag;
 }
 
 /** Everything the app knows, loaded in one go. */
