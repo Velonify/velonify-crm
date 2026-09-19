@@ -5,7 +5,7 @@ import { useCrm } from '../data/CrmContext';
 import { DemoLeadFinder } from '../data/demo/leadFinderDemo';
 import { AuthExpiredError } from '../data/errors';
 import { planeImport } from '../data/importCsv';
-import { CloudLeadFinder, importZeilen, type EntscheidungEintrag, type LeadFinderApi, type LeadKandidat } from '../data/leadFinder';
+import { BEREICHE, CloudLeadFinder, importZeilen, type Bereich, type EntscheidungEintrag, type LeadFinderApi, type LeadKandidat } from '../data/leadFinder';
 
 // One demo instance for the whole session, so decisions survive switching pages.
 let demo: DemoLeadFinder | null = null;
@@ -60,12 +60,12 @@ export function useLeadStapel(api: LeadFinderApi | null, onFertig: () => void) {
   );
 
   const starte = useCallback(
-    async (n: number) => {
+    async (n: number, bereich: Bereich) => {
       if (!api || laeuft) return;
       abbrechen.current = false;
       setLaeuft(true);
       try {
-        const queue = await api.naechste(n);
+        const queue = await api.naechste(n, bereich);
         setStand({ ...LEER, gesamt: queue.length });
         const arbeiter = async () => {
           while (queue.length > 0 && !abbrechen.current) {
@@ -130,16 +130,17 @@ export function useUebernahme(api: LeadFinderApi | null) {
   const { expire } = useAuth();
 
   return useCallback(
-    async (domains: string[], ziel: Ziel, zustaendig: string): Promise<UebernahmeErgebnis> => {
+    async (domains: string[], ziel: Ziel, zustaendig: string, bereich: Bereich): Promise<UebernahmeErgebnis> => {
       if (!api) throw new Error(NICHT_EINGERICHTET);
       if (!db) throw new Error('Die CRM-Daten sind noch nicht geladen.');
       try {
         const kandidaten = await api.details(domains);
-        const plan = planeImport(importZeilen(kandidaten), db, { tiers: ['A', 'B', 'C', 'D', 'sonstige'], zustaendig, dealAnlegen: ziel === 'pipeline', dealTitel: '' });
+        const dealTitel = BEREICHE.find((b) => b.id === bereich)?.deal ?? '';
+        const plan = planeImport(importZeilen(kandidaten, bereich), db, { tiers: ['A', 'B', 'C', 'D', 'sonstige'], zustaendig, dealAnlegen: ziel === 'pipeline', dealTitel });
         const ergebnis = await mutate((s) => s.importiere(plan));
         const eintraege: EntscheidungEintrag[] = plan.zeilen
           .filter((z) => ergebnis.firmen[z.domain])
-          .map((z) => ({ domain: z.domain, entscheidung: ziel, firma_id: ergebnis.firmen[z.domain], grund: z.aktion === 'ergaenzen' ? 'war schon im CRM, leere Felder ergänzt' : '' }));
+          .map((z) => ({ domain: z.domain, entscheidung: ziel, firma_id: ergebnis.firmen[z.domain], grund: `${BEREICHE.find((b) => b.id === bereich)?.label ?? bereich}${z.aktion === 'ergaenzen' ? ', war schon im CRM, leere Felder ergänzt' : ''}` }));
         if (eintraege.length > 0) await api.entscheide(eintraege);
         return {
           neu: ergebnis.neu,

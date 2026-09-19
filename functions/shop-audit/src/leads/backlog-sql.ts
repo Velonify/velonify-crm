@@ -24,6 +24,13 @@ export function tabellenSql(dataset: string): string[] {
   von STRING,
   qualifiziert BOOL,
   score INT64,
+  bereiche ARRAY<STRING>,
+  score_migration INT64,
+  score_ads INT64,
+  score_klaviyo INT64,
+  werbung ARRAY<STRING>,
+  gtm BOOL,
+  email_tools ARRAY<STRING>,
   ausschluss ARRAY<STRING>,
   anlaesse ARRAY<STRING>,
   anlass_texte ARRAY<STRING>,
@@ -35,6 +42,15 @@ export function tabellenSql(dataset: string): string[] {
   ort STRING,
   daten STRING
 )`,
+    // Columns added with the views per area (Migration, Media Buying, Klaviyo); no-ops on new tables.
+    `ALTER TABLE \`${dataset}.pruefungen\`
+  ADD COLUMN IF NOT EXISTS bereiche ARRAY<STRING>,
+  ADD COLUMN IF NOT EXISTS score_migration INT64,
+  ADD COLUMN IF NOT EXISTS score_ads INT64,
+  ADD COLUMN IF NOT EXISTS score_klaviyo INT64,
+  ADD COLUMN IF NOT EXISTS werbung ARRAY<STRING>,
+  ADD COLUMN IF NOT EXISTS gtm BOOL,
+  ADD COLUMN IF NOT EXISTS email_tools ARRAY<STRING>`,
     `CREATE TABLE IF NOT EXISTS \`${dataset}.entscheidungen\` (
   domain STRING NOT NULL,
   entscheidung STRING NOT NULL,
@@ -68,21 +84,26 @@ WHERE NOT p.qualifiziert
   ];
 }
 
-/** Next pool candidates in priority order: not checked recently, never decided. Parameter @n. */
-export function naechsteSql(dataset: string): string {
+/** Next pool candidates in the priority order of one area: not checked recently, never decided. Parameter @n. */
+export function naechsteSql(dataset: string, bereich: 'migration' | 'ads' | 'klaviyo' = 'migration'): string {
+  const prio = bereich === 'migration' ? 'prioritaet' : `prioritaet_${bereich}`;
   return `
 SELECT pool.domain, pool.system, pool.version, pool.rang_de, pool.lcp_ms,
-  CAST(pool.system_seit AS STRING) AS system_seit, pool.system_vorher, pool.prioritaet
+  CAST(pool.system_seit AS STRING) AS system_seit, pool.system_vorher, pool.technik, pool.${prio} AS prioritaet
 FROM \`${dataset}.pool_prio\` pool
 LEFT JOIN \`${dataset}.letzte_pruefung\` p USING (domain)
 LEFT JOIN \`${dataset}.letzte_entscheidung\` e USING (domain)
 WHERE (p.domain IS NULL OR p.geprueft_am < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${ERNEUT_PRUEFEN_TAGE} DAY))
   AND e.domain IS NULL
-ORDER BY pool.prioritaet DESC, pool.rang_de, pool.domain
+ORDER BY pool.${prio} DESC, pool.rang_de, pool.domain
 LIMIT @n`;
 }
 
-const LISTE_SPALTEN = 'domain, geprueft_am, score, ausschluss, anlaesse, anlass_texte, system, version, rang_de, firma, plz, ort';
+// Checks from before the views per area only know migration; they count as such.
+const LISTE_SPALTEN = `domain, geprueft_am, score, ausschluss, anlaesse, anlass_texte, system, version, rang_de, firma, plz, ort,
+  IF(ARRAY_LENGTH(bereiche) > 0, bereiche, ['migration']) AS bereiche,
+  IFNULL(score_migration, score) AS score_migration, IFNULL(score_ads, 0) AS score_ads, IFNULL(score_klaviyo, 0) AS score_klaviyo,
+  werbung, IFNULL(gtm, FALSE) AS gtm, email_tools`;
 
 export const backlogSql = (dataset: string) => `SELECT ${LISTE_SPALTEN}, entscheidung FROM \`${dataset}.backlog\` ORDER BY score DESC, domain LIMIT 5000`;
 export const manuellSql = (dataset: string) => `SELECT ${LISTE_SPALTEN}, prioritaet FROM \`${dataset}.manuell\` ORDER BY prioritaet DESC, domain LIMIT 1000`;

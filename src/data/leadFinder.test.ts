@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { planeImport } from './importCsv';
-import { importZeilen, plattformVon, reichweiteLabel, tierVon, type LeadKandidat } from './leadFinder';
+import { anlaesseIn, importZeilen, plattformVon, reichweiteLabel, scoreIn, tierVon, type LeadKandidat, type ListenZeile } from './leadFinder';
 import type { Database } from './types';
 
 const kandidat = (extra: Partial<LeadKandidat> = {}): LeadKandidat => ({
@@ -37,6 +37,29 @@ describe('importZeilen', () => {
     const [z] = planeImport(importZeilen([k]), leereDb, { tiers: ['A', 'B', 'C', 'D', 'sonstige'], zustaendig: '', dealAnlegen: false, dealTitel: '' }).zeilen;
     expect(z.firma?.name).toBe('muster-shop.example');
     expect(z.kontakt).toBeUndefined();
+  });
+});
+
+describe('Ansichten', () => {
+  it('nimmt Score und Anlässe der gewählten Ansicht in den Import', () => {
+    const k = kandidat({
+      anlaesse: [
+        { id: 'system_ohne_support', text: 'Shopware 5, seit Juli 2024 ohne Support', gewicht: 40, bereich: 'migration' },
+        { id: 'klaviyo_wechsel', text: 'nutzt Mailchimp, Wechsel zu Klaviyo möglich', gewicht: 35, bereich: 'klaviyo' },
+      ],
+      scores: { migration: 82, ads: 0, klaviyo: 40 }, werbung: ['Meta'], gtm: true, email_tools: ['Mailchimp'],
+    });
+    const [z] = planeImport(importZeilen([k], 'klaviyo'), leereDb, { tiers: ['A', 'B', 'C', 'D', 'sonstige'], zustaendig: '', dealAnlegen: true, dealTitel: 'Klaviyo Migration & Management' }).zeilen;
+    expect(z.firma).toMatchObject({ score: 40, tier: 'C' });
+    expect(z.firma?.notiz).toMatch(/^Lead-Scoring: nutzt Mailchimp/);
+    expect(z.firma?.tech_info).toContain('Meta, GTM, Mailchimp');
+  });
+
+  it('liest Anlässe und Score einer Ansicht aus der Listenzeile', () => {
+    const z = { anlaesse: ['system_ohne_support', 'ads_aktiv'], anlass_texte: ['Shopware 5 …', 'schaltet Werbung (Meta)'], score_migration: 80, score_ads: 55, score_klaviyo: 0 } as ListenZeile;
+    expect(anlaesseIn(z, 'ads')).toEqual([{ id: 'ads_aktiv', text: 'schaltet Werbung (Meta)' }]);
+    expect(anlaesseIn(z, 'klaviyo')).toEqual([]);
+    expect(scoreIn(z, 'ads')).toBe(55);
   });
 });
 

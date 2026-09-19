@@ -5,6 +5,7 @@ import type { PagespeedErgebnis, Strategie } from '../pagespeed.js';
 import { erkenneTechnik, type Katalog } from '../technik.js';
 import { shopSignale, sitemapStatistik, type ShopSignale, type SitemapStatistik } from './aktivitaet.js';
 import { ladeImpressum, leereFirma, leseImpressum, type Firma } from './impressum.js';
+import { emailTools, hatGtm, werbekanaele } from './kanaele.js';
 import { label, supportStatus, systemVon, type Support } from './lebenszyklus.js';
 import { qualifiziere, type Ergebnis, type Pruefdaten } from './qualifizierung.js';
 
@@ -15,6 +16,8 @@ export interface PoolDaten {
   version: string | null;
   system_seit: string | null;
   system_vorher: string | null;
+  /** Technologies HTTP Archive saw in a real browser, including what the Tag Manager loads. */
+  technik?: string[] | null;
 }
 
 export interface Abhaengigkeiten {
@@ -45,7 +48,12 @@ export interface Kandidat extends Ergebnis {
   signale: Pick<ShopSignale, 'titel' | 'warenkorb' | 'preise' | 'copyright_jahr' | 'social'> | null;
   zahlarten: string[];
   marketing: string[];
+  /** Ad channels and e-mail tools, live and from HTTP Archive, as display names. */
+  werbung: string[];
+  /** Google Tag Manager in use (often the container the ad pixels come through). */
+  gtm: boolean;
   email_tools: string[];
+  newsletter_formular: boolean;
   bewertungen: string[];
   sprachen: string[];
   technik: string[];
@@ -130,6 +138,9 @@ export async function pruefeKandidat(domain: string, pool: PoolDaten | null, dep
   const poolVersion = pool?.system === sys.id ? (pool.version ?? '') : '';
   const version = poolVersion.split('.').length > sys.version.split('.').length || !sys.version ? poolVersion : sys.version;
   const support = supportStatus(sys.id, version, deps.heute);
+  const liveTechnik = merkmale?.technologien.map((t) => t.name) ?? [];
+  const werbung = werbekanaele([...(merkmale?.pixel ?? []), ...(merkmale?.google_ads ? ['Google Ads'] : []), ...liveTechnik], pool?.technik ?? null);
+  const email = emailTools([...(merkmale?.email_tools ?? []), ...liveTechnik], pool?.technik ?? null);
 
   const daten: Pruefdaten = {
     erreichbar: {
@@ -146,7 +157,12 @@ export async function pruefeKandidat(domain: string, pool: PoolDaten | null, dep
     sitemap,
     zahlarten: merkmale?.zahlarten ?? [],
     marketing: merkmale ? marketingAus(merkmale) : [],
-    pool: pool ? { rang_de: pool.rang_de, lcp_ms: pool.lcp_ms, system_seit: pool.system === sys.id ? pool.system_seit : null, system_vorher: pool.system_vorher } : null,
+    werbung,
+    email_tools: email,
+    newsletter_formular: merkmale?.newsletter_formular ?? false,
+    pool: pool
+      ? { rang_de: pool.rang_de, lcp_ms: pool.lcp_ms, system_seit: pool.system === sys.id ? pool.system_seit : null, system_vorher: pool.system_vorher, technik_bekannt: Array.isArray(pool.technik) && pool.technik.length > 0 }
+      : null,
     pagespeed_mobil: null,
     heute: deps.heute,
   };
@@ -182,7 +198,10 @@ export async function pruefeKandidat(domain: string, pool: PoolDaten | null, dep
     signale: signale ? { titel: signale.titel, warenkorb: signale.warenkorb, preise: signale.preise, copyright_jahr: signale.copyright_jahr, social: signale.social } : null,
     zahlarten: daten.zahlarten,
     marketing: daten.marketing,
-    email_tools: merkmale?.email_tools ?? [],
+    werbung,
+    gtm: hatGtm(merkmale?.analyse.gtm ?? false, liveTechnik, pool?.technik ?? null),
+    email_tools: email,
+    newsletter_formular: daten.newsletter_formular,
     bewertungen: merkmale?.bewertungen ?? [],
     sprachen: merkmale?.sprachen ?? [],
     technik: merkmale?.technologien.map((t) => (t.version ? `${t.name} ${t.version}` : t.name)) ?? [],

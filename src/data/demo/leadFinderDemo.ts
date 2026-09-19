@@ -1,4 +1,7 @@
-import type { EntscheidungEintrag, LeadDetail, LeadFinderApi, LeadKandidat, LeadStatistik, ListenZeile, PoolKandidat } from '../leadFinder';
+import type { Bereich, EntscheidungEintrag, LeadDetail, LeadFinderApi, LeadKandidat, LeadStatistik, ListenZeile, PoolKandidat } from '../leadFinder';
+
+const WERBUNG = [['Meta', 'Google Ads'], ['Microsoft Ads'], [], ['Meta'], ['Meta', 'TikTok', 'Pinterest'], []];
+const EMAIL = [['Mailchimp'], [], ['Klaviyo'], ['Brevo'], [], ['CleverReach']];
 
 /*
  * Demo mode of the lead finder: invented shops on the reserved .example TLD, checked and decided in memory.
@@ -36,11 +39,24 @@ function kandidat(p: PoolKandidat, i: number): LeadKandidat {
   else anlaesse.push({ id: 'magento_version_unbekannt', text: 'Magento 2, Patch-Stand nicht öffentlich (2.4.4–2.4.6 sind ohne Support)', gewicht: 8 });
   if ((p.lcp_ms ?? 0) > 4000) anlaesse.push({ id: 'langsam', text: `mobil ${((p.lcp_ms ?? 0) / 1000).toLocaleString('de-DE', { maximumFractionDigits: 1 })} s bis zum größten Element (echte Nutzer)`, gewicht: 20 });
   if (p.system_seit === '2019-01-01') anlaesse.push({ id: 'lange_unveraendert', text: `seit mindestens 2019 auf ${system === 'magento' ? 'Magento' : 'Shopware'}`, gewicht: 10 });
-  const score = anlaesse.reduce((s, a, n) => s + (n === 0 ? a.gewicht : Math.round(a.gewicht / 2)), 0) + (p.rang_de! <= 10_000 ? 32 : p.rang_de! <= 100_000 ? 20 : 12) + 13;
+  for (const a of anlaesse) a.bereich = 'migration';
+  const werbung = WERBUNG[i % WERBUNG.length];
+  const email = EMAIL[(i + 1) % EMAIL.length];
+  if (werbung.length) anlaesse.push({ id: 'ads_aktiv', text: `schaltet Werbung (${werbung.join(', ')})`, gewicht: 30, bereich: 'ads' });
+  else if (p.rang_de! <= 100_000) anlaesse.push({ id: 'ads_ungenutzt', text: `Top ${p.rang_de!.toLocaleString('de-DE')} in Deutschland, aber kein Werbe-Pixel`, gewicht: 20, bereich: 'ads' });
+  if (email.includes('Klaviyo')) anlaesse.push({ id: 'klaviyo_ausbau', text: 'nutzt Klaviyo', gewicht: 20, bereich: 'klaviyo' });
+  else if (email.length) anlaesse.push({ id: 'klaviyo_wechsel', text: `nutzt ${email.join(', ')}, Wechsel zu Klaviyo möglich`, gewicht: 35, bereich: 'klaviyo' });
+  const basis = (p.rang_de! <= 10_000 ? 32 : p.rang_de! <= 100_000 ? 20 : 12) + 13;
+  const scores = { migration: 0, ads: 0, klaviyo: 0 } as Record<Bereich, number>;
+  for (const b of ['migration', 'ads', 'klaviyo'] as Bereich[]) {
+    const eigene = anlaesse.filter((a) => a.bereich === b);
+    if (eigene.length) scores[b] = eigene.reduce((s, a, n) => s + (n === 0 ? a.gewicht : Math.round(a.gewicht / 2)), 0) + basis;
+  }
+  const score = Math.max(...Object.values(scores));
   return {
     domain: p.domain, url: `https://www.${p.domain}/`, geprueft_am: new Date().toISOString(),
     qualifiziert: !blockiert, ausschluss: blockiert ? [{ id: 'blockiert', text: 'Shop blockiert automatische Abrufe (HTTP 403)' }] : [],
-    anlaesse, score, score_gruende: anlaesse.map((a) => `+${a.gewicht} ${a.text}`), http_status: blockiert ? 403 : 200,
+    anlaesse, bereiche: (['migration', 'ads', 'klaviyo'] as Bereich[]).filter((b) => scores[b] > 0), scores, score, score_gruende: anlaesse.map((a) => `+${a.gewicht} ${a.text}`), http_status: blockiert ? 403 : 200,
     system, system_label: system === 'magento' ? 'Magento' : system === 'shopware' ? 'Shopware' : system === 'oxid' ? 'OXID eShop' : 'xt:Commerce',
     version, sicherheit: 90, support: { status: supportText ? (version.startsWith('6') ? 'eol_soon' : 'eol') : 'unknown', text: supportText, datum: '' },
     letztes_deploy: system === 'magento' && version.startsWith('2') ? '2024-11-03' : '',
@@ -51,7 +67,7 @@ function kandidat(p: PoolKandidat, i: number): LeadKandidat {
     },
     sitemap: { gefunden: true, urls: 800 + i * 90, produkt_urls: 700 + i * 80, neuestes_lastmod: '2026-09-01' },
     signale: { titel: name, warenkorb: ['warenkorb'], preise: true, copyright_jahr: 2026, social: {} },
-    zahlarten: ['paypal', 'klarna', 'rechnung'].slice(0, 1 + (i % 3)), marketing: i % 2 ? ['GA4', 'meta'] : ['GA4'], email_tools: [], bewertungen: i % 2 ? ['trustedshops'] : [],
+    zahlarten: ['paypal', 'klarna', 'rechnung'].slice(0, 1 + (i % 3)), marketing: ['GA4'], werbung, gtm: i % 3 !== 2, email_tools: email, newsletter_formular: true, bewertungen: i % 2 ? ['trustedshops'] : [],
     sprachen: ['de'], technik: ['PHP', 'jQuery'], rang_de: p.rang_de, lcp_ms: p.lcp_ms, pagespeed_mobil: null, belege: [],
   };
 }
@@ -72,10 +88,12 @@ export class DemoLeadFinder implements LeadFinderApi {
       domain: k.domain, geprueft_am: k.geprueft_am, score: k.score, ausschluss: k.ausschluss.map((a) => a.id), anlaesse: k.anlaesse.map((a) => a.id),
       anlass_texte: k.anlaesse.map((a) => a.text), system: k.system, version: k.version, rang_de: k.rang_de, firma: k.firma.name, plz: k.firma.plz, ort: k.firma.ort,
       entscheidung: this.entscheidungen.get(k.domain)?.entscheidung ?? null, prioritaet: this.pool.find((p) => p.domain === k.domain)?.prioritaet,
+      bereiche: k.bereiche ?? [], score_migration: k.scores?.migration ?? 0, score_ads: k.scores?.ads ?? 0, score_klaviyo: k.scores?.klaviyo ?? 0,
+      werbung: k.werbung ?? [], gtm: k.gtm ?? false, email_tools: k.email_tools,
     };
   }
 
-  async naechste(n: number) {
+  async naechste(n: number, _bereich: Bereich) {
     return this.pool.filter((p) => !this.pruefungen.has(p.domain) && !this.entscheidungen.has(p.domain)).slice(0, n);
   }
   async pruefe(p: PoolKandidat) {

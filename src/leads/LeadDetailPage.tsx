@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Card, ErrorBox, Loading, PageHeader } from '../components/ui';
-import { AUSSCHLUSS_LABEL, reichweiteLabel, systemLabel, tierVon } from '../data/leadFinder';
+import { AUSSCHLUSS_LABEL, BEREICHE, bereichVon, reichweiteLabel, systemLabel, tierVon, type Bereich } from '../data/leadFinder';
 import { formatDateTime, shortUser } from '../lib/format';
 import { useLoad } from '../lib/useLoad';
-import { AnlassBadges, EntscheidungsLeiste, Item } from './LeadTeile';
+import { AnlassBadges, anlassBereich, EntscheidungsLeiste, Item, ToolBadges } from './LeadTeile';
 import { NICHT_EINGERICHTET, useLeadFinderApi } from './useLeadFinder';
 
 const ENTSCHEIDUNG_TEXT: Record<string, string> = {
@@ -23,6 +23,7 @@ export function LeadDetailPage() {
   const api = useLeadFinderApi();
   const detail = useLoad(() => (api ? api.detail(domain) : Promise.reject(new Error(NICHT_EINGERICHTET))), [api, domain]);
   const [entschieden, setEntschieden] = useState(false);
+  const [params] = useSearchParams();
 
   if (detail.error) return <div className="page"><ErrorBox error={detail.error} onRetry={detail.reload} /></div>;
   if (!detail.data) return <div className="page"><Loading /></div>;
@@ -31,6 +32,11 @@ export function LeadDetailPage() {
   const k = d.kandidat;
   const f = k.firma;
   const offen = !d.entscheidung || d.entscheidung === 'freigegeben' || d.entscheidung === 'zurueckgestellt';
+  const bereiche: Bereich[] = k.bereiche?.length ? k.bereiche : ['migration'];
+  // The view the page was opened from decides the deal title; else the strongest one.
+  const ansicht = params.get('ansicht')
+    ? bereichVon(params.get('ansicht')!)
+    : [...bereiche].sort((a, b) => (k.scores?.[b] ?? 0) - (k.scores?.[a] ?? 0))[0];
 
   return (
     <div className="page">
@@ -42,7 +48,7 @@ export function LeadDetailPage() {
             <a href={k.url} target="_blank" rel="noreferrer">
               {k.domain}
             </a>{' '}
-            · {systemLabel(k.system, k.version)} · Score {k.score} (Tier {tierVon(k.score)}) · geprüft {formatDateTime(d.geprueft_am)}
+            ↗ · {systemLabel(k.system, k.version)} · Score {k.scores?.[ansicht] || k.score} (Tier {tierVon(k.scores?.[ansicht] || k.score)}, {BEREICHE.find((b) => b.id === ansicht)?.label}) · geprüft {formatDateTime(d.geprueft_am)}
           </>
         }
         actions={
@@ -67,7 +73,7 @@ export function LeadDetailPage() {
 
       {offen && !entschieden && (k.qualifiziert || d.entscheidung === 'freigegeben') && (
         <div className="lead-leiste">
-          <EntscheidungsLeiste api={api} domains={[k.domain]} onErledigt={() => { setEntschieden(true); detail.reload(); }} />
+          <EntscheidungsLeiste api={api} domains={[k.domain]} bereich={ansicht} onErledigt={() => { setEntschieden(true); detail.reload(); }} />
         </div>
       )}
 
@@ -84,17 +90,25 @@ export function LeadDetailPage() {
       )}
 
       <Card title="Anlass">
-        {k.anlaesse.length > 0 ? (
-          <ul className="lead-anlaesse">
-            {k.anlaesse.map((a) => (
-              <li key={a.id}>
-                <AnlassBadges anlaesse={[a.id]} /> {a.text}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="muted">Kein Anlass gefunden.</p>
-        )}
+        {k.anlaesse.length === 0 && <p className="muted">Kein Anlass gefunden.</p>}
+        {BEREICHE.filter((b) => k.anlaesse.some((a) => (a.bereich ?? anlassBereich(a.id)) === b.id)).map((b) => (
+          <div key={b.id} className="lead-anlass-gruppe">
+            <h3 className="field-label">
+              {b.label}
+              {k.scores && bereiche.includes(b.id) && ` · Score ${k.scores[b.id]}`}
+              {!bereiche.includes(b.id) && ' · nur Verstärker'}
+            </h3>
+            <ul className="lead-anlaesse">
+              {k.anlaesse
+                .filter((a) => (a.bereich ?? anlassBereich(a.id)) === b.id)
+                .map((a) => (
+                  <li key={a.id}>
+                    <AnlassBadges anlaesse={[a.id]} /> {a.text}
+                  </li>
+                ))}
+            </ul>
+          </div>
+        ))}
       </Card>
 
       <div className="tag-grid">
@@ -136,8 +150,11 @@ export function LeadDetailPage() {
             {k.sitemap.neuestes_lastmod && `, zuletzt geändert ${k.sitemap.neuestes_lastmod}`}
           </Item>
           <Item label="Zahlarten">{k.zahlarten.join(', ')}</Item>
-          <Item label="Marketing">{k.marketing.join(', ')}</Item>
-          <Item label="E-Mail-Tool">{k.email_tools.join(', ')}</Item>
+          <Item label="Werbe-Pixel">{k.werbung && <ToolBadges tools={k.werbung} />}</Item>
+          <Item label="Google Tag Manager">{k.gtm === undefined ? '' : k.gtm ? 'ja' : 'nein'}</Item>
+          <Item label="E-Mail-Tool">{k.email_tools.length > 0 && <ToolBadges tools={k.email_tools} />}</Item>
+          <Item label="Newsletter-Anmeldung">{k.newsletter_formular === undefined ? '' : k.newsletter_formular ? 'ja' : 'nicht gefunden'}</Item>
+          <Item label="Weiteres Marketing">{k.marketing.join(', ')}</Item>
           <Item label="Bewertungen">{k.bewertungen.join(', ')}</Item>
           <Item label="Sprachen">{k.sprachen.join(', ')}</Item>
           <Item label="Social">

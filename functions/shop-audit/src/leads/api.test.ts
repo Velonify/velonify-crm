@@ -99,9 +99,9 @@ describe('leadRoute', () => {
 
 describe('pruefZeile', () => {
   it('speichert Listen-Spalten und das ganze Ergebnis als JSON', () => {
-    const k = { domain: 'a.de', geprueft_am: '2026-09-19T12:00:00.000Z', qualifiziert: false, score: 12, ausschluss: [{ id: 'blockiert', text: 'x' }], anlaesse: [], system: '', version: '', rang_de: null, firma: { name: '', plz: '', ort: '' } } as unknown as Kandidat;
+    const k = { domain: 'a.de', geprueft_am: '2026-09-19T12:00:00.000Z', qualifiziert: false, score: 12, bereiche: [], scores: { migration: 0, ads: 0, klaviyo: 0 }, werbung: [], gtm: false, email_tools: [], ausschluss: [{ id: 'blockiert', text: 'x' }], anlaesse: [], system: '', version: '', rang_de: null, firma: { name: '', plz: '', ort: '' } } as unknown as Kandidat;
     const z = pruefZeile(k, 'a@velonify.de');
-    expect(z).toMatchObject({ domain: 'a.de', ausschluss: ['blockiert'], anlaesse: [], anlass_texte: [] });
+    expect(z).toMatchObject({ domain: 'a.de', ausschluss: ['blockiert'], anlaesse: [], anlass_texte: [], bereiche: [], score_ads: 0 });
     expect(JSON.parse(z.daten as string).domain).toBe('a.de');
   });
 });

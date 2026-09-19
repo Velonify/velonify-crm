@@ -8,6 +8,15 @@ import { IMPORT_SPALTEN } from './importCsv';
 
 export type Entscheidung = 'pipeline' | 'firma' | 'abgelehnt' | 'zurueckgestellt' | 'freigegeben';
 
+/** The three lenses on the backlog, each with its own reasons, score and deal title. */
+export type Bereich = 'migration' | 'ads' | 'klaviyo';
+export const BEREICHE: { id: Bereich; label: string; deal: string }[] = [
+  { id: 'migration', label: 'Migration', deal: 'Shopify-Migration' },
+  { id: 'ads', label: 'Media Buying & Ads', deal: 'Media Buying & Ad Management' },
+  { id: 'klaviyo', label: 'Klaviyo', deal: 'Klaviyo Migration & Management' },
+];
+export const bereichVon = (id: string): Bereich => (BEREICHE.some((b) => b.id === id) ? (id as Bereich) : 'migration');
+
 /** Pool data of one candidate, as /leads/naechste returns it and /leads/pruefen takes it. */
 export interface PoolKandidat {
   domain: string;
@@ -17,6 +26,7 @@ export interface PoolKandidat {
   lcp_ms: number | null;
   system_seit: string | null;
   system_vorher: string | null;
+  technik?: string[] | null;
   prioritaet: number;
 }
 
@@ -36,7 +46,17 @@ export interface ListenZeile {
   ort: string;
   entscheidung?: string | null;
   prioritaet?: number;
+  bereiche: Bereich[];
+  score_migration: number;
+  score_ads: number;
+  score_klaviyo: number;
+  werbung: string[] | null;
+  gtm: boolean;
+  email_tools: string[] | null;
 }
+
+/** Score of a list row in one view. */
+export const scoreIn = (z: ListenZeile, b: Bereich) => (b === 'migration' ? z.score_migration : b === 'ads' ? z.score_ads : z.score_klaviyo);
 
 export interface Grund {
   id: string;
@@ -68,7 +88,9 @@ export interface LeadKandidat {
   geprueft_am: string;
   qualifiziert: boolean;
   ausschluss: Grund[];
-  anlaesse: (Grund & { gewicht: number })[];
+  anlaesse: (Grund & { gewicht: number; bereich?: Bereich })[];
+  bereiche?: Bereich[];
+  scores?: Record<Bereich, number>;
   score: number;
   score_gruende: string[];
   http_status: number;
@@ -83,7 +105,10 @@ export interface LeadKandidat {
   signale: { titel: string; warenkorb: string[]; preise: boolean; copyright_jahr: number; social: Record<string, string> } | null;
   zahlarten: string[];
   marketing: string[];
+  werbung?: string[];
+  gtm?: boolean;
   email_tools: string[];
+  newsletter_formular?: boolean;
   bewertungen: string[];
   sprachen: string[];
   technik: string[];
@@ -127,7 +152,7 @@ export interface EntscheidungEintrag {
 }
 
 export interface LeadFinderApi {
-  naechste(n: number): Promise<PoolKandidat[]>;
+  naechste(n: number, bereich: Bereich): Promise<PoolKandidat[]>;
   pruefe(kandidat: PoolKandidat): Promise<LeadKandidat>;
   backlog(): Promise<ListenZeile[]>;
   manuell(): Promise<ListenZeile[]>;
@@ -148,7 +173,25 @@ export const ANLASS_LABEL: Record<string, string> = {
   langsam: 'Langsam',
   ueberdimensioniert: 'Überdimensioniert',
   magento_version_unbekannt: 'Magento-Version unklar',
+  ads_aktiv: 'Werbung aktiv',
+  ads_ein_kanal: 'Nur ein Kanal',
+  ads_ungenutzt: 'Reichweite ohne Werbung',
+  klaviyo_wechsel: 'Anderes E-Mail-Tool',
+  klaviyo_ausbau: 'Nutzt Klaviyo',
+  kein_email_tool: 'Kein E-Mail-Tool',
 };
+
+/** Which view a reason belongs to (the same table as ANLASS_BEREICH in the function). */
+export const ANLASS_BEREICH: Record<string, Bereich> = {
+  system_ohne_support: 'migration', support_endet: 'migration', kein_update: 'migration', lange_unveraendert: 'migration',
+  langsam: 'migration', ueberdimensioniert: 'migration', magento_version_unbekannt: 'migration',
+  ads_aktiv: 'ads', ads_ein_kanal: 'ads', ads_ungenutzt: 'ads',
+  klaviyo_wechsel: 'klaviyo', klaviyo_ausbau: 'klaviyo', kein_email_tool: 'klaviyo',
+};
+
+/** Reasons of one view, with their texts, from the parallel id/text arrays of a list row. */
+export const anlaesseIn = (z: Pick<ListenZeile, 'anlaesse' | 'anlass_texte'>, b: Bereich) =>
+  z.anlaesse.map((id, i) => ({ id, text: z.anlass_texte[i] ?? '' })).filter((a) => (ANLASS_BEREICH[a.id] ?? 'migration') === b);
 
 export const AUSSCHLUSS_LABEL: Record<string, string> = {
   nicht_erreichbar: 'Nicht erreichbar',
@@ -204,12 +247,15 @@ export const IMPORT_KOPF = [...IMPORT_SPALTEN, 'ansprechpartner_rolle', 'letztes
  * Checked candidates as rows in the import format, so taking them over goes through the same planning as a CSV
  * import: duplicate check by domain and VAT ID, existing firms are never overwritten.
  */
-export function importZeilen(kandidaten: LeadKandidat[]): string[][] {
+export function importZeilen(kandidaten: LeadKandidat[], bereich: Bereich = 'migration'): string[][] {
   const zeilen = kandidaten.map((k) => {
     const f = k.firma;
+    const score = k.scores?.[bereich] || k.score;
+    // Reasons of the chosen view first, the others after them.
+    const anlaesse = [...k.anlaesse].sort((a, b) => Number((b.bereich ?? 'migration') === bereich) - Number((a.bereich ?? 'migration') === bereich));
     const werte: Record<(typeof IMPORT_KOPF)[number], string> = {
-      tier: tierVon(k.score),
-      score: String(k.score),
+      tier: tierVon(score),
+      score: String(score),
       domain: k.domain,
       firma: f.name,
       plattform: plattformVon(k),
@@ -224,11 +270,11 @@ export function importZeilen(kandidaten: LeadKandidat[]): string[][] {
       ort: f.ort,
       katalog_urls: String(k.sitemap.produkt_urls || k.sitemap.urls || ''),
       payments: k.zahlarten.join(', '),
-      marketing: k.marketing.join(', '),
+      marketing: [...new Set([...(k.werbung ?? []), ...(k.gtm ? ['GTM'] : []), ...k.email_tools, ...k.marketing])].join(', '),
       lauf: '',
       ansprechpartner_rolle: f.geschaeftsfuehrer.length ? 'Geschäftsführung' : '',
       letztes_deploy: k.letztes_deploy,
-      score_gruende: [...k.anlaesse.map((a) => a.text), ...(f.geschaeftsfuehrer.length > 1 ? [`weitere Geschäftsführung: ${f.geschaeftsfuehrer.slice(1).join(', ')}`] : [])].join(' | '),
+      score_gruende: [...anlaesse.map((a) => a.text), ...(f.geschaeftsfuehrer.length > 1 ? [`weitere Geschäftsführung: ${f.geschaeftsfuehrer.slice(1).join(', ')}`] : [])].join(' | '),
       quelle: 'Lead-Finder',
     };
     return IMPORT_KOPF.map((spalte) => werte[spalte]);
@@ -262,8 +308,8 @@ export class CloudLeadFinder implements LeadFinderApi {
     return json;
   }
 
-  async naechste(n: number) {
-    return (await this.post<{ kandidaten: PoolKandidat[] }>('naechste', { n })).kandidaten.map(zahlen);
+  async naechste(n: number, bereich: Bereich) {
+    return (await this.post<{ kandidaten: PoolKandidat[] }>('naechste', { n, bereich })).kandidaten.map(zahlen);
   }
   pruefe(k: PoolKandidat) {
     const { domain, prioritaet: _, ...pool } = k;
@@ -292,7 +338,7 @@ export class CloudLeadFinder implements LeadFinderApi {
   }
 }
 
-const ZAHL_FELDER = new Set(['rang_de', 'lcp_ms', 'prioritaet', 'score', 'pool', 'pool_hoch', 'pool_mittel', 'crux_monat', 'geprueft', 'qualifiziert', 'backlog', 'manuell', 'uebernommen', 'abgelehnt', 'offen_ab_25']);
+const ZAHL_FELDER = new Set(['rang_de', 'lcp_ms', 'prioritaet', 'score', 'score_migration', 'score_ads', 'score_klaviyo', 'pool', 'pool_hoch', 'pool_mittel', 'crux_monat', 'geprueft', 'qualifiziert', 'backlog', 'manuell', 'uebernommen', 'abgelehnt', 'offen_ab_25']);
 
 /** BigQuery sends INT64 as strings in some setups; the app works with numbers. */
 function zahlen<T extends object>(zeile: T): T {
