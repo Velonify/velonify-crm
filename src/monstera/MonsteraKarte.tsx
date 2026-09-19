@@ -33,7 +33,7 @@ export function MonsteraKarte({ db, ich, heute }: { db: Database; ich: string | 
   const eintraege = useLoad(() => (service ? service.loadMonstera() : new Promise<never>(() => {})), [service]);
   const [giesst, setGiesst] = useState(false);
   const [gegossen, setGegossen] = useState(0);
-  const [taufen, setTaufen] = useState(false);
+  const [benennen, setBenennen] = useState(false);
   const [neuerName, setNeuerName] = useState('');
 
   const stand = useMemo(() => monsteraStand(eintraege.data ?? [], db.firmen, db.deals, heute), [eintraege.data, db.firmen, db.deals, heute]);
@@ -72,7 +72,7 @@ export function MonsteraKarte({ db, ich, heute }: { db: Database; ich: string | 
     const wert = neuerName.trim().slice(0, 40);
     if (!wert) return;
     const ok = await perform(async (s) => (await s.saveEinstellungen({ [NAME_SCHLUESSEL]: wert }), true), `Die Monstera heißt jetzt ${wert}.`);
-    if (ok !== undefined) setTaufen(false);
+    if (ok !== undefined) setBenennen(false);
   };
 
   return (
@@ -84,20 +84,20 @@ export function MonsteraKarte({ db, ich, heute }: { db: Database; ich: string | 
         </>
       }
       actions={
-        !taufen && (
-          <button type="button" className="button small" onClick={() => (setNeuerName(db.einstellungen[NAME_SCHLUESSEL] ?? ''), setTaufen(true))}>
-            {db.einstellungen[NAME_SCHLUESSEL] ? 'Umbenennen' : 'Taufen'}
+        !benennen && (
+          <button type="button" className="button small" onClick={() => (setNeuerName(db.einstellungen[NAME_SCHLUESSEL] ?? ''), setBenennen(true))}>
+            {db.einstellungen[NAME_SCHLUESSEL] ? 'Umbenennen' : 'Namen geben'}
           </button>
         )
       }
     >
-      {taufen && (
-        <form className="monstera-taufe" onSubmit={speichereName}>
+      {benennen && (
+        <form className="monstera-name" onSubmit={speichereName}>
           <input value={neuerName} onChange={(e) => setNeuerName(e.target.value)} placeholder="Wie soll sie heißen?" maxLength={40} autoFocus aria-label="Name der Monstera" />
           <button type="submit" className="button small primary" disabled={!neuerName.trim()}>
             Speichern
           </button>
-          <button type="button" className="button small" onClick={() => setTaufen(false)}>
+          <button type="button" className="button small" onClick={() => setBenennen(false)}>
             Abbrechen
           </button>
         </form>
