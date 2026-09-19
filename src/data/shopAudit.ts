@@ -75,12 +75,23 @@ export class DemoShopAudit implements ShopAuditApi {
       plattform: magento1
         ? { name: 'magento1', version: '1', edition: '', sicherheit: 90, eol: 'eol', eol_datum: '2020-06-30' }
         : { name: 'magento2', version: '2.4.6', edition: 'Community', sicherheit: 98, eol: 'eol', eol_datum: '2026-08-11' },
-      mobil: { strategie: 'mobile', score, lcp_ms: lcp, cls: 0.08, inp_ms: 180 + (h % 300), quelle: 'feld', bytes: 3_100_000, anfragen: 96 },
-      desktop: { strategie: 'desktop', score: Math.min(99, score + 25), lcp_ms: 1400, cls: 0.02, inp_ms: null, quelle: 'labor', bytes: 3_300_000, anfragen: 102 },
+      mobil: {
+        strategie: 'mobile', score, lcp_ms: lcp, cls: 0.08, inp_ms: 180 + (h % 300), quelle: 'feld', bytes: 3_100_000, anfragen: 96,
+        fcp_ms: 1600 + (h % 900), tbt_ms: 300 + (h % 700), ttfb_ms: 500 + (h % 1500), felddaten: 'seite',
+        bremsen: [
+          { id: 'image-delivery-insight', titel: 'Bildübermittlung verbessern', anzeige: 'Geschätzte Einsparung von 1.240 KiB', ms: 0, bytes: 1_269_760 },
+          { id: 'render-blocking-insight', titel: 'Anfragen zum Blockieren des Renderings', anzeige: 'Geschätzte Einsparung von 610 ms', ms: 610, bytes: 0 },
+        ],
+        drittanbieter: [
+          { name: 'Facebook', kb: 118, ms: 640 },
+          { name: 'Google Tag Manager', kb: 410, ms: 220 },
+        ],
+      },
+      desktop: { strategie: 'desktop', score: Math.min(99, score + 25), lcp_ms: 1400, cls: 0.02, inp_ms: null, quelle: 'labor', bytes: 3_300_000, anfragen: 102, fcp_ms: 700, tbt_ms: 90, ttfb_ms: 480, felddaten: 'seite', bremsen: [], drittanbieter: [] },
       merkmale: {
         plattform: { name: magento1 ? 'magento1' : 'magento2', sicherheit: 90, version: magento1 ? '1' : '2.4.6', edition: '', deploy_ts: 0, belege: [] },
         https: true,
-        analyse: { ga4: true, gtm: false, universal_analytics: false },
+        analyse: { ga4: true, gtm: false, universal_analytics: false, andere: [] },
         pixel: ['meta'],
         google_ads: false,
         consent: [],
@@ -89,6 +100,17 @@ export class DemoShopAudit implements ShopAuditApi {
         zahlarten: ['paypal', 'klarna', 'rechnung'],
         bewertungen: ['trustedshops'],
         sprachen: ['de'],
+        technologien: [
+          { name: 'Magento', kategorien: ['Ecommerce'], version: magento1 ? '1' : '2', website: '' },
+          { name: 'PHP', kategorien: ['Programming languages'], version: '', website: '' },
+          { name: 'Google Analytics', kategorien: ['Analytics'], version: 'GA4', website: '' },
+          { name: 'Facebook Pixel', kategorien: ['Advertising'], version: '', website: '' },
+          { name: 'PayPal', kategorien: ['Payment processors'], version: '', website: '' },
+          { name: 'Klarna Checkout', kategorien: ['Payment processors', 'Buy now pay later'], version: '', website: '' },
+          { name: 'Trusted Shops', kategorien: ['Reviews'], version: '', website: '' },
+          { name: 'jQuery', kategorien: ['JavaScript libraries'], version: '1.12.4', website: '' },
+          { name: 'Nginx', kategorien: ['Web servers', 'Reverse proxies'], version: '', website: '' },
+        ],
         seo: { title: `${domain} – Online-Shop`, meta_description: true, h1: true, canonical: false, organization_markup: false, product_markup: false, product_bewertungen: false, sitemap: true, robots_sperrt_alles: false },
       },
       produkt_url: `https://www.${domain}/beispiel-produkt.html`,

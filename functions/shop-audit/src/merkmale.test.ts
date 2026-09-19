@@ -28,7 +28,7 @@ describe('erkennePlattform', () => {
 describe('erkenneMerkmale', () => {
   it('reads tracking, payments and SEO basics from the homepage', () => {
     const m = erkenneMerkmale(home, { magentoVersion: null, produkt: seite('https://muster-shop.example/tisch.html', PRODUKT_OHNE_MARKUP), sitemap: fehlt('s', 404), robots: seite('r', 'User-agent: *\nDisallow: /checkout/') });
-    expect(m.analyse).toEqual({ ga4: true, gtm: false, universal_analytics: false });
+    expect(m.analyse).toEqual({ ga4: true, gtm: false, universal_analytics: false, andere: [] });
     expect(m.https).toBe(true);
     expect(m.pixel).toEqual(['meta']);
     expect(m.consent).toEqual([]);

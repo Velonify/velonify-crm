@@ -5,7 +5,8 @@ import type { Messung } from './pagespeed.js';
 import { fehlt, MAGENTO_HOME, PRODUKT_OHNE_MARKUP, seite } from './testhilfen.js';
 
 const HEUTE = new Date('2026-09-18T12:00:00Z');
-const schnell: Messung = { strategie: 'mobile', score: 90, lcp_ms: 1800, cls: 0.02, inp_ms: 120, quelle: 'feld', bytes: null, anfragen: null };
+const schnell: Messung = { strategie: 'mobile', score: 90, lcp_ms: 1800, cls: 0.02, inp_ms: 120, quelle: 'feld', bytes: null, anfragen: null, fcp_ms: 900, tbt_ms: 50, ttfb_ms: 300, felddaten: 'seite', bremsen: [], drittanbieter: [] };
+const psi = (messung: Messung) => ({ messung, skripte: [] });
 
 function shop(seiten: Record<string, Seite>) {
   const geladen: string[] = [];
@@ -26,7 +27,7 @@ describe('messeShop', () => {
       'https://muster-shop.example/sitemap-products-1.xml': seite('s1', '<urlset><url><loc>https://muster-shop.example/tisch-eiche.html</loc></url></urlset>'),
       'https://muster-shop.example/tisch-eiche.html': seite('https://muster-shop.example/tisch-eiche.html', PRODUKT_OHNE_MARKUP),
     });
-    const ergebnis = await messeShop('muster-shop.example', { laden, pagespeed: async (_u, s) => ({ ...schnell, strategie: s }), heute: HEUTE });
+    const ergebnis = await messeShop('muster-shop.example', { laden, pagespeed: async (_u, s) => psi({ ...schnell, strategie: s }), heute: HEUTE, katalog: null });
 
     expect(geladen.length).toBeLessThanOrEqual(6);
     expect(ergebnis.status).toBe('ok');
@@ -44,7 +45,7 @@ describe('messeShop', () => {
       'http://www.muster-shop.example/gartenmoebel.html': seite('http://www.muster-shop.example/gartenmoebel.html', '<a class="product-item-link" href="/tisch-eiche.html">Tisch</a>'),
       'http://www.muster-shop.example/tisch-eiche.html': seite('http://www.muster-shop.example/tisch-eiche.html', PRODUKT_OHNE_MARKUP),
     });
-    const ergebnis = await messeShop('muster-shop.example', { laden, pagespeed: async () => schnell, heute: HEUTE });
+    const ergebnis = await messeShop('muster-shop.example', { laden, pagespeed: async () => psi(schnell), heute: HEUTE, katalog: null });
     expect(ergebnis.produkt_url).toBe('http://www.muster-shop.example/tisch-eiche.html');
     expect(geladen.length).toBeLessThanOrEqual(8);
     expect(ergebnis.befunde.map((b) => b.id)).toContain('shop_kein_https');
@@ -52,7 +53,7 @@ describe('messeShop', () => {
 
   it('marks blocked shops as not checked instead of reporting flaws', async () => {
     const { laden } = shop({ 'https://muster-shop.example/': fehlt('https://muster-shop.example/', 403) });
-    const ergebnis = await messeShop('muster-shop.example', { laden, pagespeed: async () => schnell, heute: HEUTE });
+    const ergebnis = await messeShop('muster-shop.example', { laden, pagespeed: async () => psi(schnell), heute: HEUTE, katalog: null });
     expect(ergebnis.status).toBe('teilweise');
     expect(ergebnis.merkmale).toBeNull();
     expect(ergebnis.befunde).toEqual([]);
@@ -64,7 +65,7 @@ describe('messeShop', () => {
       'https://muster-shop.example/': fehlt('https://muster-shop.example/', 0),
       'https://www.muster-shop.example/': seite('https://www.muster-shop.example/', '<html><title>Shop</title></html>'),
     });
-    const ergebnis = await messeShop('muster-shop.example', { laden, pagespeed: async () => { throw new Error('PageSpeed 500: timeout'); }, heute: HEUTE });
+    const ergebnis = await messeShop('muster-shop.example', { laden, pagespeed: async () => { throw new Error('PageSpeed 500: timeout'); }, heute: HEUTE, katalog: null });
     expect(geladen[1]).toBe('https://www.muster-shop.example/');
     expect(ergebnis.url).toBe('https://www.muster-shop.example/');
     expect(ergebnis.status).toBe('teilweise');

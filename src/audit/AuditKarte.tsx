@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, Loading } from '../components/ui';
 import { useToast } from '../components/Toasts';
-import { befundeVon, domainSchluessel, istVeraltet, neuestesAuditFuer } from '../data/audit';
+import { befundeVon, domainSchluessel, istVeraltet, neuestesAuditFuer, speedVon } from '../data/audit';
 import { SchemaError } from '../data/errors';
 import type { Firma } from '../data/types';
 import { errorMessage } from '../lib/errors';
@@ -62,6 +62,12 @@ export function AuditKarte({ firma }: { firma: Firma }) {
                 <Score wert={audit.score_mobil} />
               </dd>
             </div>
+            {speedVon(audit).mobil?.felddaten && (
+              <div className="item">
+                <dt>Traffic</dt>
+                <dd>{{ seite: 'relevant', origin: 'etwas', keine: 'wenig' }[speedVon(audit).mobil!.felddaten!]}</dd>
+              </div>
+            )}
           </dl>
           {wichtig.length > 0 && (
             <ul className="befund-liste">

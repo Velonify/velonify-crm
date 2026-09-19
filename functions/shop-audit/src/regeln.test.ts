@@ -5,7 +5,7 @@ import { befundeAus, kurzfassung, magentoEol } from './regeln.js';
 import { MAGENTO_HOME, PRODUKT_OHNE_MARKUP, seite } from './testhilfen.js';
 
 const HEUTE = new Date('2026-09-18T12:00:00Z');
-const messung = (teil: Partial<Messung>): Messung => ({ strategie: 'mobile', score: 80, lcp_ms: 2000, cls: 0.05, inp_ms: 150, quelle: 'feld', bytes: null, anfragen: null, ...teil });
+const messung = (teil: Partial<Messung>): Messung => ({ strategie: 'mobile', score: 80, lcp_ms: 2000, cls: 0.05, inp_ms: 150, quelle: 'feld', bytes: null, anfragen: null, fcp_ms: 900, tbt_ms: 100, ttfb_ms: 400, felddaten: 'seite', bremsen: [], drittanbieter: [], ...teil });
 const merkmale = erkenneMerkmale(seite('https://muster-shop.example/', MAGENTO_HOME), {
   magentoVersion: seite('v', 'Magento/2.4.6 (Community)'),
   produkt: seite('p', PRODUKT_OHNE_MARKUP),
@@ -52,7 +52,7 @@ describe('befundeAus', () => {
   });
 
   it('does not report missing pixels when a tag manager could load them', () => {
-    const mitGtm = { ...merkmale, pixel: [], analyse: { ga4: false, gtm: true, universal_analytics: false } };
+    const mitGtm = { ...merkmale, pixel: [], analyse: { ga4: false, gtm: true, universal_analytics: false, andere: [] } };
     const ids2 = befundeAus({ merkmale: mitGtm, mobil: null, desktop: null, heute: HEUTE }).map((b) => b.id);
     expect(ids2).not.toContain('tracking_keine_pixel');
     expect(ids2).not.toContain('tracking_kein_ads');
@@ -65,6 +65,36 @@ describe('befundeAus', () => {
     const mitCleverReach = { ...merkmale, email_tools: ['cleverreach'], newsletter_formular: false };
     const befund = befundeAus({ merkmale: mitCleverReach, mobil: null, desktop: null, heute: HEUTE }).find((b) => b.id === 'email_keine_anmeldung');
     expect(befund?.schwere).toBe('hinweis');
+  });
+
+  it('reports slow servers, blocking time, the biggest savings and heavy third parties', () => {
+    const langsam = messung({
+      ttfb_ms: 1900,
+      tbt_ms: 900,
+      bremsen: [
+        { id: 'image-delivery-insight', titel: 'Bildübermittlung verbessern', anzeige: 'Geschätzte Einsparung von 1.536 KiB', ms: 0, bytes: 1_572_864 },
+        { id: 'unused-javascript', titel: 'Reduziere nicht verwendetes JavaScript', anzeige: 'Geschätzte Einsparung von 513 KiB', ms: 0, bytes: 524_878 },
+        { id: 'legacy-javascript-insight', titel: 'Veraltetes JavaScript', anzeige: '', ms: 0, bytes: 400_000 },
+      ],
+      drittanbieter: [
+        { name: 'Facebook', kb: 117, ms: 910 },
+        { name: 'Hotjar', kb: 80, ms: 300 },
+        { name: 'Kleinkram', kb: 1, ms: 10 },
+      ],
+    });
+    const b = befundeAus({ merkmale: null, mobil: langsam, desktop: null, heute: HEUTE });
+    const nach = (id: string) => b.find((x) => x.id === id);
+    expect(nach('speed_ttfb')).toMatchObject({ schwere: 'hoch', text: 'Der Server braucht 1,9 s, bis er überhaupt antwortet (gemessen bei echten Nutzern; gut ist unter 0,8 s).' });
+    expect(nach('speed_tbt')?.text).toContain('0,9 s');
+    expect(nach('speed_bremse_image-delivery-insight')).toMatchObject({ schwere: 'mittel', text: 'Bremse laut Google: „Bildübermittlung verbessern“ (1.536 KiB weniger).' });
+    expect(nach('speed_bremse_unused-javascript')?.schwere).toBe('hinweis');
+    expect(nach('speed_bremse_legacy-javascript-insight')).toBeUndefined();
+    expect(nach('speed_drittanbieter')?.text).toBe('Fremd-Scripte beanspruchen mobil 1,2 s Rechenzeit, vor allem Facebook und Hotjar.');
+  });
+
+  it('counts other analytics tools like etracker as analytics', () => {
+    const mitEtracker = { ...merkmale, analyse: { ga4: false, gtm: false, universal_analytics: false, andere: ['Etracker'] } };
+    expect(befundeAus({ merkmale: mitEtracker, mobil: null, desktop: null, heute: HEUTE }).map((x) => x.id)).not.toContain('tracking_keine_analyse');
   });
 
   it('turns nothing into findings when nothing was measured', () => {

@@ -1,7 +1,7 @@
 import type { Seite } from './laden.js';
 
-export const seite = (url: string, text: string, extra: Partial<Seite> = {}): Seite => ({ url, status: 200, ok: true, headers: {}, text, ...extra });
-export const fehlt = (url: string, status = 404): Seite => ({ url, status, ok: false, headers: {}, text: '' });
+export const seite = (url: string, text: string, extra: Partial<Seite> = {}): Seite => ({ url, status: 200, ok: true, headers: {}, cookies: {}, text, ...extra });
+export const fehlt = (url: string, status = 404): Seite => ({ url, status, ok: false, headers: {}, cookies: {}, text: '' });
 
 /** Homepage of a fictional Magento 2 shop with Meta pixel, GA4 and no consent tool or e-mail tool. */
 export const MAGENTO_HOME = `<!doctype html><html><head><title>Muster Shop – Gartenmöbel</title>

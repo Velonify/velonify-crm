@@ -27,6 +27,27 @@ export interface Aufhaenger {
   befunde: string[];
 }
 
+export interface Bremse {
+  id: string;
+  titel: string;
+  anzeige: string;
+  ms: number;
+  bytes: number;
+}
+
+export interface Drittanbieter {
+  name: string;
+  kb: number;
+  ms: number;
+}
+
+export interface Technologie {
+  name: string;
+  kategorien: string[];
+  version: string;
+  website: string;
+}
+
 export interface Messung {
   strategie: 'mobile' | 'desktop';
   score: number | null;
@@ -36,12 +57,19 @@ export interface Messung {
   quelle: 'feld' | 'labor';
   bytes: number | null;
   anfragen: number | null;
+  /** Fields below arrived later; older audits lack them. */
+  fcp_ms?: number | null;
+  tbt_ms?: number | null;
+  ttfb_ms?: number | null;
+  felddaten?: 'seite' | 'origin' | 'keine';
+  bremsen?: Bremse[];
+  drittanbieter?: Drittanbieter[];
 }
 
 export interface Merkmale {
   plattform: { name: string; sicherheit: number; version: string; edition: string; deploy_ts: number; belege: string[] };
   https: boolean;
-  analyse: { ga4: boolean; gtm: boolean; universal_analytics: boolean };
+  analyse: { ga4: boolean; gtm: boolean; universal_analytics: boolean; andere?: string[] };
   pixel: string[];
   google_ads: boolean;
   consent: string[];
@@ -50,6 +78,7 @@ export interface Merkmale {
   zahlarten: string[];
   bewertungen: string[];
   sprachen: string[];
+  technologien?: Technologie[];
   seo: {
     title: string;
     meta_description: boolean;
@@ -138,7 +167,20 @@ function json<T>(wert: string, ersatz: T): T {
 export const befundeVon = (audit: Audit) => json<Befund[]>(audit.befunde, []);
 export const aufhaengerVon = (audit: Audit) => json<Aufhaenger[]>(audit.aufhaenger, []);
 export const nichtGeprueftVon = (audit: Audit) => json<NichtGeprueft[]>(audit.nicht_geprueft, []);
-export const merkmaleVon = (audit: Audit) => json<Merkmale | null>(audit.merkmale, null);
+/** The `merkmale` column also carries the full PageSpeed measurements under `speed`. */
+type MerkmaleSpalte = Partial<Merkmale> & { speed?: { mobil: Messung | null; desktop: Messung | null } };
+export const merkmaleVon = (audit: Audit): Merkmale | null => {
+  const m = json<MerkmaleSpalte | null>(audit.merkmale, null);
+  return m?.plattform ? (m as Merkmale) : null;
+};
+export const speedVon = (audit: Audit) => json<MerkmaleSpalte | null>(audit.merkmale, null)?.speed ?? { mobil: null, desktop: null };
+
+/** Rough size signal: Google only has real-user data for pages with noticeable Chrome traffic. */
+export const TRAFFIC_LABEL: Record<string, string> = {
+  seite: 'Relevanter Traffic (Google hat Nutzerdaten für die Startseite)',
+  origin: 'Etwas Traffic (Google hat Nutzerdaten nur für die Domain insgesamt)',
+  keine: 'Wenig Traffic (Google hat keine Nutzerdaten)',
+};
 
 export function zaehleBefunde(audit: Audit): Record<Schwere, number> {
   const anzahl = { hoch: 0, mittel: 0, hinweis: 0 };
@@ -162,7 +204,7 @@ export function auditZeile(ergebnis: AuditErgebnis, firmaId: string): Omit<Audit
     cls: ergebnis.mobil?.cls ?? null,
     inp_ms: ergebnis.mobil?.inp_ms ?? null,
     messquelle: ergebnis.mobil?.quelle ?? '',
-    merkmale: ergebnis.merkmale ? JSON.stringify(ergebnis.merkmale) : '',
+    merkmale: JSON.stringify({ ...(ergebnis.merkmale ?? {}), speed: { mobil: ergebnis.mobil, desktop: ergebnis.desktop } }),
     befunde: JSON.stringify(ergebnis.befunde),
     nicht_geprueft: JSON.stringify(ergebnis.nicht_geprueft),
     zusammenfassung: ergebnis.zusammenfassung,

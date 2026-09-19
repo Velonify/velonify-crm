@@ -6,6 +6,7 @@ import { AUSGABE_SCHEMA, AusgabeSchema, nutzerNachricht, pruefeAufhaenger, SYSTE
 import { Limit, pruefeGoogleToken, ZugriffsFehler } from './auth.js';
 import { DomainFehler, ladeSeite, normalisiereDomain } from './laden.js';
 import { pagespeed } from './pagespeed.js';
+import { katalog } from './technik.js';
 import { kurzfassung } from './regeln.js';
 
 const MODELL = 'claude-opus-5';
@@ -87,6 +88,7 @@ functions.http('shopAudit', async (req, res) => {
       laden: ladeSeite,
       pagespeed: (url, strategie) => pagespeed(url, strategie, PAGESPEED_KEY),
       heute: new Date(),
+      katalog: katalog(),
     });
   } catch (error) {
     console.error('Audit fehlgeschlagen', error);

@@ -13,9 +13,13 @@ import {
   nichtGeprueftVon,
   plattformLabel,
   sekunden,
+  speedVon,
+  TRAFFIC_LABEL,
   type Befund,
   type Bereich,
   type Merkmale,
+  type Messung,
+  type Technologie,
 } from '../data/audit';
 import { EOL_LABEL } from '../data/constants';
 import { useCrm } from '../data/CrmContext';
@@ -54,7 +58,77 @@ function Befunde({ befunde }: { befunde: Befund[] }) {
   );
 }
 
+const kib = (bytes: number) => `${Math.round(bytes / 1024).toLocaleString('de-DE')} KiB`;
+
+/** Technology categories in the order that matters for outreach; everything else follows alphabetically. */
+const KATEGORIE_REIHENFOLGE = [
+  'Ecommerce', 'Ecommerce frontends', 'Payment processors', 'Buy now pay later', 'Analytics', 'Tag managers', 'Advertising', 'Marketing automation',
+  'Email', 'Cookie compliance', 'Reviews', 'Live chat', 'Personalisation', 'A/B Testing', 'Search engines', 'CDN', 'Hosting',
+];
+const KATEGORIE_DE: Record<string, string> = {
+  Ecommerce: 'Shopsystem', 'Ecommerce frontends': 'Shop-Frontend', 'Payment processors': 'Zahlung', 'Buy now pay later': 'Kauf auf Raten',
+  Analytics: 'Analyse', 'Tag managers': 'Tag-Manager', Advertising: 'Werbung', 'Marketing automation': 'Automation', Email: 'E-Mail',
+  'Cookie compliance': 'Consent', Reviews: 'Bewertungen', 'Live chat': 'Live-Chat', Personalisation: 'Personalisierung', 'Search engines': 'Suche',
+  'JavaScript libraries': 'JS-Bibliotheken', 'JavaScript frameworks': 'JS-Frameworks', 'UI frameworks': 'UI-Frameworks', 'Web frameworks': 'Web-Frameworks', 'Web servers': 'Webserver',
+  'Programming languages': 'Sprache', Databases: 'Datenbank', 'Reverse proxies': 'Proxy', Miscellaneous: 'Sonstiges', Performance: 'Performance', 'Video players': 'Video', Security: 'Sicherheit', 'Shipping carriers': 'Versand', 'Font scripts': 'Schriften', Maps: 'Karten',
+};
+
+function TechnikKarte({ technologien }: { technologien: Technologie[] }) {
+  const gruppen = new Map<string, Technologie[]>();
+  for (const t of technologien) {
+    const kat = t.kategorien[0] ?? 'Sonstiges';
+    gruppen.set(kat, [...(gruppen.get(kat) ?? []), t]);
+  }
+  const rang = (k: string) => (KATEGORIE_REIHENFOLGE.includes(k) ? KATEGORIE_REIHENFOLGE.indexOf(k) : 100);
+  const sortiert = [...gruppen.entries()].sort(([a], [b]) => rang(a) - rang(b) || a.localeCompare(b));
+  return (
+    <Card title={`Erkannte Technik (${technologien.length})`}>
+      <dl className="items">
+        {sortiert.map(([kat, liste]) => (
+          <Item key={kat} label={KATEGORIE_DE[kat] ?? kat}>
+            {liste.map((t) => `${t.name}${t.version ? ` ${t.version}` : ''}`).join(', ')}
+          </Item>
+        ))}
+      </dl>
+      <p className="muted small">Erkannt mit den Merkmalen von webappanalyzer (Wappalyzer-Daten), inklusive Scripten, die erst der Tag Manager nachlädt.</p>
+    </Card>
+  );
+}
+
+function SpeedDetails({ mobil }: { mobil: Messung }) {
+  return (
+    <>
+      {mobil.bremsen && mobil.bremsen.length > 0 && (
+        <>
+          <h3 className="subheading">Größte Bremsen laut Google</h3>
+          <ul className="befund-liste">
+            {mobil.bremsen.map((b) => (
+              <li key={b.id}>
+                {b.titel}
+                {b.anzeige && <span className="muted"> · {b.anzeige}</span>}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {mobil.drittanbieter && mobil.drittanbieter.length > 0 && (
+        <>
+          <h3 className="subheading">Fremd-Scripte</h3>
+          <ul className="befund-liste">
+            {mobil.drittanbieter.map((d) => (
+              <li key={d.name}>
+                {d.name} <span className="muted">· {d.ms} ms Rechenzeit, {d.kb.toLocaleString('de-DE')} KB</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </>
+  );
+}
+
 function Merkmalbloecke({ audit, m, befunde }: { audit: Audit; m: Merkmale | null; befunde: Befund[] }) {
+  const { mobil } = speedVon(audit);
   const von = (...bereiche: Bereich[]) => befunde.filter((b) => bereiche.includes(b.bereich));
   return (
     <div className="audit-bloecke">
@@ -78,14 +152,22 @@ function Merkmalbloecke({ audit, m, befunde }: { audit: Audit; m: Merkmale | nul
           <Item label="Hauptinhalt mobil (LCP)">{audit.lcp_mobil_ms !== null && sekunden(audit.lcp_mobil_ms)}</Item>
           <Item label="Verschiebung (CLS)">{audit.cls !== null && audit.cls.toLocaleString('de-DE')}</Item>
           <Item label="Reaktion (INP)">{audit.inp_ms !== null && `${audit.inp_ms} ms`}</Item>
+          <Item label="Erster Inhalt (FCP)">{mobil?.fcp_ms != null && sekunden(mobil.fcp_ms)}</Item>
+          <Item label="Blockiert (TBT)">{mobil?.tbt_ms != null && sekunden(mobil.tbt_ms)}</Item>
+          <Item label="Server-Antwort (TTFB)">{mobil?.ttfb_ms != null && sekunden(mobil.ttfb_ms)}</Item>
+          <Item label="Seitengewicht">{mobil?.bytes != null && kib(mobil.bytes)}</Item>
           <Item label="Messung">{audit.messquelle && (audit.messquelle === 'feld' ? 'Echte Nutzer (Chrome UX Report)' : 'Labormessung')}</Item>
+          <Item label="Traffic-Signal">{mobil?.felddaten && TRAFFIC_LABEL[mobil.felddaten]}</Item>
         </dl>
         <Befunde befunde={von('geschwindigkeit')} />
+        {mobil && <SpeedDetails mobil={mobil} />}
       </Card>
       <Card title="Tracking & E-Mail">
         {m ? (
           <dl className="items">
-            <Item label="Analyse">{[m.analyse.ga4 && 'GA4', m.analyse.gtm && 'Tag Manager', m.analyse.universal_analytics && 'Universal Analytics'].filter(Boolean).join(', ') || <span className="warn-text">keine</span>}</Item>
+            <Item label="Analyse">
+              {[m.analyse.ga4 && 'GA4', m.analyse.gtm && 'Tag Manager', m.analyse.universal_analytics && 'Universal Analytics', ...(m.analyse.andere ?? [])].filter(Boolean).join(', ') || <span className="warn-text">keine</span>}
+            </Item>
             <Item label="Werbe-Pixel">{liste(m.pixel)}</Item>
             <Item label="Google Ads">{jaNein(m.google_ads)}</Item>
             <Item label="Consent-Tool">{liste(m.consent)}</Item>
@@ -113,6 +195,7 @@ function Merkmalbloecke({ audit, m, befunde }: { audit: Audit; m: Merkmale | nul
         )}
         <Befunde befunde={von('shop', 'seo')} />
       </Card>
+      {m?.technologien && m.technologien.length > 0 && <TechnikKarte technologien={m.technologien} />}
     </div>
   );
 }
