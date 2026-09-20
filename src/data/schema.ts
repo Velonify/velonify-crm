@@ -105,6 +105,13 @@ export const SCHEMA = {
     name: 'monstera',
     columns: ['id', 'datum', 'typ', 'von', ...META],
   },
+  eingang: {
+    name: 'eingang',
+    columns: [
+      'id', 'eingegangen_am', 'quelle', 'sprache', 'name', 'email', 'shop', 'themen', 'nachricht',
+      'status', 'firma_id', 'kontakt_id', 'erledigt_am', 'erledigt_von', ...META,
+    ],
+  },
   listen: {
     name: 'listen',
     columns: ['liste', 'wert'],
@@ -129,13 +136,16 @@ export const AUDIT_TABS = ['audits'] as const;
 export const WORDLE_TABS = ['wordle'] as const;
 /** Tab of the team plant, loaded only by its card. */
 export const MONSTERA_TABS = ['monstera'] as const;
+/** Tab of the website inbox, written by the Apps Script behind the Netlify form and loaded only by the inbox. */
+export const EINGANG_TABS = ['eingang'] as const;
 export type EntityTab =
   | (typeof ENTITY_TABS)[number]
   | (typeof ANGEBOTS_TABS)[number]
   | (typeof CONTACT_TABS)[number]
   | (typeof AUDIT_TABS)[number]
   | (typeof WORDLE_TABS)[number]
-  | (typeof MONSTERA_TABS)[number];
+  | (typeof MONSTERA_TABS)[number]
+  | (typeof EINGANG_TABS)[number];
 
 /** Editable select values, written to the "listen" tab on setup and maintained there afterwards. */
 export const LISTEN_DEFAULTS: Record<string, string[]> = {

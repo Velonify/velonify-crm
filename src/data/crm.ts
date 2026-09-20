@@ -5,6 +5,7 @@ import { isFolder, SPREADSHEET_MIME, type DriveApi, type DriveFile } from './goo
 import { addDays, ID_PREFIX, isIsoDate, isoDate, newId } from './ids';
 import { anzahlPosten, parseAuswahl, prepareAngebot, statusLabel } from './angebote';
 import { auditVerlaufText, auditZeile, firmaAbgleich, type AuditErgebnis } from './audit';
+import { ANFRAGE_STATUS, anfrageText, firmaAusAnfrage, istOffen, kontaktAusAnfrage } from './eingang';
 import { ANSCHREIBEN_STATUS, prepareAnschreiben, prepareOutreachLeistung, verlaufText, type AnschreibenInput } from './anschreiben';
 import type { ImportPlan } from './importCsv';
 import { baueKalkulation, kalkulationsThema } from './kalkulation';
@@ -23,9 +24,11 @@ import {
 import { driveKonfiguration } from './selectors';
 import { OUTREACH_STARTLISTE } from './outreachStart';
 import { STARTKATALOG } from './startkatalog';
+import { EMPTY_DEAL_INPUT } from './types';
 import type { Store } from './store';
 import type {
   Aktivitaet,
+  Anfrage,
   Audit,
   Angebot,
   AngebotInput,
@@ -100,6 +103,21 @@ export interface ImportErgebnis {
   deals: number;
   /** Domain → id of the firm created or filled in, for callers that track what became of each row. */
   firmen: Record<string, string>;
+}
+
+export interface UebernahmeEingabe {
+  /** Firm the inquiry belongs to; without it a new one is created from the inquiry. */
+  firmaId?: string;
+  /** Corrections to the new firm, e.g. the real company name instead of the domain. */
+  firma?: Partial<FirmaInput>;
+  zustaendig: string;
+  dealAnlegen: boolean;
+}
+
+export interface UebernahmeErgebnis {
+  firma: Firma;
+  kontakt: Kontakt;
+  deal: Deal | null;
 }
 
 /**
@@ -693,6 +711,69 @@ export class CrmService {
     CrmService.find((await this.store.load()).firmen, firmaId);
     const [audit] = await this.store.update('audits', [{ id: auditId, changes: { firma_id: firmaId, ...this.changed() }, expectedGeaendertAm }]);
     return audit;
+  }
+
+  // ─── Eingang: Anfragen von der Website ─────────────────────────────────────
+
+  loadEingang(): Promise<Anfrage[]> {
+    return this.store.loadEingang();
+  }
+
+  /**
+   * Turns an inquiry into a firm, a contact and an entry in the timeline. Without `firmaId` a new firm is
+   * created; with it the inquiry joins a firm that is already in the CRM. The contact is reused when the same
+   * address is already on file, so a second inquiry does not create a twin.
+   */
+  async uebernimmAnfrage(id: string, eingabe: UebernahmeEingabe): Promise<UebernahmeErgebnis> {
+    const anfragen = await this.store.loadEingang();
+    const anfrage = CrmService.find(anfragen, id);
+    if (!istOffen(anfrage)) throw new ValidationError('status', 'Diese Anfrage ist schon bearbeitet.');
+
+    const db = await this.store.load();
+    const firma = eingabe.firmaId
+      ? CrmService.find(db.firmen, eingabe.firmaId)
+      : await this.createFirma({ ...firmaAusAnfrage(anfrage, eingabe.zustaendig), ...eingabe.firma });
+
+    const bekannt = db.kontakte.find((k) => k.firma_id === firma.id && k.email.toLowerCase() === anfrage.email.toLowerCase() && !k.archiviert);
+    const kontakt = bekannt ?? (await this.saveKontakt(firma.id, kontaktAusAnfrage(anfrage)));
+
+    const deal = eingabe.dealAnlegen
+      ? await this.saveDeal(firma.id, {
+          ...EMPTY_DEAL_INPUT,
+          kontakt_id: kontakt.id,
+          titel: db.einstellungen[EINSTELLUNG.dealTitel] || DEFAULT_DEAL_TITEL,
+          zustaendig: eingabe.zustaendig,
+        })
+      : null;
+
+    await this.log({ firma_id: firma.id, kontakt_id: kontakt.id, deal_id: deal?.id ?? '', typ: 'mail', text: anfrageText(anfrage) });
+    await this.store.update('eingang', [
+      {
+        id: anfrage.id,
+        changes: {
+          status: ANFRAGE_STATUS.uebernommen,
+          firma_id: firma.id,
+          kontakt_id: kontakt.id,
+          erledigt_am: this.timestamp(),
+          erledigt_von: this.currentUser(),
+          ...this.changed(),
+        },
+        expectedGeaendertAm: anfrage.geaendert_am,
+      },
+    ]);
+    return { firma, kontakt, deal };
+  }
+
+  /** Spam and inquiries that lead nowhere stay in the sheet, but out of the inbox. */
+  async verwirfAnfrage(id: string, expectedGeaendertAm: string): Promise<Anfrage> {
+    const [anfrage] = await this.store.update('eingang', [
+      {
+        id,
+        changes: { status: ANFRAGE_STATUS.verworfen, erledigt_am: this.timestamp(), erledigt_von: this.currentUser(), ...this.changed() },
+        expectedGeaendertAm,
+      },
+    ]);
+    return anfrage;
   }
 
   // ─── Wort des Tages ────────────────────────────────────────────────────────

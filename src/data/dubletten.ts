@@ -15,6 +15,9 @@ const FREEMAIL = new Set([
   'posteo.de', 'mail.de', 'proton.me', 'protonmail.com', 'bluewin.ch', 'aon.at',
 ]);
 
+/** A shared mailbox provider – an address there belongs to a person, not to a company. */
+export const istFreemail = (domain: string) => FREEMAIL.has(domain);
+
 const GRUND = {
   ust: 'gleiche USt-ID',
   register: 'gleiche Handelsregisternummer',
