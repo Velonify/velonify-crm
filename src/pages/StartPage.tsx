@@ -16,6 +16,7 @@ import { faelligText, formatEuro } from '../lib/format';
 import { useIch } from '../lib/useIch';
 import { useLoad } from '../lib/useLoad';
 import { istGeplant, WERKZEUGE } from '../werkzeuge';
+import { AnfragenKarte } from '../eingang/AnfragenKarte';
 import { MonsteraKarte } from '../monstera/MonsteraKarte';
 import { WordleKarte } from '../wordle/WordleKarte';
 
@@ -324,6 +325,7 @@ export function StartPage() {
       <Werkzeuge {...zahlen} />
       <div className="start-grid">
         <div className="start-main">
+          <AnfragenKarte />
           <HeuteDran db={db} ich={ich} heute={heute} />
           {spiele.data?.monstera && <MonsteraKarte eintraege={spiele.data.monstera} db={db} ich={ich} heute={heute} neuLaden={spiele.reload} />}
           <Kunden db={db} />

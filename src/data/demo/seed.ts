@@ -127,6 +127,27 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   await wordle('Julian', 1, 'xxxxx/yxxyx/xgyxx/ggxgg/ggggg');
   await wordle('Julian', 3, 'xyxxx/xxgyx/gxgxx/gggxg/gggxg/gggxg', false);
 
+  // Two inquiries waiting in the inbox, as the Apps Script behind the website form would write them.
+  const anfrage = (id: string, stunden: number, felder: Record<string, string>) => {
+    const eingegangen = new Date(Date.now() - stunden * 3600_000).toISOString();
+    return new SheetStore(sheets).insert('eingang', [
+      {
+        id, eingegangen_am: eingegangen, quelle: 'velonify.de', sprache: 'de', shop: '', themen: '', nachricht: '',
+        status: 'neu', firma_id: '', kontakt_id: '', erledigt_am: '', erledigt_von: '',
+        erstellt_am: eingegangen, erstellt_von: 'Website', geaendert_am: eingegangen, geaendert_von: 'Website',
+        name: '', email: '', ...felder,
+      },
+    ]);
+  };
+  await anfrage('EA-DEMO1', 3, {
+    name: 'Mara Holm', email: 'mara.holm@nordlicht-outdoor.example', shop: 'https://nordlicht-outdoor.example',
+    themen: 'Tracking, Ads', nachricht: 'Seit dem Shop-Umzug meldet GA4 deutlich weniger Umsatz als die Bestellungen hergeben.',
+  });
+  await anfrage('EA-DEMO2', 26, {
+    name: 'Peer Lindqvist', email: 'peer@fjordlicht.example', shop: 'https://fjordlicht.example', sprache: 'en',
+    themen: 'Shopify-Migration', nachricht: 'We are on Magento 2.4.4 and want to move before support ends.',
+  });
+
   // Team plant: Johannes has already watered today.
   await service.giesseMonstera('Johannes');
 

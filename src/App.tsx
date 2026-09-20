@@ -17,6 +17,7 @@ import { Layout } from './components/Layout';
 import { ReauthDialog } from './components/ReauthDialog';
 import { ToastProvider } from './components/Toasts';
 import { CrmProvider } from './data/CrmContext';
+import { AnfragenPage } from './eingang/AnfragenPage';
 import { EinrichtungPage } from './pages/EinrichtungPage';
 import { FirmaAktePage } from './pages/FirmaAktePage';
 import { FirmaNeuPage } from './pages/FirmaNeuPage';
@@ -48,6 +49,7 @@ export function App() {
             <Route element={<Layout />}>
               <Route index element={<StartPage />} />
               <Route path="kalender" element={<KalenderPage />} />
+              <Route path="anfragen" element={<AnfragenPage />} />
               <Route path="wort" element={<WordlePage />} />
               <Route path="crm">
                 <Route index element={<MeinTagPage />} />

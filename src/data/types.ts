@@ -320,6 +320,26 @@ export interface EntityMap {
   audits: Audit;
   wordle: WordleErgebnis;
   monstera: MonsteraEintrag;
+  eingang: Anfrage;
+}
+
+/** An inquiry from the website form, written into the sheet by the Apps Script behind the Netlify webhook. */
+export interface Anfrage extends Meta {
+  id: string;
+  eingegangen_am: string;
+  quelle: string;
+  sprache: string;
+  name: string;
+  email: string;
+  shop: string;
+  themen: string;
+  nachricht: string;
+  /** 'neu', 'uebernommen' or 'verworfen'. */
+  status: string;
+  firma_id: string;
+  kontakt_id: string;
+  erledigt_am: string;
+  erledigt_von: string;
 }
 
 /** Everything the app knows, loaded in one go. */

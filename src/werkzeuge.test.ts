@@ -8,6 +8,7 @@ describe('werkzeugFuerPfad', () => {
     expect(werkzeugFuerPfad('/crm/firmen/F-123')?.id).toBe('crm');
     expect(werkzeugFuerPfad('/contact/gesendet')?.id).toBe('contact');
     expect(werkzeugFuerPfad('/kalender')?.id).toBe('home');
+    expect(werkzeugFuerPfad('/anfragen')?.id).toBe('home');
     expect(werkzeugFuerPfad('/audit/SA-123')?.id).toBe('audit');
   });
 

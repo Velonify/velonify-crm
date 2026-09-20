@@ -1,7 +1,7 @@
 import { ConflictError, NotFoundError, SchemaError } from '../errors';
-import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, LISTEN_DEFAULTS, SCHEMA, MONSTERA_TABS, WORDLE_TABS, type EntityTab, type TabSchema } from '../schema';
+import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, EINGANG_TABS, LISTEN_DEFAULTS, SCHEMA, MONSTERA_TABS, WORDLE_TABS, type EntityTab, type TabSchema } from '../schema';
 import type { RecordUpdate, Store } from '../store';
-import type { AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Listen, MonsteraEintrag, SpieleDaten, WordleErgebnis } from '../types';
+import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Listen, MonsteraEintrag, SpieleDaten, WordleErgebnis } from '../types';
 import { columnLetter, recordToRow, rowToRecord } from './rows';
 import { quoteTab, type SheetsApi, type SpreadsheetInfo, type ValueWrite } from './sheetsClient';
 
@@ -159,6 +159,17 @@ export class SheetStore implements Store {
     assertColumns(SCHEMA.monstera, table.header);
     this.headers.set('monstera', table.header);
     return entityRows('monstera', table);
+  }
+
+  async loadEingang(): Promise<Anfrage[]> {
+    const info = await this.info();
+    if (!info.sheets?.some((sheet) => sheet.properties.title === EINGANG_TABS[0])) {
+      throw new SchemaError('Der Eingang für Website-Anfragen ist noch nicht eingerichtet. Bitte unter „Einrichtung“ auf „Einrichten“ klicken.');
+    }
+    const table = splitHeader(await this.api.getValues(fullRange('eingang')));
+    assertColumns(SCHEMA.eingang, table.header);
+    this.headers.set('eingang', table.header);
+    return entityRows('eingang', table);
   }
 
   /** Both games of the start page in a single request; a tab that is not set up yet comes back as null. */
