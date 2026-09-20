@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { werkzeugFuerPfad } from './werkzeuge';
+import { seitentitel, werkzeugFuerPfad } from './werkzeuge';
 
 describe('werkzeugFuerPfad', () => {
   it('maps paths to their tool', () => {
@@ -14,5 +14,12 @@ describe('werkzeugFuerPfad', () => {
   it('leaves shared pages without a tool', () => {
     expect(werkzeugFuerPfad('/einrichtung')).toBeNull();
     expect(werkzeugFuerPfad('/crmx')).toBeNull();
+  });
+});
+
+describe('seitentitel', () => {
+  it('names the open tool in the browser tab', () => {
+    expect(seitentitel(werkzeugFuerPfad('/crm/pipeline')!)).toBe('Velonify CRM');
+    expect(seitentitel(werkzeugFuerPfad('/')!)).toBe('Velonify');
   });
 });
