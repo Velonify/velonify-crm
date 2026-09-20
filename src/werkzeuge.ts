@@ -83,6 +83,9 @@ export const WERKZEUGE: Werkzeug[] = [
 
 export const istGeplant = (w: Werkzeug) => !w.pfad;
 
+/** Browser tab title of a tool, e.g. "Velonify CRM". Home is the platform itself, so it stays "Velonify". */
+export const seitentitel = (w: Werkzeug) => (w.id === 'home' ? 'Velonify' : `Velonify ${w.name}`);
+
 /**
  * The tool a path belongs to: the one with the longest matching start path. Pages outside every tool
  * (like /einrichtung) return null, so the sidebar can stay on the tool that was open before.

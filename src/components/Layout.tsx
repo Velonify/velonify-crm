@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { isDemo } from '../config';
 import { useCrm } from '../data/CrmContext';
 import { useTheme } from '../lib/useTheme';
-import { WERKZEUGE, werkzeugFuerPfad } from '../werkzeuge';
+import { WERKZEUGE, seitentitel, werkzeugFuerPfad } from '../werkzeuge';
 import { Suche } from './Suche';
 import { WerkzeugWechsler } from './WerkzeugWechsler';
 
@@ -23,6 +23,9 @@ export function Layout() {
     if (gefunden) setZuletzt(gefunden);
   }, [gefunden]);
   const werkzeug = gefunden ?? zuletzt;
+  useEffect(() => {
+    document.title = seitentitel(werkzeug);
+  }, [werkzeug]);
 
   return (
     <div className="app">
