@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useToast } from '../components/Toasts';
 import { Card, PageHeader, PageState } from '../components/ui';
 import { useCrm } from '../data/CrmContext';
@@ -7,6 +8,7 @@ import { SchemaError } from '../data/errors';
 import { useIch } from '../lib/useIch';
 import { AnfrageKarte, ErledigteAnfrage } from './AnfrageKarte';
 import { useEingang } from './useEingang';
+import { werkzeugFuerPfad } from '../werkzeuge';
 
 export function AnfragenPage() {
   const { db, mutate } = useCrm();
@@ -15,6 +17,9 @@ export function AnfragenPage() {
   const team = db?.listen.team ?? [];
   const [ich] = useIch(team);
   const [zeigeErledigte, setZeigeErledigte] = useState(false);
+  // The page hangs in Home and in the CRM; the eyebrow names the tool it was opened from.
+  const { pathname } = useLocation();
+  const eyebrow = werkzeugFuerPfad(pathname)?.name ?? 'Home';
 
   const sortiert = useMemo(() => sortiereAnfragen(eingang.data ?? []), [eingang.data]);
   const offen = sortiert.filter(istOffen);
@@ -24,7 +29,7 @@ export function AnfragenPage() {
   if (eingang.error instanceof SchemaError) {
     return (
       <div className="page">
-        <PageHeader eyebrow="Home" title="Anfragen" />
+        <PageHeader eyebrow={eyebrow} title="Anfragen" />
         <Card title="Noch nicht eingerichtet">
           <p>{eingang.error.message}</p>
         </Card>
@@ -35,7 +40,7 @@ export function AnfragenPage() {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Home"
+        eyebrow={eyebrow}
         title="Anfragen"
         subtitle="Was über das Formular auf velonify.de hereinkommt – hier entscheiden, was daraus wird."
         actions={

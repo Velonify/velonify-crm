@@ -4,6 +4,7 @@ import { DealDialog } from '../components/dialogs/DealDialog';
 import { WiedervorlageDialog } from '../components/dialogs/WiedervorlageDialog';
 import { ErrorBox, Loading, PageHeader, PhaseBadge } from '../components/ui';
 import { useCrm } from '../data/CrmContext';
+import { AnfragenKarte } from '../eingang/AnfragenKarte';
 import { isoDate } from '../data/ids';
 import { kennzahlen, meinTag, type Aufgabe } from '../data/selectors';
 import type { Deal } from '../data/types';
@@ -151,6 +152,8 @@ export function MeinTagPage() {
           <span className="kpi-sub">{zahlen.gewonnenMonat} Deals</span>
         </div>
       </div>
+
+      <AnfragenKarte ziel="/crm/anfragen" />
 
       <div className="tag-grid">
         <div>
