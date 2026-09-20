@@ -32,6 +32,7 @@ export const WERKZEUGE: Werkzeug[] = [
     pfad: '/crm',
     navigation: [
       { label: 'Mein Tag', pfad: '/crm', end: true },
+      { label: 'Anfragen', pfad: '/crm/anfragen' },
       { label: 'Pipeline', pfad: '/crm/pipeline' },
       { label: 'Firmen', pfad: '/crm/firmen' },
       { label: 'Import', pfad: '/crm/import' },

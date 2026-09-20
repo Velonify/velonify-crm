@@ -9,6 +9,7 @@ describe('werkzeugFuerPfad', () => {
     expect(werkzeugFuerPfad('/contact/gesendet')?.id).toBe('contact');
     expect(werkzeugFuerPfad('/kalender')?.id).toBe('home');
     expect(werkzeugFuerPfad('/anfragen')?.id).toBe('home');
+    expect(werkzeugFuerPfad('/crm/anfragen')?.id).toBe('crm');
     expect(werkzeugFuerPfad('/audit/SA-123')?.id).toBe('audit');
   });
 

@@ -53,6 +53,7 @@ export function App() {
               <Route path="wort" element={<WordlePage />} />
               <Route path="crm">
                 <Route index element={<MeinTagPage />} />
+                <Route path="anfragen" element={<AnfragenPage />} />
                 <Route path="pipeline" element={<PipelinePage />} />
                 <Route path="firmen" element={<FirmenListePage />} />
                 <Route path="firmen/neu" element={<FirmaNeuPage />} />
