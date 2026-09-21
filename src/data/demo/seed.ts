@@ -151,6 +151,54 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   // Team plant: Johannes has already watered today.
   await service.giesseMonstera('Johannes');
 
+  // Social media: the 90-day plan plus invented numbers for ten posts, so the thresholds have something to
+  // compare. The dates run backwards from today – in real life the plan only starts on 22.09.
+  await service.uebernimmSocialPlan();
+  const social = await service.loadSocialDaten();
+  const posts = social.inhalte.filter((i) => i.art !== 'story');
+  const reichweiten = [820, 1240, 640, 1980, 910, 1460, 730, 2240, 1080, 560];
+  const quoten = [0.031, 0.062, 0.018, 0.074, 0.028, 0.055, 0.015, 0.081, 0.039, 0.012];
+  for (let i = 0; i < Math.min(posts.length, reichweiten.length); i++) {
+    const reichweite = reichweiten[i];
+    const gespeichert = Math.round(reichweite * quoten[i] * 0.7);
+    await service.speichereWert({
+      art: 'post',
+      datum: addDays(heute, -(i * 2 + 1)),
+      inhalt_id: posts[i].id,
+      reichweite,
+      speicherungen: gespeichert,
+      geteilt: Math.round(reichweite * quoten[i] * 0.3),
+      profilaufrufe: Math.round(reichweite * 0.04),
+      link_klicks: Math.round(reichweite * 0.012),
+      kommentare: i % 3,
+      story_antworten: null,
+      umfrage_antworten: null,
+      neue_follower: null,
+      follower_zielgruppe: null,
+      sitzungen: null,
+      formulare: null,
+      erstgespraeche: null,
+      angebote_wert_eur: null,
+      notiz: '',
+    });
+  }
+  const umzugsplan = posts.find((p) => p.kennung === 'K1');
+  const datenleck = posts.find((p) => p.kennung === 'K2');
+  if (umzugsplan) {
+    await service.erfasseDm({
+      datum: addDays(heute, -3), kanal: 'instagram', stichwort: 'UMZUG', inhalt_id: umzugsplan.id,
+      name: 'shop.nordlicht', shop: 'nordlicht-outdoor.example', nachricht: 'Checkliste bitte. Wir sitzen auf Magento 2.4.4.',
+      qualifiziert: true, beantwortet_von: 'Lugge', notiz: '',
+    });
+  }
+  if (datenleck) {
+    await service.erfasseDm({
+      datum: addDays(heute, -6), kanal: 'instagram', stichwort: 'DATEN', inhalt_id: datenleck.id,
+      name: 'kleinod.schmuck', shop: '', nachricht: 'Bei uns weicht GA4 um gut 20 % ab.',
+      qualifiziert: false, beantwortet_von: 'Julian', notiz: '',
+    });
+  }
+
   seeding = false;
   return { service, sheets };
 }

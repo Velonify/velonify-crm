@@ -23,6 +23,19 @@ import {
 } from './rules';
 import { driveKonfiguration } from './selectors';
 import { OUTREACH_STARTLISTE } from './outreachStart';
+import {
+  findeWert,
+  prepareAufgabe,
+  prepareDm,
+  prepareHook,
+  prepareInhalt,
+  preparePlan,
+  prepareText,
+  prepareWert,
+  dmAlsAnfrage,
+  inhaltById,
+} from './social';
+import { SOCIAL_START_AUFGABEN, SOCIAL_START_HOOKS, SOCIAL_START_INHALTE, SOCIAL_START_PLAN, SOCIAL_START_TEXTE } from './socialStart';
 import { STARTKATALOG } from './startkatalog';
 import { EMPTY_DEAL_INPUT } from './types';
 import type { Store } from './store';
@@ -50,6 +63,21 @@ import type {
   LeistungskategorieInput,
   Meta,
   MonsteraEintrag,
+  SocialAufgabe,
+  SocialAufgabeInput,
+  SocialDaten,
+  SocialDm,
+  SocialDmInput,
+  SocialHook,
+  SocialHookInput,
+  SocialInhalt,
+  SocialInhaltInput,
+  SocialPlanEintrag,
+  SocialPlanInput,
+  SocialText,
+  SocialTextInput,
+  SocialWert,
+  SocialWertInput,
   SpieleDaten,
   OutreachLeistung,
   OutreachLeistungInput,
@@ -823,6 +851,278 @@ export class CrmService {
     const eintrag: MonsteraEintrag = { id: newId(ID_PREFIX.monstera), datum, typ: 'giessen', von: name, ...this.created() };
     await this.store.insert('monstera', [eintrag]);
     return eintrag;
+  }
+
+  // ─── Social Media ──────────────────────────────────────────────────────────
+
+  loadSocialDaten(): Promise<SocialDaten> {
+    return this.store.loadSocialDaten();
+  }
+
+  /**
+   * Fills the empty social tabs with the 90-day plan: content first, so every plan entry can point at the
+   * post it publishes. Refuses once anything is there, so nobody ends up with the plan twice.
+   */
+  async uebernimmSocialPlan(): Promise<{ inhalte: number; plan: number; hooks: number; aufgaben: number; texte: number }> {
+    const daten = await this.store.loadSocialDaten();
+    if (daten.plan.length + daten.inhalte.length + daten.hooks.length + daten.aufgaben.length + daten.texte.length > 0) {
+      throw new ValidationError('plan', 'Hier stehen schon Einträge. Der Startplan wird nur in ein leeres Werkzeug übernommen.');
+    }
+    const meta = this.created();
+
+    const inhalte: SocialInhalt[] = SOCIAL_START_INHALTE.map((start, i) => ({
+      ...prepareInhalt(start),
+      id: newId(ID_PREFIX.social_inhalte),
+      sortierung: (i + 1) * 10,
+      archiviert: false,
+      ...meta,
+    }));
+    const idFuerKennung = new Map(inhalte.map((inhalt) => [inhalt.kennung, inhalt.id]));
+
+    const plan: SocialPlanEintrag[] = SOCIAL_START_PLAN.map(({ kennung, ...eintrag }, i) => ({
+      ...preparePlan({ ...eintrag, inhalt_id: (kennung && idFuerKennung.get(kennung)) || '' }),
+      id: newId(ID_PREFIX.social_plan),
+      erledigt_am: '',
+      erledigt_von: '',
+      sortierung: (i + 1) * 10,
+      archiviert: false,
+      ...meta,
+    }));
+
+    const hooks: SocialHook[] = SOCIAL_START_HOOKS.map((start, i) => ({
+      ...prepareHook(start),
+      id: newId(ID_PREFIX.social_hooks),
+      sortierung: (i + 1) * 10,
+      archiviert: false,
+      ...meta,
+    }));
+
+    const aufgaben: SocialAufgabe[] = SOCIAL_START_AUFGABEN.map((start, i) => ({
+      ...prepareAufgabe(start),
+      id: newId(ID_PREFIX.social_aufgaben),
+      erledigt_am: '',
+      erledigt_von: '',
+      sortierung: (i + 1) * 10,
+      archiviert: false,
+      ...meta,
+    }));
+
+    const texte: SocialText[] = SOCIAL_START_TEXTE.map((start, i) => ({
+      ...prepareText(start),
+      id: newId(ID_PREFIX.social_texte),
+      sortierung: (i + 1) * 10,
+      archiviert: false,
+      ...meta,
+    }));
+
+    await this.store.insert('social_inhalte', inhalte);
+    await this.store.insert('social_plan', plan);
+    await this.store.insert('social_hooks', hooks);
+    await this.store.insert('social_aufgaben', aufgaben);
+    await this.store.insert('social_texte', texte);
+    return { inhalte: inhalte.length, plan: plan.length, hooks: hooks.length, aufgaben: aufgaben.length, texte: texte.length };
+  }
+
+  async savePlanEintrag(input: SocialPlanInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<SocialPlanEintrag> {
+    const clean = preparePlan(input);
+    if (existing) {
+      const [eintrag] = await this.store.update('social_plan', [
+        { id: existing.id, changes: { ...clean, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm },
+      ]);
+      return eintrag;
+    }
+    const { plan } = await this.store.loadSocialDaten();
+    const eintrag: SocialPlanEintrag = {
+      ...clean,
+      id: newId(ID_PREFIX.social_plan),
+      erledigt_am: '',
+      erledigt_von: '',
+      sortierung: naechsteSortierung(plan),
+      archiviert: false,
+      ...this.created(),
+    };
+    await this.store.insert('social_plan', [eintrag]);
+    return eintrag;
+  }
+
+  /** Ticks an entry off as published, or takes the tick back. The status follows along. */
+  async setPlanErledigt(id: string, erledigt: boolean, expectedGeaendertAm: string): Promise<SocialPlanEintrag> {
+    const [eintrag] = await this.store.update('social_plan', [
+      {
+        id,
+        changes: {
+          erledigt_am: erledigt ? this.timestamp() : '',
+          erledigt_von: erledigt ? this.currentUser() : '',
+          status: erledigt ? 'veroeffentlicht' : 'bereit',
+          ...this.changed(),
+        },
+        expectedGeaendertAm,
+      },
+    ]);
+    return eintrag;
+  }
+
+  async setPlanArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<SocialPlanEintrag> {
+    const [eintrag] = await this.store.update('social_plan', [{ id, changes: { archiviert, ...this.changed() }, expectedGeaendertAm }]);
+    return eintrag;
+  }
+
+  async saveInhalt(input: SocialInhaltInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<SocialInhalt> {
+    const clean = prepareInhalt(input);
+    if (existing) {
+      const [inhalt] = await this.store.update('social_inhalte', [
+        { id: existing.id, changes: { ...clean, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm },
+      ]);
+      return inhalt;
+    }
+    const { inhalte } = await this.store.loadSocialDaten();
+    const inhalt: SocialInhalt = { ...clean, id: newId(ID_PREFIX.social_inhalte), sortierung: naechsteSortierung(inhalte), archiviert: false, ...this.created() };
+    await this.store.insert('social_inhalte', [inhalt]);
+    return inhalt;
+  }
+
+  async setInhaltArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<SocialInhalt> {
+    const [inhalt] = await this.store.update('social_inhalte', [{ id, changes: { archiviert, ...this.changed() }, expectedGeaendertAm }]);
+    return inhalt;
+  }
+
+  async saveHook(input: SocialHookInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<SocialHook> {
+    const clean = prepareHook(input);
+    if (existing) {
+      const [hook] = await this.store.update('social_hooks', [
+        { id: existing.id, changes: { ...clean, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm },
+      ]);
+      return hook;
+    }
+    const { hooks } = await this.store.loadSocialDaten();
+    const hook: SocialHook = { ...clean, id: newId(ID_PREFIX.social_hooks), sortierung: naechsteSortierung(hooks), archiviert: false, ...this.created() };
+    await this.store.insert('social_hooks', [hook]);
+    return hook;
+  }
+
+  async setHookArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<SocialHook> {
+    const [hook] = await this.store.update('social_hooks', [{ id, changes: { archiviert, ...this.changed() }, expectedGeaendertAm }]);
+    return hook;
+  }
+
+  async saveAufgabe(input: SocialAufgabeInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<SocialAufgabe> {
+    const clean = prepareAufgabe(input);
+    if (existing) {
+      const [aufgabe] = await this.store.update('social_aufgaben', [
+        { id: existing.id, changes: { ...clean, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm },
+      ]);
+      return aufgabe;
+    }
+    const { aufgaben } = await this.store.loadSocialDaten();
+    const aufgabe: SocialAufgabe = {
+      ...clean,
+      id: newId(ID_PREFIX.social_aufgaben),
+      erledigt_am: '',
+      erledigt_von: '',
+      sortierung: naechsteSortierung(aufgaben),
+      archiviert: false,
+      ...this.created(),
+    };
+    await this.store.insert('social_aufgaben', [aufgabe]);
+    return aufgabe;
+  }
+
+  async setAufgabeErledigt(id: string, erledigt: boolean, expectedGeaendertAm: string): Promise<SocialAufgabe> {
+    const [aufgabe] = await this.store.update('social_aufgaben', [
+      {
+        id,
+        changes: { erledigt_am: erledigt ? this.timestamp() : '', erledigt_von: erledigt ? this.currentUser() : '', ...this.changed() },
+        expectedGeaendertAm,
+      },
+    ]);
+    return aufgabe;
+  }
+
+  async setAufgabeArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<SocialAufgabe> {
+    const [aufgabe] = await this.store.update('social_aufgaben', [{ id, changes: { archiviert, ...this.changed() }, expectedGeaendertAm }]);
+    return aufgabe;
+  }
+
+  async saveSocialText(input: SocialTextInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<SocialText> {
+    const clean = prepareText(input);
+    if (existing) {
+      const [text] = await this.store.update('social_texte', [
+        { id: existing.id, changes: { ...clean, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm },
+      ]);
+      return text;
+    }
+    const { texte } = await this.store.loadSocialDaten();
+    const text: SocialText = { ...clean, id: newId(ID_PREFIX.social_texte), sortierung: naechsteSortierung(texte), archiviert: false, ...this.created() };
+    await this.store.insert('social_texte', [text]);
+    return text;
+  }
+
+  async setSocialTextArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<SocialText> {
+    const [text] = await this.store.update('social_texte', [{ id, changes: { archiviert, ...this.changed() }, expectedGeaendertAm }]);
+    return text;
+  }
+
+  /**
+   * Stores the numbers of a post, a week or a month. One row per kind and day: entering the same week twice
+   * updates that row instead of piling up a second one.
+   */
+  async speichereWert(input: SocialWertInput): Promise<SocialWert> {
+    const clean = prepareWert(input);
+    const { werte } = await this.store.loadSocialDaten();
+    const vorhanden = findeWert(werte, clean);
+    if (vorhanden) {
+      const [wert] = await this.store.update('social_werte', [
+        { id: vorhanden.id, changes: { ...clean, ...this.changed() }, expectedGeaendertAm: vorhanden.geaendert_am },
+      ]);
+      return wert;
+    }
+    const wert: SocialWert = { ...clean, id: newId(ID_PREFIX.social_werte), ...this.created() };
+    await this.store.insert('social_werte', [wert]);
+    return wert;
+  }
+
+  /**
+   * Records a DM with a keyword. With `anfrageAnlegen` it also lands in the inbox, so the person who answers
+   * it does not have to type it a second time; the CRM then takes it over like any other inquiry.
+   */
+  async erfasseDm(input: SocialDmInput, optionen: { anfrageAnlegen?: boolean } = {}): Promise<{ dm: SocialDm; anfrage: Anfrage | null }> {
+    const clean = prepareDm(input);
+    const { inhalte } = await this.store.loadSocialDaten();
+    let anfrage: Anfrage | null = null;
+
+    if (optionen.anfrageAnlegen) {
+      if (!clean.name) throw new ValidationError('name', 'Für den Eingang braucht es einen Namen oder das Instagram-Handle.');
+      // Fails with SchemaError before anything is written while the inbox tab is missing.
+      await this.store.loadEingang();
+      const { quelle, nachricht } = dmAlsAnfrage(clean, inhaltById(inhalte, clean.inhalt_id));
+      anfrage = {
+        id: newId(ID_PREFIX.eingang),
+        eingegangen_am: `${clean.datum}T00:00:00.000Z`,
+        quelle,
+        sprache: 'de',
+        name: clean.name,
+        email: '',
+        shop: clean.shop,
+        themen: clean.stichwort,
+        nachricht,
+        status: ANFRAGE_STATUS.neu,
+        firma_id: '',
+        kontakt_id: '',
+        erledigt_am: '',
+        erledigt_von: '',
+        ...this.created(),
+      };
+    }
+
+    const dm: SocialDm = { ...clean, id: newId(ID_PREFIX.social_dms), eingang_id: anfrage?.id ?? '', ...this.created() };
+    await this.store.insert('social_dms', [dm]);
+    if (anfrage) await this.store.insert('eingang', [anfrage]);
+    return { dm, anfrage };
+  }
+
+  async aendereDm(id: string, input: SocialDmInput, expectedGeaendertAm: string): Promise<SocialDm> {
+    const [dm] = await this.store.update('social_dms', [{ id, changes: { ...prepareDm(input), ...this.changed() }, expectedGeaendertAm }]);
+    return dm;
   }
 
   // ─── Google Drive ──────────────────────────────────────────────────────────

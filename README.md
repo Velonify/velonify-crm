@@ -1,6 +1,6 @@
 # Velonify intern
 
-Interne Company Page: Startseite mit Schnellzugriff, dazu das CRM für Leads, Vertrieb, Angebote und Kundenakte. Zwischen den Werkzeugen (Home, CRM, als Nächstes der Angebots-Rechner) wechselt man über den Umschalter unter dem Logo; die Seitenleiste zeigt nur die Seiten des geöffneten Werkzeugs. Neue Werkzeuge werden in `src/werkzeuge.ts` eingetragen.
+Interne Company Page: Startseite mit Schnellzugriff, dazu das CRM für Leads, Vertrieb, Angebote und Kundenakte, Shop-Audit, Lead-Finder und Social Media. Zwischen den Werkzeugen wechselt man über den Umschalter unter dem Logo; die Seitenleiste zeigt nur die Seiten des geöffneten Werkzeugs. Neue Werkzeuge werden in `src/werkzeuge.ts` eingetragen.
 
 - **Oberfläche:** React-App auf GitHub Pages
 - **Daten:** ein Google Sheet („CRM-Datenbank“) in der Shared Drive. **Keine Kundendaten in diesem Repo.**
@@ -21,6 +21,7 @@ Ohne Google-Zugangsdaten startet die App im **Demo-Modus** mit erfundenen Beispi
 | **Automatik beim Phasenwechsel** | *Qualifiziert*: Kürzel vorschlagen und Lead-Ordner in `02_Sales/01_Leads` anlegen · *Angebot*: Ordner nach `01_Clients` verschieben und Unterordner aus der Vorlage ergänzen · *Gewonnen*: Firma wird Kunde · *Verloren*: Grund wird abgefragt. Jeder Wechsel landet im Verlauf. |
 | **Termine** | Termin mit Google-Meet-Link direkt beim Kontakt planen, Einladung optional per Mail; Termine mit Kontakten der Firma aus dem eigenen Kalender. |
 | **Dubletten-Warnung** | Gleiche USt-ID, Handelsregisternummer (gleiches Amtsgericht), gleicher Name ohne Rechtsform oder gleiche E-Mail-/Web-Domain (ohne Freemailer) gelten als mögliche Dublette: Warnung vor dem Speichern, Hinweis in der Firmenakte, Filter „Mögliche Dubletten“ in der Firmenliste. |
+| **Social Media** | Der 90-Tage-Plan im Hub statt im Dokument: **Redaktionsplan** nach Kalenderwochen mit Häkchen je Termin, **Inhalte** (Karussells, Reels, Einzelbilder, Stories mit Hook, Slides, Caption, Hashtags und Alt-Text, direkt auf der Detailseite bearbeitbar), **Aufgaben** aus „Erste Woche“ und „Was fehlt“ zum Abhaken, **Messung** mit eigenem Median und den Schwellen zum Aussortieren oder Verdoppeln, **Strategie** mit den Kapiteln und der Hook-Bibliothek. Dazu ein UTM-Link-Generator und „DM erfassen“, das die Nachricht auf Wunsch gleich in den Anfragen-Eingang legt. Beim ersten Öffnen übernimmt ein Klick den kompletten Startplan. |
 | **Import** | CSV aus dem Magento-Lead-Qualifier: Vorschau, Tier-Filter, Dubletten per Domain; mögliche Dubletten unter anderer Domain werden markiert und standardmäßig nicht importiert. Neue Firmen bekommen Kontakt und Deal; vorhandene werden nie überschrieben, nur leere Felder ergänzt. |
 
 ## Einrichtung (einmalig)
@@ -128,7 +129,10 @@ src/
 │   ├── importCsv.ts     CSV lesen und Import-Vorschau berechnen
 │   ├── rules.ts         Regeln: Domain, Kürzel, Ordnernamen, Pflichtfelder
 │   └── schema.ts        Tabellenblätter und Spalten
+│   ├── social.ts        Säulen, Formate, Median und Schwellen der Messung, UTM-Links
+│   ├── socialStart.ts   Der 90-Tage-Plan als Startliste (Inhalte, Termine, Hooks, Aufgaben, Kapitel)
 ├── pages/               Mein Tag, Pipeline, Firmen, Firmenakte, Import, Einrichtung, Login
+├── social/              Übersicht, Redaktionsplan, Inhalte, Aufgaben, Messung, Strategie
 └── components/          Layout, Dialoge, Karten der Firmenakte
 ```
 
@@ -138,4 +142,4 @@ Ein späterer Umzug auf eine andere Datenbank (z. B. Supabase) bedeutet: eine ne
 
 **Grenzen:** Termine zeigt die Firmenakte aus dem Kalender der angemeldeten Person – Termine von Kolleg:innen stehen im Verlauf. Das CRM verschickt selbst keine E-Mails außer Google-Kalender-Einladungen.
 
-**Dieses Repo ist öffentlich:** keine echten Firmen, Kontakte, Sheet-IDs oder Zugangsdaten in Code, Tests oder Beispielen.
+**Dieses Repo ist öffentlich:** keine echten Firmen, Kontakte, Sheet-IDs oder Zugangsdaten in Code, Tests oder Beispielen. Deshalb steht im Startplan von Social Media (`src/data/socialStart.ts`) an den Stellen, wo Kundennamen, freigegebene Zahlen oder Zitate hingehören, ein `[IM HUB ERGÄNZEN: …]`. Diese Stellen werden einmal im Hub gefüllt, nicht hier.

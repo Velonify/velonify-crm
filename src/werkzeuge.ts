@@ -71,6 +71,20 @@ export const WERKZEUGE: Werkzeug[] = [
     ],
   },
   {
+    id: 'social',
+    name: 'Social Media',
+    beschreibung: 'Der 90-Tage-Plan: Redaktionsplan, fertige Posts, Aufgaben und was die Zahlen sagen',
+    pfad: '/social',
+    navigation: [
+      { label: 'Übersicht', pfad: '/social', end: true },
+      { label: 'Redaktionsplan', pfad: '/social/plan' },
+      { label: 'Inhalte', pfad: '/social/inhalte' },
+      { label: 'Aufgaben', pfad: '/social/aufgaben' },
+      { label: 'Messung', pfad: '/social/messung' },
+      { label: 'Strategie', pfad: '/social/strategie' },
+    ],
+  },
+  {
     id: 'leads',
     name: 'Lead-Finder',
     beschreibung: 'Deutsche Shops mit Anlass finden, prüfen und gezielt ins CRM übernehmen',

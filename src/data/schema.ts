@@ -112,6 +112,66 @@ export const SCHEMA = {
       'status', 'firma_id', 'kontakt_id', 'erledigt_am', 'erledigt_von', ...META,
     ],
   },
+  social_plan: {
+    name: 'social_plan',
+    columns: [
+      'id', 'datum', 'uhrzeit', 'kanal', 'format', 'saeule', 'thema', 'inhalt_id', 'status', 'hinweis',
+      'zustaendig', 'erledigt_am', 'erledigt_von', 'sortierung', 'archiviert', ...META,
+    ],
+    numeric: ['saeule', 'sortierung'],
+    boolean: ['archiviert'],
+  },
+  social_inhalte: {
+    name: 'social_inhalte',
+    columns: [
+      'id', 'kennung', 'art', 'serie', 'saeule', 'titel', 'ziel', 'hook', 'slides', 'caption', 'cta',
+      'hashtags', 'alt_text', 'ton', 'material', 'hinweis', 'status', 'sortierung', 'archiviert', ...META,
+    ],
+    numeric: ['saeule', 'sortierung'],
+    boolean: ['archiviert'],
+  },
+  social_hooks: {
+    name: 'social_hooks',
+    columns: ['id', 'saeule', 'text', 'status', 'inhalt_id', 'sortierung', 'archiviert', ...META],
+    numeric: ['saeule', 'sortierung'],
+    boolean: ['archiviert'],
+  },
+  social_aufgaben: {
+    name: 'social_aufgaben',
+    columns: [
+      'id', 'bereich', 'titel', 'beschreibung', 'dringlichkeit', 'faellig_am', 'zustaendig',
+      'erledigt_am', 'erledigt_von', 'sortierung', 'archiviert', ...META,
+    ],
+    numeric: ['sortierung'],
+    boolean: ['archiviert'],
+  },
+  social_texte: {
+    name: 'social_texte',
+    columns: ['id', 'schluessel', 'titel', 'text', 'sortierung', 'archiviert', ...META],
+    numeric: ['sortierung'],
+    boolean: ['archiviert'],
+  },
+  social_werte: {
+    name: 'social_werte',
+    columns: [
+      'id', 'art', 'datum', 'inhalt_id', 'reichweite', 'speicherungen', 'geteilt', 'profilaufrufe',
+      'link_klicks', 'kommentare', 'story_antworten', 'umfrage_antworten', 'neue_follower',
+      'follower_zielgruppe', 'sitzungen', 'formulare', 'erstgespraeche', 'angebote_wert_eur', 'notiz', ...META,
+    ],
+    numeric: [
+      'reichweite', 'speicherungen', 'geteilt', 'profilaufrufe', 'link_klicks', 'kommentare',
+      'story_antworten', 'umfrage_antworten', 'neue_follower', 'follower_zielgruppe', 'sitzungen',
+      'formulare', 'erstgespraeche', 'angebote_wert_eur',
+    ],
+  },
+  social_dms: {
+    name: 'social_dms',
+    columns: [
+      'id', 'datum', 'kanal', 'stichwort', 'inhalt_id', 'name', 'shop', 'nachricht', 'qualifiziert',
+      'eingang_id', 'beantwortet_von', 'notiz', ...META,
+    ],
+    boolean: ['qualifiziert'],
+  },
   listen: {
     name: 'listen',
     columns: ['liste', 'wert'],
@@ -138,6 +198,8 @@ export const WORDLE_TABS = ['wordle'] as const;
 export const MONSTERA_TABS = ['monstera'] as const;
 /** Tab of the website inbox, written by the Apps Script behind the Netlify form and loaded only by the inbox. */
 export const EINGANG_TABS = ['eingang'] as const;
+/** Tabs of the social media tool, loaded together only when it is opened. */
+export const SOCIAL_TABS = ['social_plan', 'social_inhalte', 'social_hooks', 'social_aufgaben', 'social_texte', 'social_werte', 'social_dms'] as const;
 export type EntityTab =
   | (typeof ENTITY_TABS)[number]
   | (typeof ANGEBOTS_TABS)[number]
@@ -145,7 +207,8 @@ export type EntityTab =
   | (typeof AUDIT_TABS)[number]
   | (typeof WORDLE_TABS)[number]
   | (typeof MONSTERA_TABS)[number]
-  | (typeof EINGANG_TABS)[number];
+  | (typeof EINGANG_TABS)[number]
+  | (typeof SOCIAL_TABS)[number];
 
 /** Editable select values, written to the "listen" tab on setup and maintained there afterwards. */
 export const LISTEN_DEFAULTS: Record<string, string[]> = {

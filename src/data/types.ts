@@ -303,6 +303,197 @@ export interface SpieleDaten {
   monstera: MonsteraEintrag[] | null;
 }
 
+/*
+ * Social media: the 90-day plan lives in the hub, not in a document. One tab per kind of entry, so every
+ * point can be edited and ticked off on its own.
+ */
+
+/** One entry of the editorial calendar: what goes out when, on which channel. */
+export interface SocialPlanEintrag extends Meta {
+  id: string;
+  /** YYYY-MM-DD */
+  datum: string;
+  /** HH:MM; empty for stories that go out live */
+  uhrzeit: string;
+  /** instagram, ig_story, linkedin, intern – see KANAELE */
+  kanal: string;
+  /** karussell, reel, einzelbild, story, textpost, pdf, auswertung – see FORMATE */
+  format: string;
+  /** Content pillar 1–4, null for internal entries */
+  saeule: number | null;
+  thema: string;
+  /** The piece of content this entry publishes; empty when the entry stands alone */
+  inhalt_id: string;
+  /** geplant / in_arbeit / bereit / veroeffentlicht */
+  status: string;
+  /** What is still missing, e.g. "Design offen" */
+  hinweis: string;
+  zustaendig: string;
+  erledigt_am: string;
+  erledigt_von: string;
+  sortierung: number | null;
+  archiviert: boolean;
+}
+export type SocialPlanInput = Pick<
+  SocialPlanEintrag,
+  'datum' | 'uhrzeit' | 'kanal' | 'format' | 'saeule' | 'thema' | 'inhalt_id' | 'status' | 'hinweis' | 'zustaendig'
+>;
+
+/** One slide of a carousel or one beat of a reel; all of them together are stored as JSON in `slides`. */
+export interface SocialSlide {
+  /** "1 (Hook)" for a carousel, "0–2" for a reel beat */
+  label: string;
+  /** On-screen text, word for word */
+  text: string;
+  /** Layout for a slide, shot list for a reel */
+  gestaltung: string;
+  /** Voice-over of a reel beat, empty elsewhere */
+  sprecher: string;
+}
+
+/** A post, reel, single image or story – everything needed to produce it. */
+export interface SocialInhalt extends Meta {
+  id: string;
+  /** Short handle used by the plan, e.g. "K1", "R2", "E3", "S7" */
+  kennung: string;
+  /** karussell, reel, einzelbild, story */
+  art: string;
+  /** Recurring series, e.g. "UMZUGSPLAN #1" */
+  serie: string;
+  saeule: number | null;
+  titel: string;
+  /** What this post is for */
+  ziel: string;
+  /** Headline of slide 1, or the first two seconds */
+  hook: string;
+  /** SocialSlide[] as JSON */
+  slides: string;
+  caption: string;
+  cta: string;
+  hashtags: string;
+  alt_text: string;
+  /** Sound of a reel, interaction sticker of a story */
+  ton: string;
+  /** What has to be recorded or approved first */
+  material: string;
+  hinweis: string;
+  /** idee / text / gestaltung / bereit / veroeffentlicht / wartet */
+  status: string;
+  sortierung: number | null;
+  archiviert: boolean;
+}
+export type SocialInhaltInput = Pick<
+  SocialInhalt,
+  'kennung' | 'art' | 'serie' | 'saeule' | 'titel' | 'ziel' | 'hook' | 'caption' | 'cta' | 'hashtags' | 'alt_text' | 'ton' | 'material' | 'hinweis' | 'status'
+> & { slides: SocialSlide[] };
+
+/** A headline from the hook library, marked as used once a post carries it. */
+export interface SocialHook extends Meta {
+  id: string;
+  saeule: number | null;
+  text: string;
+  /** frei / benutzt */
+  status: string;
+  inhalt_id: string;
+  sortierung: number | null;
+  archiviert: boolean;
+}
+export type SocialHookInput = Pick<SocialHook, 'saeule' | 'text' | 'status' | 'inhalt_id'>;
+
+/** Something that has to happen before or beside the plan: a missing piece, a step of week one, a weekly ritual. */
+export interface SocialAufgabe extends Meta {
+  id: string;
+  /** fehlt / woche1 / ritual */
+  bereich: string;
+  titel: string;
+  beschreibung: string;
+  /** sofort / diese_woche / vor_0110 / vor_1310 / spaeter – empty outside "fehlt" */
+  dringlichkeit: string;
+  faellig_am: string;
+  zustaendig: string;
+  erledigt_am: string;
+  erledigt_von: string;
+  sortierung: number | null;
+  archiviert: boolean;
+}
+export type SocialAufgabeInput = Pick<SocialAufgabe, 'bereich' | 'titel' | 'beschreibung' | 'dringlichkeit' | 'faellig_am' | 'zustaendig'>;
+
+/** A chapter of the strategy, editable so the plan can change without a commit. */
+export interface SocialText extends Meta {
+  id: string;
+  /** Stable key, e.g. "fundament" – the start list sets it, people edit the text */
+  schluessel: string;
+  titel: string;
+  text: string;
+  sortierung: number | null;
+  archiviert: boolean;
+}
+export type SocialTextInput = Pick<SocialText, 'schluessel' | 'titel' | 'text'>;
+
+/** The numbers behind a post, a week or a month. Fields that do not apply stay empty. */
+export interface SocialWert extends Meta {
+  id: string;
+  /** post / woche / monat */
+  art: string;
+  /** Day of the post, Monday of the week, or first day of the month */
+  datum: string;
+  /** Only for art = "post" */
+  inhalt_id: string;
+  reichweite: number | null;
+  speicherungen: number | null;
+  geteilt: number | null;
+  profilaufrufe: number | null;
+  link_klicks: number | null;
+  kommentare: number | null;
+  story_antworten: number | null;
+  umfrage_antworten: number | null;
+  neue_follower: number | null;
+  follower_zielgruppe: number | null;
+  sitzungen: number | null;
+  formulare: number | null;
+  erstgespraeche: number | null;
+  angebote_wert_eur: number | null;
+  notiz: string;
+}
+export type SocialWertInput = Omit<SocialWert, 'id' | MetaKeys>;
+
+/** A direct message with a keyword – the earliest signal that a post works. */
+export interface SocialDm extends Meta {
+  id: string;
+  /** YYYY-MM-DD */
+  datum: string;
+  /** instagram / linkedin */
+  kanal: string;
+  /** UMZUG, DATEN, FLOWS or something typed by hand */
+  stichwort: string;
+  /** The post that triggered it */
+  inhalt_id: string;
+  name: string;
+  shop: string;
+  nachricht: string;
+  /** Online shop in DACH, decision maker, real need within six months */
+  qualifiziert: boolean;
+  /** Row in the inbox, once the message was passed on to the CRM */
+  eingang_id: string;
+  beantwortet_von: string;
+  notiz: string;
+}
+export type SocialDmInput = Pick<
+  SocialDm,
+  'datum' | 'kanal' | 'stichwort' | 'inhalt_id' | 'name' | 'shop' | 'nachricht' | 'qualifiziert' | 'beantwortet_von' | 'notiz'
+>;
+
+/** Everything the social media tool works with, loaded in one request. */
+export interface SocialDaten {
+  plan: SocialPlanEintrag[];
+  inhalte: SocialInhalt[];
+  hooks: SocialHook[];
+  aufgaben: SocialAufgabe[];
+  texte: SocialText[];
+  werte: SocialWert[];
+  dms: SocialDm[];
+}
+
 export type Listen = Record<string, string[]>;
 export type Einstellungen = Record<string, string>;
 
@@ -321,6 +512,13 @@ export interface EntityMap {
   wordle: WordleErgebnis;
   monstera: MonsteraEintrag;
   eingang: Anfrage;
+  social_plan: SocialPlanEintrag;
+  social_inhalte: SocialInhalt;
+  social_hooks: SocialHook;
+  social_aufgaben: SocialAufgabe;
+  social_texte: SocialText;
+  social_werte: SocialWert;
+  social_dms: SocialDm;
 }
 
 /** An inquiry from the website form, written into the sheet by the Apps Script behind the Netlify webhook. */

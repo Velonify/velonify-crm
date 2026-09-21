@@ -16,6 +16,13 @@ export const ID_PREFIX = {
   wordle: 'WD',
   monstera: 'MO',
   eingang: 'EA',
+  social_plan: 'SP',
+  social_inhalte: 'SI',
+  social_hooks: 'SH',
+  social_aufgaben: 'SU',
+  social_texte: 'ST',
+  social_werte: 'SW',
+  social_dms: 'SD',
 } as const;
 
 export function newId(prefix: string, length = 8): string {

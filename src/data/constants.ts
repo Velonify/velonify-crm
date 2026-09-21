@@ -63,6 +63,7 @@ export const EINSTELLUNG = {
   vorlageOrdner: 'drive_vorlage_ordner_id',
   proposalsOrdner: 'drive_proposals_ordner_id',
   dealTitel: 'deal_titel_standard',
+  socialZiel: 'social_ziel_url',
 } as const;
 
 export const SLACK_STANDARD_URL = 'https://velonify.slack.com';

@@ -918,3 +918,72 @@ fieldset.plain.invalid legend { color: var(--danger); }
 .lead-anlass-gruppe h3 { margin: 0 0 var(--space-1); }
 .lead-website { color: inherit; text-decoration: none; }
 .lead-website:hover { text-decoration: underline; }
+
+/* ─── Social Media ───────────────────────────────────────────────────────── */
+.badge.saeule { min-width: 54px; justify-content: center; border-color: var(--line-strong); }
+.badge.saeule-1 { background: var(--panel); border-color: var(--panel); color: var(--on-panel); }
+.badge.saeule-2 { background: var(--highlight); border-color: var(--highlight); color: var(--on-highlight); }
+.badge.saeule-3 { background: transparent; border-color: var(--accent); color: var(--accent); }
+.badge.saeule-4 { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.badge.social-status.status-veroeffentlicht, .badge.social-status.status-bereit { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 30%, transparent); color: var(--ok); }
+.badge.social-status.status-in_arbeit, .badge.social-status.status-gestaltung, .badge.social-status.status-text { background: var(--highlight); border-color: var(--highlight); color: var(--on-highlight); }
+.badge.social-status.status-wartet { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 30%, transparent); color: var(--warn); }
+.badge.social-status.status-geplant, .badge.social-status.status-idee { border-color: var(--line); color: var(--ink-muted); }
+.badge.dringlichkeit-sofort { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 30%, transparent); color: var(--warn); }
+.badge.dringlichkeit-diese_woche { border-color: var(--accent); color: var(--accent); }
+.badge.dringlichkeit-spaeter { border-color: var(--line); color: var(--ink-muted); }
+.badge.urteil-verdoppeln { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 30%, transparent); color: var(--ok); }
+.badge.urteil-aussortieren { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 30%, transparent); color: var(--warn); }
+.badge.urteil-beobachten, .badge.urteil-zu_frueh { border-color: var(--line); color: var(--ink-muted); }
+
+.social-plan-tabelle tbody tr { cursor: default; }
+.social-plan-tabelle td:first-child { width: 40px; }
+.social-plan-tabelle :is(th, td):nth-child(2) { white-space: nowrap; }
+.social-plan-tabelle :is(th, td):nth-child(6) { min-width: 260px; }
+.social-plan-tabelle :is(th, td):nth-child(7) { min-width: 200px; }
+.social-plan-tabelle tr.is-erledigt :is(.row-title, .link-button) { color: var(--ink-muted); }
+.social-plan-tabelle tr.is-erledigt .link-button { text-decoration: line-through; text-decoration-color: currentColor; }
+.social-ueberfaellig .row-title { color: var(--danger); }
+
+.social-saeulen, .social-dms, .social-perioden, .social-termine, .social-aufgaben { list-style: none; margin: 0; padding: 0; }
+.social-saeulen li, .social-dms li, .social-perioden li, .social-termine li, .social-aufgaben li { padding: var(--space-2) 0; border-top: 1px solid var(--line); display: grid; gap: 4px; }
+.social-saeulen li:first-child, .social-dms li:first-child, .social-perioden li:first-child, .social-termine li:first-child, .social-aufgaben li:first-child { border-top: 0; padding-top: 0; }
+.social-saeule-kopf { display: flex; align-items: center; gap: var(--space-1); }
+.social-saeule-kopf .row-title { flex: 1; min-width: 0; }
+.social-balken { height: 6px; background: var(--sunken); border: 1px solid var(--line); }
+.social-balken span { display: block; height: 100%; background: var(--accent); }
+
+.social-inhalte { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.social-inhalte li.is-archived { opacity: 0.55; }
+.social-inhalt-karte { display: flex; flex-direction: column; gap: 8px; height: 100%; padding: var(--space-3) var(--space-4) var(--space-4); background: var(--raised); color: var(--ink); text-decoration: none; }
+.social-inhalt-karte:hover { background: var(--hover); text-decoration: none; }
+.social-inhalt-karte h3 { font-size: 16px; margin: 0; }
+.social-inhalt-karte p { margin: 0; }
+.social-inhalt-kopf { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.social-kennung { font-family: var(--font-display); font-size: 15px; line-height: 1; letter-spacing: 0.01em; color: var(--accent); }
+.social-hook { font-family: var(--font-display); font-size: 13px; line-height: 1.3; text-transform: uppercase; color: var(--ink); margin: 0; }
+.social-hook.gross { font-size: 22px; line-height: 1.15; margin-top: var(--space-2); max-width: 44rem; }
+
+.social-detail-kopf { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-4); }
+.social-detail-kopf h2 { margin: var(--space-2) 0 4px; }
+.social-detail-kopf .row-sub { margin: 0; }
+.social-inhalt-form { display: flex; flex-direction: column; gap: var(--space-4); }
+.social-form-aktionen { display: flex; justify-content: flex-end; gap: var(--space-1); }
+
+.social-slides { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); counter-reset: slide; }
+.social-slide { border-left: var(--border-accent) solid var(--highlight); background: var(--sunken); padding: var(--space-2) var(--space-3); }
+.social-slides.bearbeitbar .social-slide { display: grid; gap: var(--space-1); }
+.social-slide-kopf { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); }
+.social-slide-nummer, .social-slide-label { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-muted); }
+.social-slide-label { width: 140px; padding: 6px 8px; font-family: var(--font-sans); }
+.social-slide-text { white-space: pre-wrap; margin: 4px 0 6px; font-weight: 600; }
+.social-slide p:last-child { margin-bottom: 0; }
+.social-slide .label-text { color: var(--ink); margin-right: 6px; }
+
+.social-aufgabenliste li.is-erledigt .link-button { color: var(--ink-muted); text-decoration: line-through; text-decoration-color: currentColor; }
+.social-aufgabenliste li.is-archived { opacity: 0.55; }
+.social-aufgabenliste .notiz { margin: 4px 0; white-space: pre-wrap; }
+.social-hooks li.is-erledigt .link-button { color: var(--ink-muted); text-decoration: line-through; text-decoration-color: currentColor; }
+.social-hook-gruppe + .social-hook-gruppe { margin-top: var(--space-3); }
+.social-hook-gruppe .subheading { display: flex; align-items: center; gap: var(--space-1); }
+.card.is-archived { opacity: 0.6; }

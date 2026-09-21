@@ -28,6 +28,13 @@ import { LoginPage } from './pages/LoginPage';
 import { MeinTagPage } from './pages/MeinTagPage';
 import { PipelinePage } from './pages/PipelinePage';
 import { StartPage } from './pages/StartPage';
+import { SocialAufgabenPage } from './social/AufgabenPage';
+import { SocialInhaltDetailPage } from './social/InhaltDetailPage';
+import { SocialInhaltePage } from './social/InhaltePage';
+import { SocialMessungPage } from './social/MessungPage';
+import { SocialPlanPage } from './social/PlanPage';
+import { SocialStrategiePage } from './social/StrategiePage';
+import { SocialUebersichtPage } from './social/UebersichtPage';
 import { WordlePage } from './wordle/WordlePage';
 
 /** Links from before the start page (/#/firmen/…) now live under /crm. */
@@ -75,6 +82,15 @@ export function App() {
                 <Route index element={<AuditUebersichtPage />} />
                 <Route path="neu" element={<AuditNeuPage />} />
                 <Route path=":id" element={<AuditDetailPage />} />
+              </Route>
+              <Route path="social">
+                <Route index element={<SocialUebersichtPage />} />
+                <Route path="plan" element={<SocialPlanPage />} />
+                <Route path="inhalte" element={<SocialInhaltePage />} />
+                <Route path="inhalte/:id" element={<SocialInhaltDetailPage />} />
+                <Route path="aufgaben" element={<SocialAufgabenPage />} />
+                <Route path="messung" element={<SocialMessungPage />} />
+                <Route path="strategie" element={<SocialStrategiePage />} />
               </Route>
               <Route path="leads">
                 <Route index element={<BacklogPage />} />

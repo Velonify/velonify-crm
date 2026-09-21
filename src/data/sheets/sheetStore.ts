@@ -1,7 +1,7 @@
 import { ConflictError, NotFoundError, SchemaError } from '../errors';
-import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, EINGANG_TABS, LISTEN_DEFAULTS, SCHEMA, MONSTERA_TABS, WORDLE_TABS, type EntityTab, type TabSchema } from '../schema';
+import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, EINGANG_TABS, LISTEN_DEFAULTS, SCHEMA, MONSTERA_TABS, SOCIAL_TABS, WORDLE_TABS, type EntityTab, type TabSchema } from '../schema';
 import type { RecordUpdate, Store } from '../store';
-import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Listen, MonsteraEintrag, SpieleDaten, WordleErgebnis } from '../types';
+import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Listen, MonsteraEintrag, SocialDaten, SpieleDaten, WordleErgebnis } from '../types';
 import { columnLetter, recordToRow, rowToRecord } from './rows';
 import { quoteTab, type SheetsApi, type SpreadsheetInfo, type ValueWrite } from './sheetsClient';
 
@@ -170,6 +170,30 @@ export class SheetStore implements Store {
     assertColumns(SCHEMA.eingang, table.header);
     this.headers.set('eingang', table.header);
     return entityRows('eingang', table);
+  }
+
+  async loadSocialDaten(): Promise<SocialDaten> {
+    const info = await this.info();
+    const vorhanden = new Set(info.sheets?.map((sheet) => sheet.properties.title));
+    if (SOCIAL_TABS.some((tab) => !vorhanden.has(tab))) {
+      throw new SchemaError('Social Media ist noch nicht eingerichtet. Bitte unter \u201eEinrichtung\u201c auf \u201eEinrichten\u201c klicken.');
+    }
+    const values = await this.api.batchGetValues(SOCIAL_TABS.map((tab) => fullRange(tab)));
+    const tables = SOCIAL_TABS.map((tab, i) => {
+      const table = splitHeader(values[i]);
+      assertColumns(SCHEMA[tab], table.header);
+      this.headers.set(tab, table.header);
+      return table;
+    });
+    return {
+      plan: entityRows('social_plan', tables[0]),
+      inhalte: entityRows('social_inhalte', tables[1]),
+      hooks: entityRows('social_hooks', tables[2]),
+      aufgaben: entityRows('social_aufgaben', tables[3]),
+      texte: entityRows('social_texte', tables[4]),
+      werte: entityRows('social_werte', tables[5]),
+      dms: entityRows('social_dms', tables[6]),
+    };
   }
 
   /** Both games of the start page in a single request; a tab that is not set up yet comes back as null. */
