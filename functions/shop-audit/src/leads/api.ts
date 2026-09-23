@@ -39,7 +39,10 @@ const Schemas = {
           entscheidung: z.enum(ENTSCHEIDUNGEN as [string, ...string[]]),
           grund: z.string().trim().max(500).default(''),
           firma_id: z.string().trim().max(60).default(''),
-        }),
+          /** Contact e-mail a person found on the shop; required when releasing a shop by hand. */
+          email: z.union([z.string().trim().toLowerCase().email().max(200), z.literal('')]).default(''),
+        })
+        .refine((e) => e.entscheidung !== 'freigegeben' || e.email !== '', { message: 'Zum Freigeben wird eine Kontakt-E-Mail gebraucht.', path: ['email'] }),
       )
       .min(1)
       .max(500),
@@ -98,6 +101,12 @@ export function pruefZeile(k: Kandidat, von: string): Record<string, unknown> {
   };
 }
 
+/** Fills the contact e-mail a person entered on release into a check whose Impressum had none. */
+function mitEmail(k: Kandidat, email: unknown): Kandidat {
+  if (!k.firma || k.firma.email || typeof email !== 'string' || !email) return k;
+  return { ...k, firma: { ...k.firma, email } };
+}
+
 /** Handles POST /leads/<route>. Returns the JSON body. */
 export async function leadRoute(route: Route, body: unknown, ctx: Kontext): Promise<unknown> {
   const { bq, dataset } = ctx;
@@ -122,13 +131,13 @@ export async function leadRoute(route: Route, body: unknown, ctx: Kontext): Prom
       const domain = domainOder400(parse(Schemas.detail, body).domain);
       const [zeile] = await bq.query<{ daten: string } & Record<string, unknown>>(detailSql(dataset), { domain });
       if (!zeile) throw new AnfrageFehler('Diese Domain wurde noch nicht geprüft.', 404);
-      const { daten, ...rest } = zeile;
-      return { ...rest, kandidat: JSON.parse(daten) as Kandidat };
+      const { daten, email, ...rest } = zeile;
+      return { ...rest, kandidat: mitEmail(JSON.parse(daten) as Kandidat, email) };
     }
     case 'details': {
       const domains = parse(Schemas.details, body).domains.map(domainOder400);
-      const zeilen = await bq.query<{ domain: string; daten: string }>(detailsSql(dataset), { domains });
-      return { kandidaten: zeilen.map((z) => JSON.parse(z.daten) as Kandidat) };
+      const zeilen = await bq.query<{ domain: string; daten: string; email: string | null }>(detailsSql(dataset), { domains });
+      return { kandidaten: zeilen.map((z) => mitEmail(JSON.parse(z.daten) as Kandidat, z.email)) };
     }
     case 'entscheiden': {
       const { eintraege } = parse(Schemas.entscheiden, body);

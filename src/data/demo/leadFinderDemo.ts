@@ -83,13 +83,20 @@ export class DemoLeadFinder implements LeadFinderApi {
 
   private warte = () => new Promise((r) => setTimeout(r, this.dauerMs));
 
-  private zeile(k: LeadKandidat): ListenZeile {
+  /** Like the function: an e-mail entered on release fills an Impressum without one. */
+  private mitEmail(k: LeadKandidat): LeadKandidat {
+    const email = this.entscheidungen.get(k.domain)?.email;
+    return k.firma.email || !email ? k : { ...k, firma: { ...k.firma, email } };
+  }
+
+  private zeile(roh: LeadKandidat): ListenZeile {
+    const k = this.mitEmail(roh);
     return {
       domain: k.domain, geprueft_am: k.geprueft_am, score: k.score, ausschluss: k.ausschluss.map((a) => a.id), anlaesse: k.anlaesse.map((a) => a.id),
       anlass_texte: k.anlaesse.map((a) => a.text), system: k.system, version: k.version, rang_de: k.rang_de, firma: k.firma.name, plz: k.firma.plz, ort: k.firma.ort,
       entscheidung: this.entscheidungen.get(k.domain)?.entscheidung ?? null, prioritaet: this.pool.find((p) => p.domain === k.domain)?.prioritaet,
       bereiche: k.bereiche ?? [], score_migration: k.scores?.migration ?? 0, score_ads: k.scores?.ads ?? 0, score_klaviyo: k.scores?.klaviyo ?? 0,
-      werbung: k.werbung ?? [], gtm: k.gtm ?? false, email_tools: k.email_tools,
+      werbung: k.werbung ?? [], gtm: k.gtm ?? false, email_tools: k.email_tools, email: k.firma.email || null,
     };
   }
 
@@ -109,19 +116,20 @@ export class DemoLeadFinder implements LeadFinderApi {
         return (k.qualifiziert || e === 'freigegeben') && (!e || e === 'freigegeben');
       })
       .map((k) => this.zeile(k))
+      .filter((z) => z.email)
       .sort((a, b) => b.score - a.score);
   }
   async manuell() {
-    return [...this.pruefungen.values()].filter((k) => !k.qualifiziert && !this.entscheidungen.has(k.domain)).map((k) => this.zeile(k));
+    return [...this.pruefungen.values()].filter((k) => !this.entscheidungen.has(k.domain)).map((k) => this.zeile(k)).filter((z) => z.ausschluss.length > 0 || !z.email);
   }
   async detail(domain: string): Promise<LeadDetail> {
     const k = this.pruefungen.get(domain);
     if (!k) throw new Error('Diese Domain wurde noch nicht geprüft.');
     const e = this.entscheidungen.get(domain);
-    return { kandidat: k, geprueft_am: k.geprueft_am, von: 'demo@velonify.de', entscheidung: e?.entscheidung ?? null, grund: e?.grund ?? null, entschieden_am: e?.am ?? null, entschieden_von: e ? 'demo@velonify.de' : null, firma_id: e?.firma_id ?? null };
+    return { kandidat: this.mitEmail(k), geprueft_am: k.geprueft_am, von: 'demo@velonify.de', entscheidung: e?.entscheidung ?? null, grund: e?.grund ?? null, entschieden_am: e?.am ?? null, entschieden_von: e ? 'demo@velonify.de' : null, firma_id: e?.firma_id ?? null };
   }
   async details(domains: string[]) {
-    return domains.flatMap((d) => (this.pruefungen.has(d) ? [this.pruefungen.get(d)!] : []));
+    return domains.flatMap((d) => (this.pruefungen.has(d) ? [this.mitEmail(this.pruefungen.get(d)!)] : []));
   }
   async entscheide(eintraege: EntscheidungEintrag[]) {
     for (const e of eintraege) this.entscheidungen.set(e.domain, { ...e, am: new Date().toISOString() });

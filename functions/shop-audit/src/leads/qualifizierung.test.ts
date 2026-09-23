@@ -6,7 +6,7 @@ import { qualifiziere, type Pruefdaten } from './qualifizierung.js';
 const HEUTE = new Date('2026-09-19T12:00:00Z');
 
 const firma = (extra: Partial<Firma> = {}): Firma => ({
-  ...leereFirma(), gefunden: true, name: 'Muster GmbH', rechtsform: 'GmbH', register: 'HRB 1', registergericht: 'Köln', plz: '50667', ort: 'Köln', land: 'DE', ...extra,
+  ...leereFirma(), gefunden: true, name: 'Muster GmbH', rechtsform: 'GmbH', register: 'HRB 1', registergericht: 'Köln', plz: '50667', ort: 'Köln', land: 'DE', email: 'info@muster.example', ...extra,
 });
 
 /** A qualified Shopware 5 shop; each test changes one thing. */
@@ -98,6 +98,7 @@ describe('qualifiziere', () => {
     ['nicht_deutsch', { firma: firma({ land: 'AT', plz: '' }) }],
     ['adresse_unklar', { firma: firma({ land: '', plz: '' }) }],
     ['offshore', { firma: firma({ offshore: true }) }],
+    ['keine_email', { firma: firma({ email: '' }) }],
     ['system_unbekannt', { system: { id: 'shopware', label: 'Shopware', version: '5', sicherheit: 35, deploy_ts: 0 } }],
     ['gerade_migriert', { pool: { rang_de: 50_000, lcp_ms: 1800, system_seit: '2026-03-01', system_vorher: 'magento' } }],
   ] as const)('schließt aus: %s', (grund, extra) => {

@@ -92,15 +92,17 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
   const leistungen = useMemo(() => aktiveLeistungen(daten.leistungen), [daten]);
 
   const firmen = useMemo(() => db.firmen.filter((f) => !f.archiviert).sort((a, b) => a.name.localeCompare(b.name, 'de')), [db]);
-  const vorschlag = (firmaId: string, kontaktId?: string | null) => {
+  const vorschlag = (firmaId: string, kontaktId?: string | null, dealId?: string | null) => {
     const deals = offeneDeals(db.deals, firmaId);
     const kontakt = db.kontakte.find((k) => k.id === kontaktId && k.firma_id === firmaId) ?? db.kontakte.find((k) => k.firma_id === firmaId && k.hauptkontakt && !k.archiviert);
-    return { kontaktId: kontakt?.id ?? '', dealId: deals.length === 1 ? deals[0].id : '' };
+    const deal = deals.find((d) => d.id === dealId) ?? (deals.length === 1 ? deals[0] : undefined);
+    return { kontaktId: kontakt?.id ?? '', dealId: deal?.id ?? '' };
   };
 
   const [firmaId, setFirmaId] = useState(() => params.get('firma') ?? '');
   const [kontaktId, setKontaktId] = useState(() => vorschlag(params.get('firma') ?? '', params.get('kontakt')).kontaktId);
-  const [dealId, setDealId] = useState(() => vorschlag(params.get('firma') ?? '').dealId);
+  // From the pipeline: /contact?firma=…&deal=…&kontakt=…
+  const [dealId, setDealId] = useState(() => vorschlag(params.get('firma') ?? '', null, params.get('deal')).dealId);
   const [kanal, setKanal] = useState<Kanal>(() => (kanalInfo(lies(KANAL_KEY))?.wert ?? 'linkedin_notiz'));
   const [anrede, setAnrede] = useState<Anrede>(() => kanalInfo(kanal)?.anrede ?? 'sie');
   const [sprache, setSprache] = useState<'de' | 'en'>('de');
