@@ -198,6 +198,17 @@ describe('CrmService', () => {
     expect((await crm.ordnerInhalt(db.firmen[0])).length).toBe(2);
   });
 
+  it('creates a client folder straight in 01_Clients with the template', async () => {
+    await konfiguriereDrive();
+    const firma = await crm.createFirma(firmaInput({ name: 'Sturm & Berger GmbH' }));
+    const mitOrdner = await crm.legeLeadOrdnerAn(firma.id, 'SBI', undefined, 'clients');
+    const db = await crm.load();
+    expect(await crm.ordnerOrt(db, db.firmen[0])).toBe('clients');
+    expect((await crm.ordnerInhalt(db.firmen[0])).map((f) => f.name)).toEqual(['00_Account', '03_Creative']);
+    expect(db.aktivitaeten.some((a) => a.text === 'Kundenordner „SBI_Sturm-Berger“ in 01_Clients angelegt')).toBe(true);
+    expect(mitOrdner.kuerzel).toBe('SBI');
+  });
+
   it('reuses an existing lead folder with the same name instead of creating a duplicate', async () => {
     await konfiguriereDrive();
     const vorhanden = drive.add('ABC_Alpha-Beta', leadsId);
