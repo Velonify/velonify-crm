@@ -36,7 +36,7 @@ export const REGELN = {
 
 export type AusschlussId =
   | 'nicht_erreichbar' | 'blockiert' | 'weitergeleitet' | 'geparkt' | 'geschlossen' | 'shopify' | 'kein_shop'
-  | 'system_unbekannt' | 'gerade_migriert' | 'kein_impressum' | 'adresse_unklar' | 'nicht_deutsch' | 'offshore' | 'agentur' | 'kein_haendler' | 'kein_anlass';
+  | 'system_unbekannt' | 'gerade_migriert' | 'kein_impressum' | 'adresse_unklar' | 'keine_email' | 'nicht_deutsch' | 'offshore' | 'agentur' | 'kein_haendler' | 'kein_anlass';
 
 export type AnlassId =
   | 'system_ohne_support' | 'support_endet' | 'kein_update' | 'lange_unveraendert' | 'langsam' | 'ueberdimensioniert' | 'magento_version_unbekannt'
@@ -200,6 +200,8 @@ export function ausschluesse(d: Pruefdaten, anlassListe: Anlass[]): Grund<Aussch
   if (!f.gefunden) aus('kein_impressum', 'kein Impressum gefunden');
   else if (!f.land) aus('adresse_unklar', 'keine Adresse im Impressum lesbar');
   else if (f.land !== 'DE') aus('nicht_deutsch', `Firmensitz ${f.land}`);
+  // Every lead needs a contact e-mail; the Impressum has to name one anyway (§ 5 DDG).
+  if (f.gefunden && !f.email) aus('keine_email', 'keine E-Mail-Adresse im Impressum');
   if (f.offshore) aus('offshore', 'Offshore-Adresse im Impressum');
   if (s?.agentur.length) aus('agentur', `Agentur (${s.agentur.join(', ')})`);
   if (s?.kein_haendler.length) aus('kein_haendler', `kein Händler (${s.kein_haendler.join(', ')})`);

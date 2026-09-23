@@ -688,6 +688,7 @@ details summary { cursor: pointer; margin-top: var(--space-2); font-weight: 600;
 .dialog-body { padding: 4px var(--space-4) var(--space-3); overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-2); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-1); padding: var(--space-3) var(--space-4); flex-wrap: wrap; border-top: 1px solid var(--line); }
 .dialog-extra { margin-right: auto; }
+.dialog-cta { align-self: flex-start; }
 .dialog p { margin: 0; }
 .icon-button { background: none; border: 0; font-family: var(--font-display); font-size: 22px; line-height: 1; color: var(--ink); cursor: pointer; width: 34px; height: 34px; flex: none; }
 .icon-button:hover { background: var(--selected-bg); color: var(--selected-ink); }

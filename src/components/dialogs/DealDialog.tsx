@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { DEFAULT_DEAL_TITEL, EINSTELLUNG, phaseLabel, STANDARD_WAHRSCHEINLICHKEIT, type Phase } from '../../data/constants';
 import { useCrm } from '../../data/CrmContext';
 import { ValidationError } from '../../data/errors';
@@ -93,6 +94,11 @@ export function DealDialog({ firmaId: festeFirma, deal, ich, onClose }: Props) {
         )
       }
     >
+      {deal && (
+        <Link to={`/contact?firma=${deal.firma_id}&deal=${deal.id}${deal.kontakt_id ? `&kontakt=${deal.kontakt_id}` : ''}`} className="button dialog-cta" onClick={onClose}>
+          Diesen Lead in den Contact Generator übernehmen
+        </Link>
+      )}
       <div className="grid">
         {!festeFirma && !deal && (
           <Field label="Firma" wide invalid={invalid === 'firma'}>

@@ -40,7 +40,7 @@ export function BacklogPage() {
     const max = Number(filter.reichweite) || 0;
     return zeilen.filter(
       (z: ListenZeile) =>
-        (!q || `${z.firma} ${z.domain} ${z.ort}`.toLowerCase().includes(q)) &&
+        (!q || `${z.firma} ${z.domain} ${z.ort} ${z.email ?? ''}`.toLowerCase().includes(q)) &&
         (!filter.system || z.system === filter.system) &&
         (!filter.anlass || z.anlaesse.includes(filter.anlass)) &&
         (!max || (z.rang_de !== null && z.rang_de <= max)) &&
@@ -97,7 +97,7 @@ export function BacklogPage() {
           </div>
 
           <div className="filters" role="search">
-            <input type="search" value={filter.q} onChange={(e) => setFilter('q', e.target.value)} placeholder="Firma, Domain oder Ort" aria-label="Suche" />
+            <input type="search" value={filter.q} onChange={(e) => setFilter('q', e.target.value)} placeholder="Firma, Domain, Ort oder E-Mail" aria-label="Suche" />
             <select value={filter.system} onChange={(e) => setFilter('system', e.target.value)} aria-label="System">
               <option value="">Alle Systeme</option>
               {systeme.map((s) => (
@@ -170,6 +170,13 @@ export function BacklogPage() {
                             {z.domain} ↗
                           </a>
                         </div>
+                        {z.email && (
+                          <div className="row-sub">
+                            <a href={`mailto:${z.email}`} onClick={(e) => e.stopPropagation()}>
+                              {z.email}
+                            </a>
+                          </div>
+                        )}
                       </td>
                       <td>
                         {ansicht === 'ads' ? (

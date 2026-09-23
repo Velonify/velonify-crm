@@ -22,7 +22,7 @@ function fakeBq(antworten: Record<string, unknown[]> = {}) {
 const HOME = `<html><head><title>Muster Shop</title></head><body>
 <script src="/web/cache/1700000000_abc.js"></script><link href="/themes/Frontend/Responsive/style.css">
 <a href="/impressum">Impressum</a><a href="/checkout/cart">Warenkorb</a> 19,99 €</body></html>`;
-const IMPRESSUM = '<p>Impressum</p><p>Muster Handel GmbH</p><p>Hauptstraße 1</p><p>50667 Köln</p><p>HRB 1234, Amtsgericht Köln</p>' + ' '.repeat(600);
+const IMPRESSUM = '<p>Impressum</p><p>Muster Handel GmbH</p><p>Hauptstraße 1</p><p>50667 Köln</p><p>HRB 1234, Amtsgericht Köln</p><p>E-Mail: info@muster.de</p>' + ' '.repeat(600);
 
 function kontext(bq: Bq): Kontext {
   const seiten: Record<string, string> = { 'https://muster.de/': HOME, 'https://muster.de/impressum': IMPRESSUM };
@@ -87,6 +87,26 @@ describe('leadRoute', () => {
     const f = fakeBq({ 'IN UNNEST(@domains)': [{ domain: 'a.de', daten: '{"domain":"a.de"}' }] });
     expect(await leadRoute('details', { domains: ['www.a.de'] }, kontext(f.bq))).toEqual({ kandidaten: [{ domain: 'a.de' }] });
     expect(f.abfragen[0].params).toEqual({ domains: ['a.de'] });
+  });
+
+  it('ergänzt die bei der Freigabe eingetragene E-Mail, wenn das Impressum keine hatte', async () => {
+    const f = fakeBq({
+      'IN UNNEST(@domains)': [
+        { domain: 'a.de', daten: '{"domain":"a.de","firma":{"email":""}}', email: 'kontakt@a.de' },
+        { domain: 'b.de', daten: '{"domain":"b.de","firma":{"email":"info@b.de"}}', email: 'anders@b.de' },
+      ],
+    });
+    expect(await leadRoute('details', { domains: ['a.de', 'b.de'] }, kontext(f.bq))).toEqual({
+      kandidaten: [{ domain: 'a.de', firma: { email: 'kontakt@a.de' } }, { domain: 'b.de', firma: { email: 'info@b.de' } }],
+    });
+  });
+
+  it('gibt manuell nur mit Kontakt-E-Mail frei', async () => {
+    const f = fakeBq();
+    await expect(leadRoute('entscheiden', { eintraege: [{ domain: 'a.de', entscheidung: 'freigegeben' }] }, kontext(f.bq))).rejects.toBeInstanceOf(AnfrageFehler);
+    await expect(leadRoute('entscheiden', { eintraege: [{ domain: 'a.de', entscheidung: 'freigegeben', email: 'kein-at' }] }, kontext(f.bq))).rejects.toBeInstanceOf(AnfrageFehler);
+    await leadRoute('entscheiden', { eintraege: [{ domain: 'a.de', entscheidung: 'freigegeben', email: ' Info@A.de ' }] }, kontext(f.bq));
+    expect(f.eingefuegt[0].zeilen[0]).toMatchObject({ domain: 'a.de', entscheidung: 'freigegeben', email: 'info@a.de' });
   });
 
   it('importiert den neuesten Crawl mit typisiertem Datum', async () => {

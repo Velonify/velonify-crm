@@ -53,6 +53,8 @@ export interface ListenZeile {
   werbung: string[] | null;
   gtm: boolean;
   email_tools: string[] | null;
+  /** Contact e-mail from the Impressum, or the one entered when releasing the shop by hand. */
+  email: string | null;
 }
 
 /** Score of a list row in one view. */
@@ -149,6 +151,8 @@ export interface EntscheidungEintrag {
   entscheidung: Entscheidung;
   grund?: string;
   firma_id?: string;
+  /** Contact e-mail found by hand; required for "freigegeben". */
+  email?: string;
 }
 
 export interface LeadFinderApi {
@@ -205,6 +209,7 @@ export const AUSSCHLUSS_LABEL: Record<string, string> = {
   gerade_migriert: 'Gerade migriert',
   kein_impressum: 'Kein Impressum',
   adresse_unklar: 'Adresse unklar',
+  keine_email: 'Keine E-Mail',
   nicht_deutsch: 'Nicht deutsch',
   offshore: 'Offshore',
   agentur: 'Agentur',
