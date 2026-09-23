@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { normalisiereDomain } from '../laden.js';
-import { backlogSql, detailSql, detailsSql, ENTSCHEIDUNGEN, manuellSql, naechsteSql, statistikSql, tabellenSql } from './backlog-sql.js';
+import { backlogSql, detailSql, detailsSql, ENTSCHEIDUNGEN, manuellSql, naechsteSql, statistikSql, tabellenSql, zaehlerSql } from './backlog-sql.js';
 import { mergeSql, neuesteQuellenSql, poolTabelleSql, prioViewSql } from './pool-sql.js';
 import { pruefeKandidat, type Abhaengigkeiten, type Kandidat, type PoolDaten } from './pruefen.js';
 
@@ -49,7 +49,7 @@ const Schemas = {
   }),
 } as const;
 
-export const ROUTEN = ['naechste', 'pruefen', 'backlog', 'manuell', 'detail', 'details', 'entscheiden', 'statistik', 'import', 'einrichten'] as const;
+export const ROUTEN = ['naechste', 'pruefen', 'backlog', 'manuell', 'detail', 'details', 'entscheiden', 'statistik', 'zaehler', 'import', 'einrichten'] as const;
 export type Route = (typeof ROUTEN)[number];
 
 export interface Kontext {
@@ -145,6 +145,9 @@ export async function leadRoute(route: Route, body: unknown, ctx: Kontext): Prom
       await bq.insert('entscheidungen', eintraege.map((e) => ({ ...e, domain: domainOder400(e.domain), von: ctx.email, am })));
       return { gespeichert: eintraege.length };
     }
+    case 'zaehler':
+      // Only the signed-in user's own decisions; nobody can ask for someone else's count.
+      return { tage: await bq.query(zaehlerSql(dataset), { von: ctx.email }) };
     case 'statistik': {
       const [zeile] = await bq.query(statistikSql(dataset));
       return zeile ?? {};

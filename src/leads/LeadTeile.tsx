@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Dialog } from '../components/Dialog';
 import { useToast } from '../components/Toasts';
 import { useCrm } from '../data/CrmContext';
-import { ANLASS_BEREICH, ANLASS_LABEL, AUSSCHLUSS_LABEL, BEREICHE, type Bereich, type LeadFinderApi } from '../data/leadFinder';
+import { ANLASS_BEREICH, ANLASS_LABEL, AUSSCHLUSS_LABEL, BEREICHE, type Bereich, type LeadFinderApi, type ZaehlerTag } from '../data/leadFinder';
+import { useLoad } from '../lib/useLoad';
 import { useIch } from '../lib/useIch';
 import { useUebernahme, type StartPhase, type UebernahmeErgebnis, type Ziel } from './useLeadFinder';
 
@@ -232,5 +233,45 @@ export function EntscheidungsLeiste({ api, domains, bereich, onErledigt, disable
         </Dialog>
       )}
     </>
+  );
+}
+
+const ZAEHLER_LABEL: Record<string, string> = { pipeline: 'Pipeline', firma: 'Firmenübersicht', abgelehnt: 'abgelehnt', zurueckgestellt: 'zurückgestellt', freigegeben: 'freigegeben' };
+
+/** Date in German time as YYYY-MM-DD, `vor` days back. */
+const berlinTag = (vor = 0) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date(Date.now() - vor * 86_400_000));
+
+/** Totals of the personal counter: today with its decisions, yesterday, the last seven days. */
+export function zaehlerSummen(tage: ZaehlerTag[], heute = berlinTag(0), gestern = berlinTag(1), wocheAb = berlinTag(6)) {
+  const summe = (f: (t: ZaehlerTag) => boolean) => tage.filter(f).reduce((n, t) => n + t.n, 0);
+  return {
+    heute: summe((t) => t.tag === heute),
+    heuteJe: tage.filter((t) => t.tag === heute && t.n > 0).sort((a, b) => b.n - a.n),
+    gestern: summe((t) => t.tag === gestern),
+    woche: summe((t) => t.tag >= wocheAb && t.tag <= heute),
+  };
+}
+
+/**
+ * How many shops the signed-in person worked through today. Private: the function only ever returns the caller's
+ * own decisions. `stand` changes after every decision on the page, which reloads the count.
+ */
+export function MeinZaehler({ api, stand }: { api: LeadFinderApi | null; stand: number }) {
+  const daten = useLoad(() => (api ? api.zaehler() : Promise.resolve([])), [api, stand]);
+  const s = useMemo(() => zaehlerSummen(daten.data ?? []), [daten.data]);
+  if (!daten.data) return null;
+  return (
+    <div className="mein-zaehler" aria-label="Deine bearbeiteten Leads">
+      <div>
+        <span className="kpi-label">Heute bearbeitet</span>
+        <span className="mein-zaehler-zahl">{s.heute.toLocaleString('de-DE')}</span>
+      </div>
+      <div className="mein-zaehler-details small">
+        {s.heuteJe.length > 0 && <span>{s.heuteJe.map((t) => `${t.n} ${ZAEHLER_LABEL[t.entscheidung] ?? t.entscheidung}`).join(' · ')}</span>}
+        <span className="muted">
+          Gestern {s.gestern.toLocaleString('de-DE')} · Letzte 7 Tage {s.woche.toLocaleString('de-DE')} · nur für dich sichtbar
+        </span>
+      </div>
+    </div>
   );
 }

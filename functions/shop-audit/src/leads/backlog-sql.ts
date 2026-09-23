@@ -131,6 +131,24 @@ FROM \`${dataset}.letzte_pruefung\` p
 LEFT JOIN \`${dataset}.letzte_entscheidung\` e USING (domain)
 WHERE p.domain IN UNNEST(@domains)`;
 
+/** Days the personal counter looks back. */
+export const ZAEHLER_TAGE = 14;
+
+/**
+ * Personal counter: shops one person decided on per day (German time), each shop once per day with its last
+ * decision of that day. Parameter @von – always the signed-in user, never taken from the request.
+ */
+export const zaehlerSql = (dataset: string) => `
+SELECT CAST(tag AS STRING) AS tag, entscheidung, COUNT(*) AS n
+FROM (
+  SELECT domain, DATE(am, 'Europe/Berlin') AS tag, entscheidung
+  FROM \`${dataset}.entscheidungen\`
+  WHERE von = @von AND am >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${ZAEHLER_TAGE + 1} DAY)
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY domain, DATE(am, 'Europe/Berlin') ORDER BY am DESC) = 1
+)
+GROUP BY tag, entscheidung
+ORDER BY tag, entscheidung`;
+
 /** Counts for the "Suche" page. */
 export const statistikSql = (dataset: string) => `
 SELECT
