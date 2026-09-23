@@ -72,6 +72,8 @@ export interface ImportOptionen {
   zustaendig: string;
   dealAnlegen: boolean;
   dealTitel: string;
+  /** Phase for the new deals; "neu" when not set. */
+  dealPhase?: 'neu' | 'qualifiziert';
   /** Import rows flagged as possible duplicates anyway. */
   dublettenImportieren?: boolean;
 }

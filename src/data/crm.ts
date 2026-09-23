@@ -1356,7 +1356,7 @@ export class CrmService {
         if (plan.optionen.dealAnlegen) {
           deals.push({
             id: newId(ID_PREFIX.deals), firma_id: firma.id, kontakt_id: kontaktId,
-            titel: dealTitel, phase: 'neu', wert_eur: null, wahrscheinlichkeit: null, zustaendig: plan.optionen.zustaendig,
+            titel: dealTitel, phase: plan.optionen.dealPhase ?? 'neu', wert_eur: null, wahrscheinlichkeit: null, zustaendig: plan.optionen.zustaendig,
             naechster_schritt: '', naechster_schritt_am: '', verlustgrund: '', abgeschlossen_am: '', archiviert: false, ...meta,
           });
         }

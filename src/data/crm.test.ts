@@ -286,6 +286,15 @@ describe('CrmService', () => {
     expect(nochmal.zeilen.filter((z) => z.aktion === 'neu')).toHaveLength(0);
   });
 
+  it('starts imported deals in the chosen phase', async () => {
+    const csv = ['tier,domain,firma', 'A,phase.example,Phase GmbH'].join('\n');
+    const plan = planeImport(parseCsv(csv), await crm.load(), { tiers: ['A'], zustaendig: '', dealAnlegen: true, dealTitel: '', dealPhase: 'qualifiziert' });
+    await crm.importiere(plan);
+    const nachher = await crm.load();
+    const firma = nachher.firmen.find((f) => f.domain === 'phase.example')!;
+    expect(nachher.deals.find((d) => d.firma_id === firma.id)).toMatchObject({ phase: 'qualifiziert' });
+  });
+
   it('imports the qualifier output format directly, including extra columns and old English headers', async () => {
     const neu = [
       'tier,score,domain,firma,plattform,version,eol,register,ust_id,ansprechpartner,email,telefon,ort,katalog_urls,payments,marketing,lauf,konfidenz,rechtsform,ansprechpartner_rolle,letztes_deploy,score_gruende,url',
