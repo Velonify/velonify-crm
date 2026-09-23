@@ -5,7 +5,7 @@ import { useToast } from '../components/Toasts';
 import { useCrm } from '../data/CrmContext';
 import { ANLASS_BEREICH, ANLASS_LABEL, AUSSCHLUSS_LABEL, BEREICHE, type Bereich, type LeadFinderApi } from '../data/leadFinder';
 import { useIch } from '../lib/useIch';
-import { useUebernahme, type UebernahmeErgebnis, type Ziel } from './useLeadFinder';
+import { useUebernahme, type StartPhase, type UebernahmeErgebnis, type Ziel } from './useLeadFinder';
 
 export function Item({ label, children }: { label: string; children: ReactNode }) {
   const leer = children === '' || children === null || children === undefined || children === false;
@@ -81,11 +81,12 @@ export function EntscheidungsLeiste({ api, domains, bereich, onErledigt, disable
   const [ich] = useIch(team);
   const [offen, setOffen] = useState<Offen>(null);
   const [zustaendig, setZustaendig] = useState('');
+  const [phase, setPhase] = useState<StartPhase>('neu');
   const [grund, setGrund] = useState(ABLEHNGRUENDE[0]);
   const [freitext, setFreitext] = useState('');
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState('');
-  const [ergebnis, setErgebnis] = useState<UebernahmeErgebnis | null>(null);
+  const [ergebnis, setErgebnis] = useState<(UebernahmeErgebnis & { phase: StartPhase }) | null>(null);
 
   const n = domains.length;
   const oeffne = (o: Offen) => {
@@ -100,8 +101,8 @@ export function EntscheidungsLeiste({ api, domains, bereich, onErledigt, disable
     setFehler('');
     try {
       if (offen.art === 'uebernehmen') {
-        const e = await uebernehmen(domains, offen.ziel, zustaendig, bereich);
-        setErgebnis(e);
+        const e = await uebernehmen(domains, offen.ziel, zustaendig, bereich, phase);
+        setErgebnis({ ...e, phase });
         const dubletten = new Set(e.dubletten.map((d) => d.domain));
         onErledigt(domains.filter((d) => !dubletten.has(d)));
         toast.show(offen.ziel === 'pipeline' ? `${e.neu + e.ergaenzt} in die Pipeline übernommen` : `${e.neu + e.ergaenzt} in die Firmenübersicht übernommen`);
@@ -154,7 +155,7 @@ export function EntscheidungsLeiste({ api, domains, bereich, onErledigt, disable
       {ergebnis && (
         <div className={`hint-box ${ergebnis.dubletten.length ? 'warn' : 'success'}`} role="status">
           {ergebnis.neu} neu angelegt{ergebnis.ergaenzt > 0 && `, ${ergebnis.ergaenzt} schon vorhandene ergänzt`}
-          {ergebnis.deals > 0 && `, ${ergebnis.deals} Deals in Phase „Neu“`}. <Link to="/crm/pipeline">Zur Pipeline</Link> · <Link to="/crm/firmen?status=lead">Zu den Firmen</Link>
+          {ergebnis.deals > 0 && `, ${ergebnis.deals} Deals in Phase „${ergebnis.phase === 'qualifiziert' ? 'Qualifiziert' : 'Neu'}“`}. <Link to="/crm/pipeline">Zur Pipeline</Link> · <Link to="/crm/firmen?status=lead">Zu den Firmen</Link>
           {ergebnis.dubletten.length > 0 && (
             <ul className="small">
               {ergebnis.dubletten.map((d) => (
@@ -180,10 +181,19 @@ export function EntscheidungsLeiste({ api, domains, bereich, onErledigt, disable
         >
           <p>
             {offen.ziel === 'pipeline'
-              ? `Legt je Shop eine Firma (Lead) mit Geschäftsführung als Ansprechpartner und einen Deal „${deal}“ in Phase „Neu“ an.`
+              ? `Legt je Shop eine Firma (Lead) mit Geschäftsführung als Ansprechpartner und einen Deal „${deal}“ in der gewählten Phase an.`
               : 'Legt je Shop eine Firma (Lead) mit Geschäftsführung als Ansprechpartner an, ohne Deal.'}{' '}
             Firmen, die es schon gibt, werden nicht überschrieben, nur leere Felder ergänzt. Mögliche Dubletten bleiben im Backlog.
           </p>
+          {offen.ziel === 'pipeline' && (
+            <label className="field">
+              <span className="field-label">Phase</span>
+              <select value={phase} onChange={(e) => setPhase(e.target.value as StartPhase)}>
+                <option value="neu">Neu</option>
+                <option value="qualifiziert">Qualifiziert</option>
+              </select>
+            </label>
+          )}
           <label className="field">
             <span className="field-label">Zuständig</span>
             <select value={zustaendig} onChange={(e) => setZustaendig(e.target.value)}>

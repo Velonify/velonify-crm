@@ -113,6 +113,9 @@ export function useLeadStapel(api: LeadFinderApi | null, onFertig: () => void) {
 
 export type Ziel = 'pipeline' | 'firma';
 
+/** Phase the pipeline deals start in. */
+export type StartPhase = 'neu' | 'qualifiziert';
+
 export interface UebernahmeErgebnis {
   neu: number;
   ergaenzt: number;
@@ -130,13 +133,13 @@ export function useUebernahme(api: LeadFinderApi | null) {
   const { expire } = useAuth();
 
   return useCallback(
-    async (domains: string[], ziel: Ziel, zustaendig: string, bereich: Bereich): Promise<UebernahmeErgebnis> => {
+    async (domains: string[], ziel: Ziel, zustaendig: string, bereich: Bereich, phase: StartPhase = 'neu'): Promise<UebernahmeErgebnis> => {
       if (!api) throw new Error(NICHT_EINGERICHTET);
       if (!db) throw new Error('Die CRM-Daten sind noch nicht geladen.');
       try {
         const kandidaten = await api.details(domains);
         const dealTitel = BEREICHE.find((b) => b.id === bereich)?.deal ?? '';
-        const plan = planeImport(importZeilen(kandidaten, bereich), db, { tiers: ['A', 'B', 'C', 'D', 'sonstige'], zustaendig, dealAnlegen: ziel === 'pipeline', dealTitel });
+        const plan = planeImport(importZeilen(kandidaten, bereich), db, { tiers: ['A', 'B', 'C', 'D', 'sonstige'], zustaendig, dealAnlegen: ziel === 'pipeline', dealTitel, dealPhase: phase });
         const ergebnis = await mutate((s) => s.importiere(plan));
         const eintraege: EntscheidungEintrag[] = plan.zeilen
           .filter((z) => ergebnis.firmen[z.domain])
