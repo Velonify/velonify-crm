@@ -1156,8 +1156,11 @@ export class CrmService {
     return dateien.sort((a, b) => Number(isFolder(b)) - Number(isFolder(a)) || a.name.localeCompare(b.name, 'de'));
   }
 
-  /** Creates `02_Sales/01_Leads/<KÜRZEL>_<Name>` (or links an existing folder of that name) and stores Kürzel and folder on the firm. */
-  async legeLeadOrdnerAn(firmaId: string, kuerzel: string, ordnerName?: string): Promise<Firma> {
+  /**
+   * Creates `02_Sales/01_Leads/<KÜRZEL>_<Name>` (or links an existing folder of that name) and stores Kürzel and folder on the firm.
+   * With `ort: 'clients'` the folder goes straight into 01_Clients and gets the client folder template.
+   */
+  async legeLeadOrdnerAn(firmaId: string, kuerzel: string, ordnerName?: string, ort: 'leads' | 'clients' = 'leads'): Promise<Firma> {
     const db = await this.store.load();
     const konfig = this.konfiguration(db);
     const firma = CrmService.find(db.firmen, firmaId);
@@ -1167,8 +1170,9 @@ export class CrmService {
     if (!clean) throw new ValidationError('kuerzel', 'Für den Ordner wird ein Kürzel gebraucht.');
     const name = (ordnerName ?? '').trim() || driveFolderName(clean, firma.name);
 
-    const vorhanden = (await this.drive.listChildren(konfig.leads)).find((f) => isFolder(f) && f.name === name);
-    const ordner = vorhanden ?? (await this.drive.createFolder(name, konfig.leads));
+    const elternId = ort === 'clients' ? konfig.clients : konfig.leads;
+    const vorhanden = (await this.drive.listChildren(elternId)).find((f) => isFolder(f) && f.name === name);
+    const ordner = vorhanden ?? (await this.drive.createFolder(name, elternId));
 
     const [aktualisiert] = await this.store.update('firmen', [
       { id: firmaId, changes: { kuerzel: clean, drive_ordner_id: ordner.id, ...this.changed() } },
@@ -1178,8 +1182,11 @@ export class CrmService {
       kontakt_id: '',
       deal_id: '',
       typ: 'system',
-      text: vorhanden ? `Vorhandenen Lead-Ordner „${name}“ verknüpft` : `Lead-Ordner „${name}“ in 01_Leads angelegt`,
+      text: ort === 'clients'
+        ? (vorhanden ? `Vorhandenen Kundenordner „${name}“ verknüpft` : `Kundenordner „${name}“ in 01_Clients angelegt`)
+        : (vorhanden ? `Vorhandenen Lead-Ordner „${name}“ verknüpft` : `Lead-Ordner „${name}“ in 01_Leads angelegt`),
     });
+    if (ort === 'clients') await this.verschiebeNachClients(firmaId);
     return aktualisiert;
   }
 

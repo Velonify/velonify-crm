@@ -20,21 +20,22 @@ interface Pending {
   nachClients: boolean;
 }
 
-/** Kürzel and folder name inputs for creating a lead folder; the name follows the Kürzel until edited by hand. */
-export function LeadOrdnerFelder({ firma, kuerzel, setKuerzel, name, setName, invalid }: {
+/** Kürzel and folder name inputs for creating a lead or client folder; the name follows the Kürzel until edited by hand. */
+export function LeadOrdnerFelder({ firma, kuerzel, setKuerzel, name, setName, invalid, ort = 'leads' }: {
   firma: Firma;
   kuerzel: string;
   setKuerzel(value: string): void;
   name: string;
   setName(value: string | null): void;
   invalid?: string;
+  ort?: 'leads' | 'clients';
 }) {
   return (
     <div className="grid">
       <Field label="Kürzel" invalid={invalid === 'kuerzel'} hint="3 Buchstaben, gilt für Drive, Slack und Trello">
         <input value={kuerzel} onChange={(e) => setKuerzel(e.target.value.toUpperCase())} maxLength={3} disabled={Boolean(firma.kuerzel)} />
       </Field>
-      <Field label="Ordnername" hint="Liegt dann in 02_Sales/01_Leads">
+      <Field label="Ordnername" hint={ort === 'clients' ? 'Liegt dann in 01_Clients, mit Vorlage' : 'Liegt dann in 02_Sales/01_Leads'}>
         <input value={name} onChange={(e) => setName(e.target.value)} />
       </Field>
     </div>
@@ -80,8 +81,8 @@ function PhaseDialog({ pending, onClose }: { pending: Pending; onClose(): void }
         await s.changePhase(deal.id, phase, deal.geaendert_am, grund);
         erledigt.push(`Phase: ${phaseLabel(phase)}`);
         if (pending.leadOrdner && ordnerAnlegen) {
-          await s.legeLeadOrdnerAn(firma.id, ordner.kuerzel, ordner.name);
-          erledigt.push('Lead-Ordner angelegt');
+          await s.legeLeadOrdnerAn(firma.id, ordner.kuerzel, ordner.name, 'clients');
+          erledigt.push('Kundenordner angelegt');
         }
         if (pending.nachClients && verschieben) {
           await s.verschiebeNachClients(firma.id);
@@ -117,9 +118,9 @@ function PhaseDialog({ pending, onClose }: { pending: Pending; onClose(): void }
         <div className="option-block">
           <label className="checkbox">
             <input type="checkbox" checked={ordnerAnlegen} onChange={(e) => setOrdnerAnlegen(e.target.checked)} />
-            Lead-Ordner in Google Drive anlegen
+            Kundenordner in Google Drive anlegen
           </label>
-          {ordnerAnlegen && <LeadOrdnerFelder firma={firma} {...ordner} invalid={fieldOf(error)} />}
+          {ordnerAnlegen && <LeadOrdnerFelder firma={firma} {...ordner} invalid={fieldOf(error)} ort="clients" />}
         </div>
       )}
       {pending.nachClients && (
@@ -151,7 +152,8 @@ export function usePhaseChange(): { request(deal: Deal, phase: string): Promise<
       const firma = db.firmen.find((f) => f.id === deal.firma_id);
       if (!firma) return;
       const konfig = driveKonfiguration(db.einstellungen);
-      const leadOrdner = phase === 'qualifiziert' && !firma.drive_ordner_id && Boolean(konfig);
+      // The client folder only comes with an offer; a deal that skips "Angebot" gets it when won.
+      const leadOrdner = (phase === 'angebot' || phase === 'gewonnen') && !firma.drive_ordner_id && Boolean(konfig);
       let nachClients = false;
       if ((phase === 'angebot' || phase === 'gewonnen') && firma.drive_ordner_id && konfig) {
         try {
