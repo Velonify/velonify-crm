@@ -1,4 +1,4 @@
-import type { Bereich, EntscheidungEintrag, LeadDetail, LeadFinderApi, LeadKandidat, LeadStatistik, ListenZeile, PoolKandidat } from '../leadFinder';
+import type { Bereich, Entscheidung, EntscheidungEintrag, LeadDetail, LeadFinderApi, LeadKandidat, LeadStatistik, ListenZeile, PoolKandidat, ZaehlerTag } from '../leadFinder';
 
 const WERBUNG = [['Meta', 'Google Ads'], ['Microsoft Ads'], [], ['Meta'], ['Meta', 'TikTok', 'Pinterest'], []];
 const EMAIL = [['Mailchimp'], [], ['Klaviyo'], ['Brevo'], [], ['CleverReach']];
@@ -133,6 +133,12 @@ export class DemoLeadFinder implements LeadFinderApi {
   }
   async entscheide(eintraege: EntscheidungEintrag[]) {
     for (const e of eintraege) this.entscheidungen.set(e.domain, { ...e, am: new Date().toISOString() });
+  }
+  async zaehler(): Promise<ZaehlerTag[]> {
+    const heute = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
+    const je = new Map<string, number>();
+    for (const e of this.entscheidungen.values()) je.set(e.entscheidung, (je.get(e.entscheidung) ?? 0) + 1);
+    return [{ tag: '2026-09-22', entscheidung: 'pipeline', n: 6 }, { tag: '2026-09-22', entscheidung: 'abgelehnt', n: 4 }, ...[...je].map(([entscheidung, n]) => ({ tag: heute, entscheidung: entscheidung as Entscheidung, n }))];
   }
   async statistik(): Promise<LeadStatistik> {
     const alle = [...this.pruefungen.values()];

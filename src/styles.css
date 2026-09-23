@@ -412,6 +412,10 @@ a.row-title:hover { color: var(--accent); }
 .kpi-label { font-size: 11px; line-height: 1.2; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted); }
 .kpi-value { font-family: var(--font-display); font-size: clamp(20px, 1vw + 14px, 30px); line-height: 1.08; letter-spacing: 0.01em; margin-top: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .kpi-sub { font-size: 13px; color: var(--ink-muted); }
+.mein-zaehler { display: flex; align-items: flex-end; gap: var(--space-4); flex-wrap: wrap; border: 1px solid var(--line); background: var(--raised); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); }
+.mein-zaehler > div:first-child { display: flex; flex-direction: column; gap: var(--space-1); }
+.mein-zaehler-zahl { font-family: var(--font-display); font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
+.mein-zaehler-details { display: flex; flex-direction: column; gap: 2px; }
 /* Cells without a sub line keep their value on the same baseline as the others. */
 .kpi-value:last-child { margin-bottom: calc(13px * 1.55 + var(--space-1)); }
 .kpi.panel { background: var(--panel); color: var(--on-panel); outline: 1px solid var(--panel-border); outline-offset: -1px; }

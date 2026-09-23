@@ -101,6 +101,12 @@ describe('leadRoute', () => {
     });
   });
 
+  it('zählt nur die eigenen Entscheidungen, egal was die Anfrage verlangt', async () => {
+    const f = fakeBq({ 'AS n': [{ tag: '2026-09-23', entscheidung: 'pipeline', n: 3 }] });
+    expect(await leadRoute('zaehler', { von: 'jemand@velonify.de' }, kontext(f.bq))).toEqual({ tage: [{ tag: '2026-09-23', entscheidung: 'pipeline', n: 3 }] });
+    expect(f.abfragen[0].params).toEqual({ von: 'lukas@velonify.de' });
+  });
+
   it('gibt manuell nur mit Kontakt-E-Mail frei', async () => {
     const f = fakeBq();
     await expect(leadRoute('entscheiden', { eintraege: [{ domain: 'a.de', entscheidung: 'freigegeben' }] }, kontext(f.bq))).rejects.toBeInstanceOf(AnfrageFehler);

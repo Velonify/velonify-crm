@@ -155,6 +155,13 @@ export interface EntscheidungEintrag {
   email?: string;
 }
 
+/** One day of the personal counter: how many shops ended with this decision. */
+export interface ZaehlerTag {
+  tag: string;
+  entscheidung: Entscheidung;
+  n: number;
+}
+
 export interface LeadFinderApi {
   naechste(n: number, bereich: Bereich): Promise<PoolKandidat[]>;
   pruefe(kandidat: PoolKandidat): Promise<LeadKandidat>;
@@ -164,6 +171,8 @@ export interface LeadFinderApi {
   details(domains: string[]): Promise<LeadKandidat[]>;
   entscheide(eintraege: EntscheidungEintrag[]): Promise<void>;
   statistik(): Promise<LeadStatistik>;
+  /** The signed-in user's own decisions per day, last two weeks. Nobody sees anyone else's. */
+  zaehler(): Promise<ZaehlerTag[]>;
   importiere(): Promise<{ crawl_datum: string; crux_monat: number }>;
 }
 
@@ -337,6 +346,9 @@ export class CloudLeadFinder implements LeadFinderApi {
   }
   async statistik() {
     return zahlen(await this.post<LeadStatistik>('statistik'));
+  }
+  async zaehler() {
+    return (await this.post<{ tage: ZaehlerTag[] }>('zaehler')).tage.map((t) => ({ ...t, n: Number(t.n) }));
   }
   importiere() {
     return this.post<{ crawl_datum: string; crux_monat: number }>('import');

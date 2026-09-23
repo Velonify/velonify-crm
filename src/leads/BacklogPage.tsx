@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ErrorBox, Loading, PageHeader } from '../components/ui';
 import { ANLASS_BEREICH, ANLASS_LABEL, anlaesseIn, BEREICHE, bereichVon, reichweiteLabel, scoreIn, systemLabel, tierVon, type ListenZeile } from '../data/leadFinder';
 import { useLoad } from '../lib/useLoad';
-import { AnlassBadges, EntscheidungsLeiste, ToolBadges } from './LeadTeile';
+import { AnlassBadges, EntscheidungsLeiste, MeinZaehler, ToolBadges } from './LeadTeile';
 import { NICHT_EINGERICHTET, useLeadFinderApi } from './useLeadFinder';
 
 const REICHWEITEN = [10_000, 50_000, 100_000, 500_000];
@@ -17,6 +17,7 @@ export function BacklogPage() {
   const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
   const [erledigt, setErledigt] = useState<Set<string>>(new Set());
   const [anzahl, setAnzahl] = useState(SEITE);
+  const [zaehlerStand, setZaehlerStand] = useState(0);
 
   const ansicht = bereichVon(params.get('ansicht') ?? 'migration');
   const filter = { q: params.get('q') ?? '', system: params.get('system') ?? '', anlass: params.get('anlass') ?? '', reichweite: params.get('reichweite') ?? '', plz: params.get('plz') ?? '' };
@@ -62,6 +63,7 @@ export function BacklogPage() {
   const entschieden = (domains: string[]) => {
     setErledigt((s) => new Set([...s, ...domains]));
     setAuswahl(new Set());
+    setZaehlerStand((n) => n + 1);
   };
 
   const anlassOptionen = Object.entries(ANLASS_LABEL).filter(([id]) => ANLASS_BEREICH[id] === ansicht);
@@ -82,6 +84,8 @@ export function BacklogPage() {
           </Link>
         }
       />
+
+      <MeinZaehler api={api} stand={zaehlerStand} />
 
       {liste.error && <ErrorBox error={liste.error} onRetry={liste.reload} />}
       {liste.loading && !liste.data && <Loading label="Backlog wird geladen …" />}
