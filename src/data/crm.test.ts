@@ -157,6 +157,38 @@ describe('CrmService', () => {
     expect(kontakte.filter((k) => k.hauptkontakt).map((k) => k.nachname)).toEqual(['Zwei']);
   });
 
+  it('assigns a lead to whoever moves it from qualified to contacted, and it stays editable', async () => {
+    const firma = await crm.createFirma(firmaInput({ name: 'Shop', zustaendig: 'Julian' }));
+    const deal = await crm.saveDeal(firma.id, { ...EMPTY_DEAL_INPUT, titel: 'Migration', zustaendig: 'Julian' });
+    const qualifiziert = await crm.changePhase(deal.id, 'qualifiziert', deal.geaendert_am, '', 'Lugge');
+    expect(qualifiziert.zustaendig).toBe('Julian');
+
+    const kontaktiert = await crm.changePhase(deal.id, 'kontaktiert', qualifiziert.geaendert_am, '', 'Lugge');
+    let db = await crm.load();
+    expect(kontaktiert.zustaendig).toBe('Lugge');
+    expect(db.firmen[0].zustaendig).toBe('Lugge');
+    expect(db.aktivitaeten.at(-1)?.text).toBe('„Migration“: Qualifiziert → Kontaktiert, zugeteilt an Lugge');
+
+    // Changing it by hand afterwards sticks; later phase changes leave it alone.
+    const { titel, kontakt_id, wert_eur, wahrscheinlichkeit, naechster_schritt, naechster_schritt_am } = kontaktiert;
+    const umgestellt = await crm.saveDeal(firma.id, { titel, kontakt_id, wert_eur, wahrscheinlichkeit, naechster_schritt, naechster_schritt_am, zustaendig: 'Johannes' }, { id: kontaktiert.id, expectedGeaendertAm: kontaktiert.geaendert_am });
+    const gespraech = await crm.changePhase(deal.id, 'gespraech', umgestellt.geaendert_am, '', 'Lugge');
+    expect(gespraech.zustaendig).toBe('Johannes');
+    db = await crm.load();
+    expect(db.firmen[0].zustaendig).toBe('Lugge');
+  });
+
+  it('does not reassign when a deal skips "qualifiziert" or the mover is unknown', async () => {
+    const firma = await crm.createFirma(firmaInput({ name: 'Shop' }));
+    const deal = await crm.saveDeal(firma.id, { ...EMPTY_DEAL_INPUT, titel: 'Migration', zustaendig: 'Julian' });
+    const direkt = await crm.changePhase(deal.id, 'kontaktiert', deal.geaendert_am, '', 'Lugge');
+    expect(direkt.zustaendig).toBe('Julian');
+
+    const zweiter = await crm.saveDeal(firma.id, { ...EMPTY_DEAL_INPUT, titel: 'SEO', zustaendig: 'Julian' });
+    const q = await crm.changePhase(zweiter.id, 'qualifiziert', zweiter.geaendert_am);
+    expect((await crm.changePhase(zweiter.id, 'kontaktiert', q.geaendert_am)).zustaendig).toBe('Julian');
+  });
+
   it('logs phase changes, requires a reason for lost deals and turns won leads into customers', async () => {
     const firma = await crm.createFirma(firmaInput({ name: 'Shop' }));
     const deal = await crm.saveDeal(firma.id, { ...EMPTY_DEAL_INPUT, titel: 'Migration', wert_eur: 10000 });

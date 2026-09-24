@@ -304,8 +304,11 @@ export class CrmService {
     return deal;
   }
 
-  /** Moves a deal to another phase, logs it and marks the firm as customer when the deal is won. */
-  async changePhase(dealId: string, phase: string, expectedGeaendertAm: string, verlustgrund = ''): Promise<Deal> {
+  /**
+   * Moves a deal to another phase, logs it and marks the firm as customer when the deal is won.
+   * Whoever moves a lead from "qualifiziert" to "kontaktiert" (`ich`, a team name) takes it over.
+   */
+  async changePhase(dealId: string, phase: string, expectedGeaendertAm: string, verlustgrund = '', ich = ''): Promise<Deal> {
     if (!(PHASEN as readonly string[]).includes(phase)) throw new ValidationError('phase', `Unbekannte Phase „${phase}“.`);
     if (phase === 'verloren' && !verlustgrund.trim()) throw new ValidationError('verlustgrund', 'Bitte einen Grund angeben, warum der Deal verloren ist.');
 
@@ -313,12 +316,14 @@ export class CrmService {
     const alt = CrmService.find(db.deals, dealId);
     const firma = CrmService.find(db.firmen, alt.firma_id);
     if (alt.phase === phase) return alt;
+    const zuteilen = alt.phase === 'qualifiziert' && phase === 'kontaktiert' && Boolean(ich) && alt.zustaendig !== ich;
 
     const [deal] = await this.store.update('deals', [
       {
         id: dealId,
         changes: {
           phase,
+          ...(zuteilen ? { zustaendig: ich } : {}),
           verlustgrund: phase === 'verloren' ? verlustgrund.trim() : '',
           abgeschlossen_am: isAbgeschlossen(phase) ? this.today() : '',
           ...this.changed(),
@@ -328,13 +333,18 @@ export class CrmService {
     ]);
 
     const grund = phase === 'verloren' ? ` (Grund: ${verlustgrund.trim()})` : '';
+    const zugeteilt = zuteilen ? `, zugeteilt an ${ich}` : '';
     await this.log({
       firma_id: firma.id,
       kontakt_id: '',
       deal_id: dealId,
       typ: 'phasenwechsel',
-      text: `„${deal.titel}“: ${phaseLabel(alt.phase)} → ${phaseLabel(phase as Phase)}${grund}`,
+      text: `„${deal.titel}“: ${phaseLabel(alt.phase)} → ${phaseLabel(phase as Phase)}${grund}${zugeteilt}`,
     });
+
+    if (zuteilen && firma.status === 'lead' && firma.zustaendig !== ich) {
+      await this.store.update('firmen', [{ id: firma.id, changes: { zustaendig: ich, ...this.changed() } }]);
+    }
 
     if (phase === 'gewonnen' && firma.status !== 'kunde') {
       await this.store.update('firmen', [{ id: firma.id, changes: { status: 'kunde', ...this.changed() } }]);
@@ -657,7 +667,7 @@ export class CrmService {
    * Records a message that was sent by hand: stores it, logs it in the firm's history and moves an early deal
    * to "kontaktiert". Without an open deal one can be created on the way.
    */
-  async markiereGesendet(input: AnschreibenInput, optionen: { neuerDeal?: { titel: string; zustaendig: string } } = {}): Promise<Anschreiben> {
+  async markiereGesendet(input: AnschreibenInput, optionen: { neuerDeal?: { titel: string; zustaendig: string }; ich?: string } = {}): Promise<Anschreiben> {
     const clean = prepareAnschreiben(input);
     // Fails with SchemaError before anything is written while the tabs are missing.
     await this.store.loadContactDaten();
@@ -699,7 +709,7 @@ export class CrmService {
       text: verlaufText(anschreiben),
     });
     if (deal && (deal.phase === 'neu' || deal.phase === 'qualifiziert')) {
-      await this.changePhase(deal.id, 'kontaktiert', deal.geaendert_am);
+      await this.changePhase(deal.id, 'kontaktiert', deal.geaendert_am, '', optionen.ich);
     }
     return anschreiben;
   }

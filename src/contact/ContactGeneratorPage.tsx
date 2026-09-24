@@ -256,7 +256,7 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
             betreff: variante.betreff,
             text: istEmail ? mitSignatur(variante.text, signatur) : variante.text,
           },
-          !dealId && deals.length === 0 && neuerDeal ? { neuerDeal: { titel, zustaendig: firma.zustaendig || ich || '' } } : {},
+          { ich: ich ?? '', ...(!dealId && deals.length === 0 && neuerDeal ? { neuerDeal: { titel, zustaendig: firma.zustaendig || ich || '' } } : {}) },
         ),
       );
       setGesendet(true);
