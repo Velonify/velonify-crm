@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DealDialog } from '../components/dialogs/DealDialog';
+import { VernetzungKnoepfe } from '../components/dialogs/Vernetzung';
 import { WiedervorlageDialog } from '../components/dialogs/WiedervorlageDialog';
 import { ErrorBox, Loading, PageHeader, PhaseBadge } from '../components/ui';
 import { useCrm } from '../data/CrmContext';
@@ -60,6 +61,7 @@ function AufgabenListe({ titel, aufgaben, heute, leer, onDeal, klasse = '' }: {
                 )}
                 {a.zustaendig && <> · {a.zustaendig}</>}
               </div>
+              {a.art === 'deal' && a.deal?.phase === 'vernetzung' && a.firma && <VernetzungKnoepfe deal={a.deal} firma={a.firma} />}
             </div>
             <span className="task-due" title={a.faellig}>
               {a.faellig === heute ? 'heute' : a.faellig < heute ? faelligText(a.faellig, heute) : formatDayShort(a.faellig)}

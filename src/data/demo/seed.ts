@@ -92,7 +92,14 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   const fd = await deal(feldmann.id, { wert_eur: 12000 });
   await phase(fd.id, 'verloren', 'Kein Budget');
 
-  await firma({ name: 'Seeblick Heimtextil', domain: 'seeblick-heimtextil.example', tier: 'B', score: 58, plattform: 'magento2', version: '2.4.5', eol: 'eol', ort: 'Konstanz', zustaendig: 'Lugge' });
+  const seeblick = await firma({ name: 'Seeblick Heimtextil', domain: 'seeblick-heimtextil.example', tier: 'B', score: 58, plattform: 'magento2', version: '2.4.5', eol: 'eol', ort: 'Konstanz', zustaendig: 'Lugge' });
+  const sk = await kontakt(seeblick.id, { vorname: 'Lea', nachname: 'Sommer', rolle: 'Geschäftsführerin', linkedin: 'https://www.linkedin.com/in/lea-sommer-demo' });
+  const sd = await deal(seeblick.id, { wert_eur: 22000, zustaendig: 'Lugge' });
+  await phase(sd.id, 'qualifiziert');
+  const vernetzt = await service.sendeVernetzung(sd.id, (await service.load()).deals.find((d) => d.id === sd.id)!.geaendert_am, { kontaktId: sk.id, notiz: '', ich: 'Lugge' });
+  // The request is a week old in the demo, so the reminder is due today.
+  const { titel, kontakt_id, wert_eur, wahrscheinlichkeit, zustaendig, naechster_schritt } = vernetzt;
+  await service.saveDeal(seeblick.id, { titel, kontakt_id, wert_eur, wahrscheinlichkeit, zustaendig, naechster_schritt, naechster_schritt_am: heute }, { id: vernetzt.id, expectedGeaendertAm: vernetzt.geaendert_am });
 
   await service.uebernimmStartkatalog();
   await service.uebernimmOutreachStartliste();

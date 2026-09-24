@@ -163,6 +163,15 @@ describe('CrmService: Contact Generator', () => {
     expect(db.deals.find((d) => d.id === deal.id)?.phase).toBe('gespraech');
   });
 
+  it('moves a deal waiting for a LinkedIn connection on to "kontaktiert"', async () => {
+    const firma = await crm.createFirma({ ...EMPTY_FIRMA_INPUT, name: 'Shop GmbH', domain: 'shop.example' });
+    const deal = await crm.saveDeal(firma.id, { ...EMPTY_DEAL_INPUT, titel: 'Shopify-Migration' });
+    await crm.sendeVernetzung(deal.id, deal.geaendert_am, { kontaktId: '', notiz: '' });
+    await crm.markiereGesendet(nachricht(firma.id, { kanal: 'linkedin_nachricht', betreff: '', deal_id: deal.id }));
+    const db = await crm.load();
+    expect(db.deals.find((d) => d.id === deal.id)).toMatchObject({ phase: 'kontaktiert', naechster_schritt: '', naechster_schritt_am: '' });
+  });
+
   it('rejects contacts and deals of other firms', async () => {
     const a = await crm.createFirma({ ...EMPTY_FIRMA_INPUT, name: 'A', domain: 'a.example' });
     const b = await crm.createFirma({ ...EMPTY_FIRMA_INPUT, name: 'B', domain: 'b.example' });

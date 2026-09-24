@@ -2,6 +2,7 @@ import { useMemo, useState, type DragEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { DealDialog } from '../components/dialogs/DealDialog';
 import { usePhaseChange } from '../components/dialogs/PhaseChange';
+import { VernetzungKnoepfe } from '../components/dialogs/Vernetzung';
 import { ErrorBox, Loading, PageHeader, TierBadge } from '../components/ui';
 import { isAbgeschlossen, PHASEN, phaseLabel } from '../data/constants';
 import { useCrm } from '../data/CrmContext';
@@ -147,6 +148,7 @@ export function PipelinePage() {
                         {deal.naechster_schritt_am && <strong>{deal.naechster_schritt_am === heute ? 'Heute' : formatDayShort(deal.naechster_schritt_am)}</strong>} {deal.naechster_schritt}
                       </div>
                     )}
+                    {deal.phase === 'vernetzung' && <VernetzungKnoepfe deal={deal} firma={firma} />}
                     {deal.phase === 'verloren' && deal.verlustgrund && <div className="row-sub">{deal.verlustgrund}</div>}
                     <select
                       className="phase-select compact"

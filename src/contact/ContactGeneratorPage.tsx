@@ -104,7 +104,8 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
   const [kontaktId, setKontaktId] = useState(() => vorschlag(params.get('firma') ?? '', params.get('kontakt')).kontaktId);
   // From the pipeline: /contact?firma=…&deal=…&kontakt=…
   const [dealId, setDealId] = useState(() => vorschlag(params.get('firma') ?? '', null, params.get('deal')).dealId);
-  const [kanal, setKanal] = useState<Kanal>(() => (kanalInfo(lies(KANAL_KEY))?.wert ?? 'linkedin_notiz'));
+  // /contact?…&kanal=email after a connection request was answered; otherwise the last channel used.
+  const [kanal, setKanal] = useState<Kanal>(() => (kanalInfo(params.get('kanal') ?? '')?.wert ?? kanalInfo(lies(KANAL_KEY))?.wert ?? 'linkedin_notiz'));
   const [anrede, setAnrede] = useState<Anrede>(() => kanalInfo(kanal)?.anrede ?? 'sie');
   const [sprache, setSprache] = useState<'de' | 'en'>('de');
   // From the shop audit: /contact?firma=…&leistung=…&aufhaenger=…
@@ -576,7 +577,7 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
                   )}
                   <p className="small muted">
                     Erst selbst senden, dann markieren. Die Nachricht landet im Verlauf
-                    {dealVorher && (dealVorher.phase === 'neu' || dealVorher.phase === 'qualifiziert') ? ', der Deal wechselt auf „Kontaktiert“' : ''}.
+                    {dealVorher && (dealVorher.phase === 'neu' || dealVorher.phase === 'qualifiziert' || dealVorher.phase === 'vernetzung') ? ', der Deal wechselt auf „Kontaktiert“' : ''}.
                   </p>
                   <FormError error={fehler} />
                   {gesendet ? (

@@ -1,6 +1,6 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { istErstkontakt, KONTAKT_WEGE, kontaktVermerk, phaseLabel } from '../../data/constants';
+import { istErstkontakt, istZuteilung, KONTAKT_WEGE, kontaktVermerk, phaseLabel } from '../../data/constants';
 import { useCrm } from '../../data/CrmContext';
 import { ValidationError } from '../../data/errors';
 import { driveFolderName, kontaktName, prepareFirma, suggestKuerzel } from '../../data/rules';
@@ -11,6 +11,7 @@ import { useIch } from '../../lib/useIch';
 import { Dialog } from '../Dialog';
 import { useToast } from '../Toasts';
 import { Field, FormError } from '../ui';
+import { VernetzungDialog } from './Vernetzung';
 
 interface Pending {
   deal: Deal;
@@ -64,7 +65,8 @@ function PhaseDialog({ pending, onClose }: { pending: Pending; onClose(): void }
   const [ich] = useIch(db?.listen.team ?? []);
   const { deal, phase, firma } = pending;
   const [grund, setGrund] = useState('');
-  const [weg, setWeg] = useState('');
+  // Coming from a LinkedIn connection request, the first message is usually on LinkedIn too.
+  const [weg, setWeg] = useState(deal.phase === 'vernetzung' ? 'LinkedIn' : '');
   const [kontaktId, setKontaktId] = useState(deal.kontakt_id);
   const [vermerk, setVermerk] = useState('');
   const kontakte = (db?.kontakte ?? []).filter((k) => k.firma_id === firma.id && !k.archiviert);
@@ -92,7 +94,7 @@ function PhaseDialog({ pending, onClose }: { pending: Pending; onClose(): void }
         if (pending.erstkontakt) {
           await s.addAktivitaet({ firma_id: firma.id, kontakt_id: kontaktId, deal_id: deal.id, typ: 'notiz', datum: '', text: kontaktVermerk(weg, vermerk) });
           erledigt.push('im Verlauf vermerkt');
-          if (ich && deal.zustaendig !== ich) erledigt.push('dir zugeteilt');
+          if (istZuteilung(deal.phase, phase) && ich && deal.zustaendig !== ich) erledigt.push('dir zugeteilt');
         }
         if (pending.leadOrdner && ordnerAnlegen) {
           await s.legeLeadOrdnerAn(firma.id, ordner.kuerzel, ordner.name, 'clients');
@@ -192,12 +194,14 @@ export function usePhaseChange(): { request(deal: Deal, phase: string): Promise<
   const toast = useToast();
   const [ich] = useIch(db?.listen.team ?? []);
   const [pending, setPending] = useState<Pending | null>(null);
+  const [vernetzung, setVernetzung] = useState<{ deal: Deal; firma: Firma } | null>(null);
 
   const request = useCallback(
     async (deal: Deal, phase: string) => {
       if (!db || !service || deal.phase === phase) return;
       const firma = db.firmen.find((f) => f.id === deal.firma_id);
       if (!firma) return;
+      if (phase === 'vernetzung') return setVernetzung({ deal, firma });
       const konfig = driveKonfiguration(db.einstellungen);
       // The client folder only comes with an offer; a deal that skips "Angebot" gets it when won.
       const leadOrdner = (phase === 'angebot' || phase === 'gewonnen') && !firma.drive_ordner_id && Boolean(konfig);
@@ -215,13 +219,21 @@ export function usePhaseChange(): { request(deal: Deal, phase: string): Promise<
         return;
       }
       const kunde = phase === 'gewonnen' && firma.status !== 'kunde' ? ` · ${firma.name} ist jetzt Kunde` : '';
-      const zugeteilt = deal.phase === 'qualifiziert' && phase === 'kontaktiert' && ich && deal.zustaendig !== ich ? ` · dir zugeteilt` : '';
+      const zugeteilt = istZuteilung(deal.phase, phase) && ich && deal.zustaendig !== ich ? ` · dir zugeteilt` : '';
       await perform((s) => s.changePhase(deal.id, phase, deal.geaendert_am, '', ich ?? ''), `${firma.name}: ${phaseLabel(phase)}${kunde}${zugeteilt}`);
     },
     [db, service, perform, toast, ich],
   );
 
-  return { request, element: pending && <PhaseDialog pending={pending} onClose={() => setPending(null)} /> };
+  return {
+    request,
+    element: (
+      <>
+        {pending && <PhaseDialog pending={pending} onClose={() => setPending(null)} />}
+        {vernetzung && <VernetzungDialog {...vernetzung} onClose={() => setVernetzung(null)} />}
+      </>
+    ),
+  };
 }
 
 export function DriveNichtEingerichtet() {
