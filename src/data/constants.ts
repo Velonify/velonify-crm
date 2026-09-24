@@ -54,6 +54,15 @@ export const AKTIVITAET_LABEL: Record<string, string> = {
   system: 'System',
 };
 
+/** How a lead was contacted, asked when a deal moves from "Neu"/"Qualifiziert" to "Kontaktiert". */
+export const KONTAKT_WEGE = ['E-Mail', 'LinkedIn', 'Instagram', 'Telefon', 'Persönlich', 'Sonstiges'] as const;
+
+/** Phases from which moving to "Kontaktiert" means a first contact, so the pipeline asks how it happened. */
+export const istErstkontakt = (von: string, nach: string) => nach === 'kontaktiert' && (von === 'neu' || von === 'qualifiziert');
+
+/** Note for the Verlauf: "Kontaktiert über LinkedIn: Vernetzungsanfrage an die Geschäftsführerin". */
+export const kontaktVermerk = (weg: string, notiz: string) => `Kontaktiert über ${weg}${notiz.trim() ? `: ${notiz.trim()}` : ''}`;
+
 export const DEFAULT_DEAL_TITEL = 'Shopify-Migration';
 
 /** Keys in the "einstellungen" tab. */

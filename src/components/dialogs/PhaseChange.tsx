@@ -1,9 +1,9 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { phaseLabel } from '../../data/constants';
+import { istErstkontakt, KONTAKT_WEGE, kontaktVermerk, phaseLabel } from '../../data/constants';
 import { useCrm } from '../../data/CrmContext';
 import { ValidationError } from '../../data/errors';
-import { driveFolderName, prepareFirma, suggestKuerzel } from '../../data/rules';
+import { driveFolderName, kontaktName, prepareFirma, suggestKuerzel } from '../../data/rules';
 import { driveKonfiguration } from '../../data/selectors';
 import type { Deal, Firma } from '../../data/types';
 import { errorMessage, fieldOf } from '../../lib/errors';
@@ -17,6 +17,8 @@ interface Pending {
   phase: string;
   firma: Firma;
   verlustgrund: boolean;
+  /** First contact: ask how the lead was contacted and note it in the Verlauf. */
+  erstkontakt: boolean;
   leadOrdner: boolean;
   nachClients: boolean;
 }
@@ -59,8 +61,13 @@ export function useLeadOrdnerFelder(firma: Firma, alleFirmen: readonly Firma[]) 
 function PhaseDialog({ pending, onClose }: { pending: Pending; onClose(): void }) {
   const { db, mutate } = useCrm();
   const toast = useToast();
+  const [ich] = useIch(db?.listen.team ?? []);
   const { deal, phase, firma } = pending;
   const [grund, setGrund] = useState('');
+  const [weg, setWeg] = useState('');
+  const [kontaktId, setKontaktId] = useState(deal.kontakt_id);
+  const [vermerk, setVermerk] = useState('');
+  const kontakte = (db?.kontakte ?? []).filter((k) => k.firma_id === firma.id && !k.archiviert);
   const [ordnerAnlegen, setOrdnerAnlegen] = useState(true);
   const [verschieben, setVerschieben] = useState(true);
   const ordner = useLeadOrdnerFelder(firma, db?.firmen ?? []);
@@ -71,6 +78,7 @@ function PhaseDialog({ pending, onClose }: { pending: Pending; onClose(): void }
     setError(undefined);
     try {
       if (pending.verlustgrund && !grund) throw new ValidationError('verlustgrund', 'Bitte einen Grund auswählen.');
+      if (pending.erstkontakt && !weg) throw new ValidationError('weg', 'Bitte angeben, worüber kontaktiert wurde.');
       if (pending.leadOrdner && ordnerAnlegen) ordner.pruefe();
     } catch (err) {
       return setError(err);
@@ -79,8 +87,13 @@ function PhaseDialog({ pending, onClose }: { pending: Pending; onClose(): void }
     const erledigt: string[] = [];
     try {
       await mutate(async (s) => {
-        await s.changePhase(deal.id, phase, deal.geaendert_am, grund);
+        await s.changePhase(deal.id, phase, deal.geaendert_am, grund, ich ?? '');
         erledigt.push(`Phase: ${phaseLabel(phase)}`);
+        if (pending.erstkontakt) {
+          await s.addAktivitaet({ firma_id: firma.id, kontakt_id: kontaktId, deal_id: deal.id, typ: 'notiz', datum: '', text: kontaktVermerk(weg, vermerk) });
+          erledigt.push('im Verlauf vermerkt');
+          if (ich && deal.zustaendig !== ich) erledigt.push('dir zugeteilt');
+        }
         if (pending.leadOrdner && ordnerAnlegen) {
           await s.legeLeadOrdnerAn(firma.id, ordner.kuerzel, ordner.name, 'clients');
           erledigt.push('Kundenordner angelegt');
@@ -114,6 +127,38 @@ function PhaseDialog({ pending, onClose }: { pending: Pending; onClose(): void }
             ))}
           </select>
         </Field>
+      )}
+      {pending.erstkontakt && (
+        <>
+          <fieldset className={`plain${fieldOf(error) === 'weg' ? ' invalid' : ''}`}>
+            <legend>Worüber wurde kontaktiert?</legend>
+            <div className="segmented" role="radiogroup" aria-label="Worüber wurde kontaktiert?">
+              {KONTAKT_WEGE.map((w) => (
+                <button key={w} type="button" role="radio" aria-checked={weg === w} className={weg === w ? 'is-active' : ''} onClick={() => {
+                    setWeg(w);
+                    if (fieldOf(error) === 'weg') setError(undefined);
+                  }}>
+                  {w}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          {kontakte.length > 0 && (
+            <Field label="Wen?">
+              <select value={kontaktId} onChange={(e) => setKontaktId(e.target.value)}>
+                <option value="">Die Firma allgemein</option>
+                {kontakte.map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {kontaktName(k) || k.email}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          <Field label="Notiz (optional)" hint="Landet mit dem Kanal als Notiz im Verlauf der Firma">
+            <textarea rows={2} value={vermerk} onChange={(e) => setVermerk(e.target.value)} placeholder="z. B. Vernetzungsanfrage an die Geschäftsführerin, Bezug auf Magento-Support-Ende" />
+          </Field>
+        </>
       )}
       {pending.leadOrdner && (
         <div className="option-block">
@@ -164,8 +209,9 @@ export function usePhaseChange(): { request(deal: Deal, phase: string): Promise<
           toast.show(`Drive-Ordner konnte nicht geprüft werden: ${errorMessage(err)}`, 'error');
         }
       }
-      if (phase === 'verloren' || leadOrdner || nachClients) {
-        setPending({ deal, phase, firma, verlustgrund: phase === 'verloren', leadOrdner, nachClients });
+      const erstkontakt = istErstkontakt(deal.phase, phase);
+      if (phase === 'verloren' || erstkontakt || leadOrdner || nachClients) {
+        setPending({ deal, phase, firma, verlustgrund: phase === 'verloren', erstkontakt, leadOrdner, nachClients });
         return;
       }
       const kunde = phase === 'gewonnen' && firma.status !== 'kunde' ? ` · ${firma.name} ist jetzt Kunde` : '';

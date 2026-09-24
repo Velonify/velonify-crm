@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { EINSTELLUNG } from './constants';
+import { EINSTELLUNG, istErstkontakt, kontaktVermerk } from './constants';
 import { CrmService, type TerminEingabe } from './crm';
 import { MemoryCalendar, MemoryDrive } from './demo/memoryGoogle';
 import { MemorySheets } from './demo/memorySheets';
@@ -40,6 +40,15 @@ describe('rules', () => {
     expect(normalizeDomain(' https://www.Shop.de/impressum ')).toBe('shop.de');
     expect(extractDriveFolderId('https://drive.google.com/drive/folders/abc_123-X?usp=sharing')).toBe('abc_123-X');
     expect(prepareFirma({ kuerzel: ' abc ', slack_channel: '#client-abc-general' }, alle)).toEqual({ kuerzel: 'ABC', slack_channel: 'client-abc-general' });
+  });
+
+  it('asks for the channel only on a first contact and notes it', () => {
+    expect(istErstkontakt('qualifiziert', 'kontaktiert')).toBe(true);
+    expect(istErstkontakt('neu', 'kontaktiert')).toBe(true);
+    expect(istErstkontakt('gespraech', 'kontaktiert')).toBe(false);
+    expect(istErstkontakt('qualifiziert', 'gespraech')).toBe(false);
+    expect(kontaktVermerk('LinkedIn', ' Vernetzungsanfrage ')).toBe('Kontaktiert über LinkedIn: Vernetzungsanfrage');
+    expect(kontaktVermerk('Telefon', '')).toBe('Kontaktiert über Telefon');
   });
 
   it('reads the name from a LinkedIn profile link', () => {
