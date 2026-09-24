@@ -7,6 +7,7 @@ import { driveFolderName, prepareFirma, suggestKuerzel } from '../../data/rules'
 import { driveKonfiguration } from '../../data/selectors';
 import type { Deal, Firma } from '../../data/types';
 import { errorMessage, fieldOf } from '../../lib/errors';
+import { useIch } from '../../lib/useIch';
 import { Dialog } from '../Dialog';
 import { useToast } from '../Toasts';
 import { Field, FormError } from '../ui';
@@ -144,6 +145,7 @@ function PhaseDialog({ pending, onClose }: { pending: Pending; onClose(): void }
 export function usePhaseChange(): { request(deal: Deal, phase: string): Promise<void>; element: ReactNode } {
   const { db, service, perform } = useCrm();
   const toast = useToast();
+  const [ich] = useIch(db?.listen.team ?? []);
   const [pending, setPending] = useState<Pending | null>(null);
 
   const request = useCallback(
@@ -167,9 +169,10 @@ export function usePhaseChange(): { request(deal: Deal, phase: string): Promise<
         return;
       }
       const kunde = phase === 'gewonnen' && firma.status !== 'kunde' ? ` · ${firma.name} ist jetzt Kunde` : '';
-      await perform((s) => s.changePhase(deal.id, phase, deal.geaendert_am), `${firma.name}: ${phaseLabel(phase)}${kunde}`);
+      const zugeteilt = deal.phase === 'qualifiziert' && phase === 'kontaktiert' && ich && deal.zustaendig !== ich ? ` · dir zugeteilt` : '';
+      await perform((s) => s.changePhase(deal.id, phase, deal.geaendert_am, '', ich ?? ''), `${firma.name}: ${phaseLabel(phase)}${kunde}${zugeteilt}`);
     },
-    [db, service, perform, toast],
+    [db, service, perform, toast, ich],
   );
 
   return { request, element: pending && <PhaseDialog pending={pending} onClose={() => setPending(null)} /> };
