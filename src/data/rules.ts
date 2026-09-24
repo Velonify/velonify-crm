@@ -153,4 +153,25 @@ export function splitName(full: string): { vorname: string; nachname: string } {
   return { vorname: parts.slice(0, -1).join(' '), nachname: parts[parts.length - 1] };
 }
 
+/**
+ * Name from a LinkedIn profile link: ".../in/max-beispiel-7a1b2c3/" → { vorname: "Max", nachname: "Beispiel" }.
+ * Only the slug is read (LinkedIn profiles need a login); trailing ID parts with digits are dropped. Null when
+ * the link is no profile link or holds no name.
+ */
+export function nameAusLinkedin(url: string): { vorname: string; nachname: string } | null {
+  const treffer = /linkedin\.com\/in\/([^/?#\s]+)/i.exec(url.trim());
+  if (!treffer) return null;
+  let slug: string;
+  try {
+    slug = decodeURIComponent(treffer[1]);
+  } catch {
+    slug = treffer[1];
+  }
+  const teile = slug.split(/[-_]+/).filter(Boolean);
+  while (teile.length > 0 && /\d/.test(teile[teile.length - 1])) teile.pop();
+  if (teile.length === 0 || teile.some((t) => /\d/.test(t))) return null;
+  const gross = (wort: string) => wort.charAt(0).toLocaleUpperCase('de') + wort.slice(1).toLocaleLowerCase('de');
+  return splitName(teile.map(gross).join(' '));
+}
+
 export const isValidEmail = (value: string) => EMAIL_PATTERN.test(value);

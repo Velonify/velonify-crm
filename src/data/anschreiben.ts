@@ -59,6 +59,8 @@ export interface GeneratorEingabe {
   absender: string;
   firma: Firma;
   kontakt?: Kontakt;
+  /** What the team copied from the contact's LinkedIn profile (headline, position, a recent post); only with a contact. */
+  profil?: string;
   /** One or more services, in list order; the message presents them as one offer. */
   leistungen: LeistungsWahl[];
   aufhaenger: string;
@@ -73,7 +75,7 @@ export interface GeneratorAnfrage {
   anrede: Anrede;
   absender: { vorname: string };
   firma: Pick<Firma, 'name' | 'domain' | 'ort' | 'plattform' | 'version' | 'eol' | 'tech_info' | 'notiz'>;
-  kontakt: Pick<Kontakt, 'vorname' | 'nachname' | 'rolle'> | null;
+  kontakt: (Pick<Kontakt, 'vorname' | 'nachname' | 'rolle'> & { profil: string }) | null;
   leistungen: { titel: string; unterpunkte: string[]; anlass: string; nutzen: string; beleg: string; beschreibung: string }[];
   aufhaenger: string;
   hinweis: string;
@@ -120,7 +122,9 @@ export function baueAnfrage(e: GeneratorEingabe): GeneratorAnfrage {
       tech_info: kurz(f.tech_info, 1000),
       notiz: kurz(f.notiz, 2000),
     },
-    kontakt: e.kontakt ? { vorname: kurz(e.kontakt.vorname, 60), nachname: kurz(e.kontakt.nachname, 60), rolle: kurz(e.kontakt.rolle, 120) } : null,
+    kontakt: e.kontakt
+      ? { vorname: kurz(e.kontakt.vorname, 60), nachname: kurz(e.kontakt.nachname, 60), rolle: kurz(e.kontakt.rolle, 120), profil: kurz(e.profil ?? '', 1500) }
+      : null,
     leistungen: e.leistungen.map((w) =>
       w.art === 'liste'
         ? {

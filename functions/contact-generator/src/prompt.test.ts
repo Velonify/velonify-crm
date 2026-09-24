@@ -55,6 +55,12 @@ describe('nutzerNachricht', () => {
     expect(text).toContain('Leistungen: 2. Stell sie als ein zusammenhängendes Angebot vor');
   });
 
+  it('passes what the team copied from the LinkedIn profile', () => {
+    const text = nutzerNachricht(AnfrageSchema.parse({ ...basis, kontakt: { ...basis.kontakt, profil: 'Seit 2024 Head of E-Commerce, vorher Zalando' } }), 'heute');
+    expect(text).toContain('Aus dem LinkedIn-Profil: Seit 2024 Head of E-Commerce, vorher Zalando');
+    expect(nutzerNachricht(AnfrageSchema.parse(basis), 'heute')).not.toContain('LinkedIn-Profil:');
+  });
+
   it('omits the contact block when there is no contact', () => {
     const text = nutzerNachricht(AnfrageSchema.parse({ ...basis, kontakt: null }), 'heute');
     expect(text).not.toContain('<kontakt>');
