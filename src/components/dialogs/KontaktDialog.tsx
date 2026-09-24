@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useCrm } from '../../data/CrmContext';
+import { nameAusLinkedin } from '../../data/rules';
 import { EMPTY_KONTAKT_INPUT, type Kontakt, type KontaktInput } from '../../data/types';
 import { fieldOf } from '../../lib/errors';
 import { Dialog } from '../Dialog';
@@ -10,9 +11,11 @@ interface Props {
   firmaId: string;
   kontakt?: Kontakt;
   onClose(): void;
+  /** Called with the saved contact, e.g. to select a new contact right away. */
+  onSaved?(kontakt: Kontakt): void;
 }
 
-export function KontaktDialog({ firmaId, kontakt, onClose }: Props) {
+export function KontaktDialog({ firmaId, kontakt, onClose, onSaved }: Props) {
   const { mutate } = useCrm();
   const toast = useToast();
   const [values, setValues] = useState<KontaktInput>(() => {
@@ -24,13 +27,19 @@ export function KontaktDialog({ firmaId, kontakt, onClose }: Props) {
   const [error, setError] = useState<unknown>();
   const set = (field: keyof KontaktInput) => (e: { target: { value: string } }) => setValues((v) => ({ ...v, [field]: e.target.value }));
   const invalid = fieldOf(error);
+  // A pasted profile link fills in the name, as long as none is typed yet.
+  const setLinkedin = (e: { target: { value: string } }) => {
+    const linkedin = e.target.value;
+    setValues((v) => (v.vorname || v.nachname ? { ...v, linkedin } : { ...v, linkedin, ...nameAusLinkedin(linkedin) }));
+  };
 
   const save = async () => {
     setBusy(true);
     setError(undefined);
     try {
-      await mutate((s) => s.saveKontakt(firmaId, values, kontakt && { id: kontakt.id, expectedGeaendertAm: kontakt.geaendert_am }));
+      const gespeichert = await mutate((s) => s.saveKontakt(firmaId, values, kontakt && { id: kontakt.id, expectedGeaendertAm: kontakt.geaendert_am }));
       toast.show(kontakt ? 'Kontakt gespeichert' : 'Kontakt angelegt');
+      onSaved?.(gespeichert);
       onClose();
     } catch (err) {
       setError(err);
@@ -66,6 +75,9 @@ export function KontaktDialog({ firmaId, kontakt, onClose }: Props) {
       }
     >
       <div className="grid">
+        <Field label="LinkedIn" hint="Link einfügen, der Name wird daraus vorbelegt" wide>
+          <input type="url" value={values.linkedin} onChange={setLinkedin} placeholder="https://www.linkedin.com/in/…" />
+        </Field>
         <Field label="Vorname">
           <input value={values.vorname} onChange={set('vorname')} autoComplete="off" />
         </Field>
@@ -80,9 +92,6 @@ export function KontaktDialog({ firmaId, kontakt, onClose }: Props) {
         </Field>
         <Field label="Telefon">
           <input type="tel" value={values.telefon} onChange={set('telefon')} autoComplete="off" />
-        </Field>
-        <Field label="LinkedIn" wide>
-          <input type="url" value={values.linkedin} onChange={set('linkedin')} placeholder="https://www.linkedin.com/in/…" />
         </Field>
         <Field label="Notiz" wide>
           <textarea rows={2} value={values.notiz} onChange={set('notiz')} />

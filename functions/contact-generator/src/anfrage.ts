@@ -43,7 +43,13 @@ export const AnfrageSchema = z.object({
     notiz: feld(2000),
   }),
   kontakt: z
-    .object({ vorname: feld(60), nachname: feld(60), rolle: feld(120) })
+    .object({
+      vorname: feld(60),
+      nachname: feld(60),
+      rolle: feld(120),
+      /** Copied by the team from the person's LinkedIn profile; Claude cannot open LinkedIn itself. */
+      profil: feld(1500),
+    })
     .nullable()
     .default(null),
   /** One or more services; with several, the message presents them as one offer. */

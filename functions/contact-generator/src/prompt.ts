@@ -6,6 +6,7 @@ Ein Teammitglied verschickt die Nachricht persönlich an eine Firma, die Velonif
 
 Grundsätze:
 - Verwende nur Fakten aus den mitgeschickten Daten. Erfinde keine Zahlen, Referenzkunden, Beobachtungen oder Namen. Fehlt ein Ansprechpartner, sprich die Firma oder das Team an.
+- Steht beim Kontakt etwas aus dem LinkedIn-Profil, greif einen passenden Punkt daraus als persönlichen Bezug auf (Position, Werdegang, Thema eines Beitrags). Gib das Profil nicht wieder und schreib nicht, dass du es gelesen hast.
 - Vorne steht ein konkreter Bezug zur Firma, danach der Nutzen der Leistung für genau diese Firma. Technische Daten wie Plattform, Version oder Support-Ende nutzt du nur, wenn sie zur Leistung passen.
 - Am Ende steht genau ein Abschluss, der sich leicht beantworten lässt: eine Frage oder ein kurzes Gesprächsangebot. Kein Druck, keine künstliche Dringlichkeit.
 - Keine Superlative, keine Floskeln wie „Ich hoffe, es geht Ihnen gut“, keine Emojis, keine Hashtags, keine Platzhalter in eckigen Klammern.
@@ -111,7 +112,14 @@ export function nutzerNachricht(anfrage: Anfrage, heute: string): string {
       ['Erkannte Technik', firma.tech_info],
       ['Notiz des Teams', firma.notiz],
     ]),
-    kontakt ? block('kontakt', [['Vorname', kontakt.vorname], ['Nachname', kontakt.nachname], ['Rolle', kontakt.rolle]]) : '',
+    kontakt
+      ? block('kontakt', [
+          ['Vorname', kontakt.vorname],
+          ['Nachname', kontakt.nachname],
+          ['Rolle', kontakt.rolle],
+          ['Aus dem LinkedIn-Profil', kontakt.profil],
+        ])
+      : '',
     ...leistungen.map((leistung) =>
       block('leistung', [
         ['Titel', leistung.titel],

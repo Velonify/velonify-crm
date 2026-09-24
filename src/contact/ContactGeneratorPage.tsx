@@ -25,12 +25,13 @@ import {
   type Modus,
   type Variante,
 } from '../data/anschreiben';
+import { KontaktDialog } from '../components/dialogs/KontaktDialog';
 import { useCrm } from '../data/CrmContext';
 import { phaseLabel } from '../data/constants';
 import type { CrmService } from '../data/crm';
 import { AuthExpiredError } from '../data/errors';
 import { kontaktName } from '../data/rules';
-import type { ContactDaten, Database } from '../data/types';
+import type { ContactDaten, Database, Kontakt } from '../data/types';
 import { errorMessage, fieldOf } from '../lib/errors';
 import { useIch } from '../lib/useIch';
 import { useAudits } from '../audit/useAudits';
@@ -116,6 +117,10 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
   const [auditAuswahl, setAuditAuswahl] = useState<string[] | null>(() => (params.get('aufhaenger') ? [] : null));
   const audits = useAudits();
   const [modus, setModus] = useState<Modus>(() => (lies(MODUS_KEY) === 'easy' ? 'easy' : 'komplex'));
+  // Pasted from the contact's LinkedIn profile, only for this message.
+  const [profil, setProfil] = useState('');
+  // null = closed, undefined = new contact
+  const [kontaktDialog, setKontaktDialog] = useState<Kontakt | undefined | null>(null);
 
   const [varianten, setVarianten] = useState<Variante[]>([]);
   const [aktiv, setAktiv] = useState(0);
@@ -171,6 +176,14 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
     setAuditAuswahl(null);
     setKontaktId(v.kontaktId);
     setDealId(v.dealId);
+    setProfil('');
+  };
+
+  const NEUER_KONTAKT = '__neu';
+  const wechsleKontakt = (id: string) => {
+    if (id === NEUER_KONTAKT) return setKontaktDialog(undefined);
+    setKontaktId(id);
+    setProfil('');
   };
 
   const schalteLeistung = (id: string) => setLeistungIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
@@ -195,7 +208,7 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
     if (!generator) return setFehler(new Error('Die Adresse des Contact Generators fehlt (VITE_CONTACT_GENERATOR_URL).'));
     setBusy(true);
     try {
-      const anfrage = baueAnfrage({ kanal, sprache, anrede, absender, firma, kontakt, leistungen: wahlen, aufhaenger: aufhaengerGesamt, hinweis: mitHinweis ? hinweis : '', modus });
+      const anfrage = baueAnfrage({ kanal, sprache, anrede, absender, firma, kontakt, profil, leistungen: wahlen, aufhaenger: aufhaengerGesamt, hinweis: mitHinweis ? hinweis : '', modus });
       merke(ABSENDER_KEY, absender.trim());
       const neu = await generator.generiere(anfrage);
       setVarianten(neu);
@@ -298,13 +311,14 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
                 </select>
               </Field>
               <Field label="Ansprechpartner" hint={kontakt?.rolle || (kontakte.length === 0 && firma ? 'Keine Kontakte hinterlegt – Claude spricht die Firma an' : undefined)}>
-                <select value={kontaktId} onChange={(e) => setKontaktId(e.target.value)} disabled={!firma}>
+                <select value={kontaktId} onChange={(e) => wechsleKontakt(e.target.value)} disabled={!firma}>
                   <option value="">Keiner</option>
                   {kontakte.map((k) => (
                     <option key={k.id} value={k.id}>
                       {kontaktName(k) || k.email}
                     </option>
                   ))}
+                  <option value={NEUER_KONTAKT}>+ Neuer Ansprechpartner …</option>
                 </select>
               </Field>
               <Field label="Deal" hint={dealVorher ? `Phase: ${phaseLabel(dealVorher.phase)}` : undefined}>
@@ -317,11 +331,26 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
                   ))}
                 </select>
               </Field>
+              {kontakt && (
+                <Field
+                  label="Aus dem LinkedIn-Profil (optional)"
+                  hint="Überschrift, Position, Werdegang oder ein aktueller Beitrag. Claude kann LinkedIn nicht selbst öffnen und nutzt nur, was hier steht."
+                  wide
+                >
+                  <textarea
+                    rows={3}
+                    value={profil}
+                    onChange={(e) => setProfil(e.target.value)}
+                    maxLength={1500}
+                    placeholder="z. B. Head of E-Commerce seit 2024, vorher Online-Marketing bei einem Modehändler. Hat kürzlich über den Relaunch des Shops gepostet."
+                  />
+                </Field>
+              )}
             </div>
             {firma && (
               <p className="small muted contact-daten">
                 An Claude gehen: {[firma.name, firma.domain, firma.ort, [firma.plattform, firma.version].filter(Boolean).join(' '), firma.tech_info && 'Technik', firma.notiz && 'Notiz'].filter(Boolean).join(' · ')}
-                {kontakt && ` · ${kontaktName(kontakt)}${kontakt.rolle ? ` (${kontakt.rolle})` : ''}`}. Keine E-Mail-Adressen, Telefonnummern oder Deal-Werte.
+                {kontakt && ` · ${kontaktName(kontakt)}${kontakt.rolle ? ` (${kontakt.rolle})` : ''}${profil.trim() ? ' · Profil-Auszug' : ''}`}. Keine E-Mail-Adressen, Telefonnummern oder Deal-Werte.
               </p>
             )}
             {firma && (
@@ -331,8 +360,29 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
                     Shop öffnen ({firma.domain.replace(/^https?:\/\//i, '').replace(/\/$/, '')})
                   </a>
                 )}
+                {kontakt?.linkedin && (
+                  <a href={kontakt.linkedin} target="_blank" rel="noopener noreferrer">
+                    LinkedIn-Profil öffnen
+                  </a>
+                )}
+                {kontakt && (
+                  <button type="button" className="link-button" onClick={() => setKontaktDialog(kontakt)}>
+                    {kontakt.linkedin ? 'Ansprechpartner bearbeiten' : 'LinkedIn-Link ergänzen'}
+                  </button>
+                )}
                 <Link to={`/crm/firmen/${firma.id}`}>Firmenakte</Link>
               </div>
+            )}
+            {firma && kontaktDialog !== null && (
+              <KontaktDialog
+                firmaId={firma.id}
+                kontakt={kontaktDialog}
+                onClose={() => setKontaktDialog(null)}
+                onSaved={(k) => {
+                  setKontaktId(k.id);
+                  if (!kontaktDialog) setProfil('');
+                }}
+              />
             )}
           </Card>
 

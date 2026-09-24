@@ -31,6 +31,7 @@ describe('Anfrage an den Contact Generator', () => {
       absender: ' Lukas ',
       firma,
       kontakt,
+      profil: ' Spricht auf Konferenzen über Shop-Migrationen ',
       leistungen: [{ art: 'liste', leistung: { ...migration, beleg: 'Referenz' } }],
       aufhaenger: '',
       modus: 'easy',
@@ -38,12 +39,12 @@ describe('Anfrage an den Contact Generator', () => {
     expect(anfrage.absender).toEqual({ vorname: 'Lukas' });
     expect(anfrage.modus).toBe('easy');
     expect(anfrage.firma).toMatchObject({ name: firma.name, version: '2.4.6', eol: 'eol' });
-    expect(anfrage.kontakt).toEqual({ vorname: 'Mara', nachname: 'Holm', rolle: 'Head of E-Commerce' });
+    expect(anfrage.kontakt).toEqual({ vorname: 'Mara', nachname: 'Holm', rolle: 'Head of E-Commerce', profil: 'Spricht auf Konferenzen über Shop-Migrationen' });
     expect(anfrage.leistungen).toHaveLength(1);
     expect(anfrage.leistungen[0]).toMatchObject({ titel: 'Shopify Migration', anlass: migration.anlass, nutzen: migration.nutzen, beleg: 'Referenz', beschreibung: migration.beschreibung });
     expect(anfrage.leistungen[0].anlass).toContain('Magento');
     const text = JSON.stringify(anfrage);
-    for (const privat of [firma.email_allgemein, firma.telefon_allgemein, firma.register, kontakt.email, kontakt.telefon]) {
+    for (const privat of [firma.email_allgemein, firma.telefon_allgemein, firma.register, kontakt.email, kontakt.telefon, kontakt.notiz].filter(Boolean)) {
       expect(text).not.toContain(privat);
     }
   });

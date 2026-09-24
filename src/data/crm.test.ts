@@ -7,7 +7,7 @@ import { createDemoBackend } from './demo/seed';
 import { ConflictError, DuplicateError, NotConfiguredError, SchemaError, ValidationError } from './errors';
 import { addDays, isoDate } from './ids';
 import { parseCsv, planeImport } from './importCsv';
-import { driveFolderName, extractDriveFolderId, normalizeDomain, prepareFirma, splitName, suggestKuerzel } from './rules';
+import { driveFolderName, extractDriveFolderId, nameAusLinkedin, normalizeDomain, prepareFirma, splitName, suggestKuerzel } from './rules';
 import { findeTeamMitglied, fortschritt, kennzahlen, meinTag } from './selectors';
 import { columnLetter, recordToRow, rowToRecord } from './sheets/rows';
 import { SCHEMA } from './schema';
@@ -40,6 +40,14 @@ describe('rules', () => {
     expect(normalizeDomain(' https://www.Shop.de/impressum ')).toBe('shop.de');
     expect(extractDriveFolderId('https://drive.google.com/drive/folders/abc_123-X?usp=sharing')).toBe('abc_123-X');
     expect(prepareFirma({ kuerzel: ' abc ', slack_channel: '#client-abc-general' }, alle)).toEqual({ kuerzel: 'ABC', slack_channel: 'client-abc-general' });
+  });
+
+  it('reads the name from a LinkedIn profile link', () => {
+    expect(nameAusLinkedin('https://www.linkedin.com/in/max-beispiel-7a1b2c3/')).toEqual({ vorname: 'Max', nachname: 'Beispiel' });
+    expect(nameAusLinkedin('linkedin.com/in/anna-maria-m%C3%BCller?utm_source=share')).toEqual({ vorname: 'Anna Maria', nachname: 'Müller' });
+    expect(nameAusLinkedin('https://de.linkedin.com/in/beispiel')).toEqual({ vorname: '', nachname: 'Beispiel' });
+    expect(nameAusLinkedin('https://www.linkedin.com/in/ACoAAB12cd')).toBeNull();
+    expect(nameAusLinkedin('https://www.linkedin.com/company/beispiel-gmbh')).toBeNull();
   });
 
   it('rejects duplicate domains and Kürzel, but not on the firm itself', () => {
