@@ -313,7 +313,7 @@ a.row-title:hover { color: var(--accent); }
 .badge.aktion-fehler, .chip.aktion-fehler.is-active {
   background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 30%, transparent); color: var(--danger);
 }
-.badge.status-lead, .badge.phase-qualifiziert, .badge.phase-kontaktiert, .badge.aktion-ergaenzen, .chip.aktion-ergaenzen.is-active {
+.badge.status-lead, .badge.phase-qualifiziert, .badge.phase-vernetzung, .badge.phase-kontaktiert, .badge.aktion-ergaenzen, .chip.aktion-ergaenzen.is-active {
   background: var(--highlight); border-color: var(--highlight); color: var(--on-highlight);
 }
 .badge.status-ehemalig, .badge.phase-verloren, .badge.phase-neu, .badge.subtle, .badge.archived, .badge.status-none {
@@ -696,6 +696,11 @@ details summary { cursor: pointer; margin-top: var(--space-2); font-weight: 600;
 .dialog p { margin: 0; }
 .icon-button { background: none; border: 0; font-family: var(--font-display); font-size: 22px; line-height: 1; color: var(--ink); cursor: pointer; width: 34px; height: 34px; flex: none; }
 .icon-button:hover { background: var(--selected-bg); color: var(--selected-ink); }
+.vernetzung-knoepfe { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--space-1); }
+.vernetzung-knoepfe .button.small { padding: 7px 10px; }
+.vernetzung-wege .checkbox { white-space: normal; align-items: flex-start; color: var(--ink); padding: 6px 0; }
+.vernetzung-wege .checkbox input { flex: none; margin-top: 2px; }
+.vernetzung-wege .checkbox small { display: block; font-weight: 400; margin-top: 2px; }
 .option-block { border: 1px solid var(--line); padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); }
 fieldset.plain { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 fieldset.plain legend { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 6px; padding: 0; }

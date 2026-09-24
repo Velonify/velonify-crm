@@ -1,6 +1,6 @@
-import { EINSTELLUNG, isAbgeschlossen, phaseIndex, STANDARD_WAHRSCHEINLICHKEIT, type Phase } from './constants';
-import { addDays } from './ids';
-import type { Database, Deal, Einstellungen, Firma, Wiedervorlage } from './types';
+import { EINSTELLUNG, isAbgeschlossen, istVernetzungVermerk, phaseIndex, STANDARD_WAHRSCHEINLICHKEIT, type Phase } from './constants';
+import { addDays, isoDate, tageZwischen } from './ids';
+import type { Aktivitaet, Database, Deal, Einstellungen, Firma, Wiedervorlage } from './types';
 
 export function indexById<T extends { id: string }>(items: readonly T[]): Map<string, T> {
   return new Map(items.map((item) => [item.id, item]));
@@ -117,4 +117,15 @@ export function driveKonfiguration(einstellungen: Einstellungen): DriveKonfigura
   const clients = einstellungen[EINSTELLUNG.clientsOrdner] ?? '';
   if (!leads || !clients) return null;
   return { leads, clients, vorlage: einstellungen[EINSTELLUNG.vorlageOrdner] ?? '' };
+}
+
+/** Days since the newest LinkedIn connection request of a deal, or null when none is in the Verlauf. */
+export function tageSeitVernetzung(aktivitaeten: readonly Aktivitaet[], dealId: string, heute: string): number | null {
+  let neueste = '';
+  for (const a of aktivitaeten) {
+    if (a.deal_id === dealId && istVernetzungVermerk(a.text) && a.datum > neueste) neueste = a.datum;
+  }
+  if (!neueste) return null;
+  const tag = /^\d{4}-\d{2}-\d{2}$/.test(neueste) ? neueste : isoDate(new Date(neueste));
+  return tageZwischen(tag, heute);
 }

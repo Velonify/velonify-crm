@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { EINSTELLUNG, istErstkontakt, kontaktVermerk } from './constants';
+import { EINSTELLUNG, istErstkontakt, istZuteilung, kontaktVermerk, tageText, vernetzungSchritt, vernetzungVermerk } from './constants';
 import { CrmService, type TerminEingabe } from './crm';
 import { MemoryCalendar, MemoryDrive } from './demo/memoryGoogle';
 import { MemorySheets } from './demo/memorySheets';
 import { createDemoBackend } from './demo/seed';
 import { ConflictError, DuplicateError, NotConfiguredError, SchemaError, ValidationError } from './errors';
-import { addDays, isoDate } from './ids';
+import { addDays, isoDate, tageZwischen } from './ids';
 import { parseCsv, planeImport } from './importCsv';
 import { driveFolderName, extractDriveFolderId, nameAusLinkedin, normalizeDomain, prepareFirma, splitName, suggestKuerzel } from './rules';
-import { findeTeamMitglied, fortschritt, kennzahlen, meinTag } from './selectors';
+import { findeTeamMitglied, fortschritt, kennzahlen, meinTag, tageSeitVernetzung } from './selectors';
 import { columnLetter, recordToRow, rowToRecord } from './sheets/rows';
 import { SCHEMA } from './schema';
 import { checkSetup, runSetup } from './sheets/setup';
@@ -47,6 +47,15 @@ describe('rules', () => {
     expect(istErstkontakt('neu', 'kontaktiert')).toBe(true);
     expect(istErstkontakt('gespraech', 'kontaktiert')).toBe(false);
     expect(istErstkontakt('qualifiziert', 'gespraech')).toBe(false);
+    expect(istErstkontakt('vernetzung', 'kontaktiert')).toBe(true);
+    expect(istZuteilung('qualifiziert', 'vernetzung')).toBe(true);
+    expect(istZuteilung('vernetzung', 'kontaktiert')).toBe(false);
+    expect(vernetzungVermerk('Lea Sommer', '')).toBe('Vernetzungsanfrage auf LinkedIn an Lea Sommer');
+    expect(vernetzungVermerk('', ' Bezug auf Magento ')).toBe('Vernetzungsanfrage auf LinkedIn an die Firma: Bezug auf Magento');
+    expect(vernetzungSchritt('')).toBe('Vernetzung prüfen');
+    expect([tageText(0), tageText(1), tageText(8), tageText(null)]).toEqual(['am selben Tag', 'nach 1 Tag', 'nach 8 Tagen', '']);
+    expect(tageZwischen('2026-09-24', '2026-10-01')).toBe(7);
+    expect(tageZwischen('2026-03-28', '2026-03-30')).toBe(2);
     expect(kontaktVermerk('LinkedIn', ' Vernetzungsanfrage ')).toBe('Kontaktiert über LinkedIn: Vernetzungsanfrage');
     expect(kontaktVermerk('Telefon', '')).toBe('Kontaktiert über Telefon');
   });
@@ -193,6 +202,69 @@ describe('CrmService', () => {
     expect(gespraech.zustaendig).toBe('Johannes');
     db = await crm.load();
     expect(db.firmen[0].zustaendig).toBe('Lugge');
+  });
+
+  it('tracks a LinkedIn connection request: reminder in 7 days, assignment, accepted → kontaktiert', async () => {
+    const firma = await crm.createFirma(firmaInput({ name: 'Shop', zustaendig: 'Julian' }));
+    const lea = await crm.saveKontakt(firma.id, { ...EMPTY_KONTAKT_INPUT, vorname: 'Lea', nachname: 'Sommer' });
+    const deal = await crm.saveDeal(firma.id, { ...EMPTY_DEAL_INPUT, titel: 'Migration', zustaendig: 'Julian', naechster_schritt: 'Erstkontakt', naechster_schritt_am: heute });
+    const q = await crm.changePhase(deal.id, 'qualifiziert', deal.geaendert_am);
+
+    const wartend = await crm.sendeVernetzung(deal.id, q.geaendert_am, { kontaktId: lea.id, notiz: '', ich: 'Lugge' });
+    expect(wartend).toMatchObject({ phase: 'vernetzung', zustaendig: 'Lugge', kontakt_id: lea.id, naechster_schritt: 'Vernetzung prüfen: Lea Sommer', naechster_schritt_am: addDays(heute, 7) });
+    let db = await crm.load();
+    expect(db.firmen[0].zustaendig).toBe('Lugge');
+    expect(db.aktivitaeten.at(-1)?.text).toBe('Vernetzungsanfrage auf LinkedIn an Lea Sommer');
+    expect(tageSeitVernetzung(db.aktivitaeten, deal.id, addDays(heute, 4))).toBe(4);
+    expect(meinTag(db, 'Lugge', heute).naechsteTage.map((a) => a.titel)).toEqual(['Vernetzung prüfen: Lea Sommer']);
+
+    const angenommen = await crm.vernetzungErgebnis(deal.id, wartend.geaendert_am, 'angenommen', 'Lugge');
+    expect(angenommen).toMatchObject({ phase: 'kontaktiert', naechster_schritt: '', naechster_schritt_am: '' });
+    db = await crm.load();
+    expect(db.aktivitaeten.slice(-2).map((a) => a.text)).toEqual([
+      'LinkedIn-Anfrage an Lea Sommer angenommen (am selben Tag) · Kontaktiert über LinkedIn',
+      '„Migration“: Vernetzung → Kontaktiert',
+    ]);
+    await expect(crm.vernetzungErgebnis(deal.id, angenommen.geaendert_am, 'angenommen')).rejects.toThrow(ValidationError);
+  });
+
+  it('handles a request that was not accepted: wait, ask someone else, e-mail or lose the deal', async () => {
+    const firma = await crm.createFirma(firmaInput({ name: 'Shop' }));
+    const lea = await crm.saveKontakt(firma.id, { ...EMPTY_KONTAKT_INPUT, vorname: 'Lea', nachname: 'Sommer' });
+    const tom = await crm.saveKontakt(firma.id, { ...EMPTY_KONTAKT_INPUT, vorname: 'Tom', nachname: 'Berg' });
+    const deal = await crm.saveDeal(firma.id, { ...EMPTY_DEAL_INPUT, titel: 'Migration' });
+    let d = await crm.sendeVernetzung(deal.id, deal.geaendert_am, { kontaktId: lea.id, notiz: '' });
+    expect(d.phase).toBe('vernetzung');
+
+    d = await crm.vernetzungErgebnis(d.id, d.geaendert_am, 'warten');
+    expect(d).toMatchObject({ phase: 'vernetzung', naechster_schritt: 'Vernetzung prüfen: Lea Sommer', naechster_schritt_am: addDays(heute, 7) });
+
+    d = await crm.sendeVernetzung(d.id, d.geaendert_am, { kontaktId: tom.id, notiz: '' });
+    expect(d).toMatchObject({ phase: 'vernetzung', kontakt_id: tom.id, naechster_schritt: 'Vernetzung prüfen: Tom Berg' });
+    let db = await crm.load();
+    expect(db.aktivitaeten.slice(-2).map((a) => a.text)).toEqual(['LinkedIn-Anfrage an Lea Sommer nicht angenommen (am selben Tag)', 'Vernetzungsanfrage auf LinkedIn an Tom Berg']);
+
+    const perMail = await crm.vernetzungErgebnis(d.id, d.geaendert_am, 'email');
+    expect(perMail).toMatchObject({ phase: 'kontaktiert', naechster_schritt: '' });
+    db = await crm.load();
+    expect(db.aktivitaeten.at(-2)?.text).toBe('LinkedIn-Anfrage an Tom Berg nicht angenommen (am selben Tag) · Kontaktiert über E-Mail');
+
+    const zweiter = await crm.saveDeal(firma.id, { ...EMPTY_DEAL_INPUT, titel: 'SEO' });
+    const w = await crm.sendeVernetzung(zweiter.id, zweiter.geaendert_am, { kontaktId: '', notiz: '' });
+    const verloren = await crm.vernetzungErgebnis(w.id, w.geaendert_am, 'verloren');
+    expect(verloren).toMatchObject({ phase: 'verloren', verlustgrund: 'Keine Reaktion', naechster_schritt: '' });
+  });
+
+  it('drops the reminder when a waiting deal is dragged to another phase', async () => {
+    const firma = await crm.createFirma(firmaInput({ name: 'Shop' }));
+    const deal = await crm.saveDeal(firma.id, { ...EMPTY_DEAL_INPUT, titel: 'Migration' });
+    const w = await crm.sendeVernetzung(deal.id, deal.geaendert_am, { kontaktId: '', notiz: '' });
+    const gespraech = await crm.changePhase(w.id, 'gespraech', w.geaendert_am);
+    expect(gespraech).toMatchObject({ naechster_schritt: '', naechster_schritt_am: '' });
+
+    const zweiter = await crm.saveDeal(firma.id, { ...EMPTY_DEAL_INPUT, titel: 'SEO', naechster_schritt: 'Eigener Schritt', naechster_schritt_am: heute });
+    const w2 = await crm.sendeVernetzung(zweiter.id, zweiter.geaendert_am, { kontaktId: '', notiz: '' });
+    expect(w2.naechster_schritt).toBe('Vernetzung prüfen');
   });
 
   it('does not reassign when a deal skips "qualifiziert" or the mover is unknown', async () => {
@@ -393,7 +465,7 @@ describe('selectors', () => {
 
     const alle = meinTag(db, null, heute);
     expect(alle.ueberfaellig.map((a) => a.titel)).toEqual(['Quartalsreport schicken', 'Angebot nachfassen']);
-    expect(alle.heute.map((a) => a.titel)).toEqual(['Erstkontakt per Mail']);
+    expect(alle.heute.map((a) => a.titel)).toEqual(['Erstkontakt per Mail', 'Vernetzung prüfen: Lea Sommer']);
 
     const nordlicht = db.firmen.find((f) => f.name.startsWith('Nordlicht'))!;
     expect(fortschritt(db.deals.filter((d) => d.firma_id === nordlicht.id))).toBe('angebot');

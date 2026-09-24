@@ -1,4 +1,20 @@
-import { DEFAULT_DEAL_TITEL, EINSTELLUNG, isAbgeschlossen, phaseLabel, PHASEN, type Phase } from './constants';
+import {
+  DEFAULT_DEAL_TITEL,
+  EINSTELLUNG,
+  isAbgeschlossen,
+  istVernetzungSchritt,
+  istZuteilung,
+  kontaktVermerk,
+  phaseLabel,
+  PHASEN,
+  tageText,
+  VERNETZUNG_KEINE_REAKTION,
+  VERNETZUNG_TAGE,
+  vernetzungSchritt,
+  vernetzungVermerk,
+  type Phase,
+  type VernetzungErgebnis,
+} from './constants';
 import { NotConfiguredError, NotFoundError, ValidationError } from './errors';
 import type { CalendarApi, CalendarEvent, TerminDaten } from './google/calendar';
 import { isFolder, SPREADSHEET_MIME, type DriveApi, type DriveFile } from './google/drive';
@@ -21,7 +37,7 @@ import {
   prepareKontakt,
   prepareWiedervorlage,
 } from './rules';
-import { driveKonfiguration } from './selectors';
+import { driveKonfiguration, tageSeitVernetzung } from './selectors';
 import { OUTREACH_STARTLISTE } from './outreachStart';
 import {
   findeWert,
@@ -306,7 +322,8 @@ export class CrmService {
 
   /**
    * Moves a deal to another phase, logs it and marks the firm as customer when the deal is won.
-   * Whoever moves a lead from "qualifiziert" to "kontaktiert" (`ich`, a team name) takes it over.
+   * Whoever moves a lead from "qualifiziert" to "vernetzung" or "kontaktiert" (`ich`, a team name) takes it over.
+   * Leaving "vernetzung" drops the automatic "Vernetzung prüfen" step.
    */
   async changePhase(dealId: string, phase: string, expectedGeaendertAm: string, verlustgrund = '', ich = ''): Promise<Deal> {
     if (!(PHASEN as readonly string[]).includes(phase)) throw new ValidationError('phase', `Unbekannte Phase „${phase}“.`);
@@ -316,7 +333,8 @@ export class CrmService {
     const alt = CrmService.find(db.deals, dealId);
     const firma = CrmService.find(db.firmen, alt.firma_id);
     if (alt.phase === phase) return alt;
-    const zuteilen = alt.phase === 'qualifiziert' && phase === 'kontaktiert' && Boolean(ich) && alt.zustaendig !== ich;
+    const zuteilen = istZuteilung(alt.phase, phase) && Boolean(ich) && alt.zustaendig !== ich;
+    const schrittWeg = alt.phase === 'vernetzung' && istVernetzungSchritt(alt.naechster_schritt);
 
     const [deal] = await this.store.update('deals', [
       {
@@ -324,6 +342,7 @@ export class CrmService {
         changes: {
           phase,
           ...(zuteilen ? { zustaendig: ich } : {}),
+          ...(schrittWeg ? { naechster_schritt: '', naechster_schritt_am: '' } : {}),
           verlustgrund: phase === 'verloren' ? verlustgrund.trim() : '',
           abgeschlossen_am: isAbgeschlossen(phase) ? this.today() : '',
           ...this.changed(),
@@ -350,6 +369,87 @@ export class CrmService {
       await this.store.update('firmen', [{ id: firma.id, changes: { status: 'kunde', ...this.changed() } }]);
     }
     return deal;
+  }
+
+  // ─── LinkedIn-Vernetzung ───────────────────────────────────────────────────
+
+  /**
+   * A connection request went out without a message: the deal moves to "vernetzung" (and to `ich`, like a first
+   * contact), the person becomes the deal's contact and "Vernetzung prüfen" is due in seven days.
+   * On a deal that is already waiting, this is a request to another person and notes that the first one did not accept.
+   */
+  async sendeVernetzung(dealId: string, expectedGeaendertAm: string, input: { kontaktId: string; notiz: string; ich?: string }): Promise<Deal> {
+    const db = await this.store.load();
+    let deal = CrmService.find(db.deals, dealId);
+    if (isAbgeschlossen(deal.phase)) throw new ValidationError('phase', 'Der Deal ist schon abgeschlossen.');
+    const kontakt = input.kontaktId ? CrmService.find(db.kontakte, input.kontaktId) : undefined;
+    if (kontakt && kontakt.firma_id !== deal.firma_id) throw new ValidationError('kontakt_id', 'Der Ansprechpartner gehört zu einer anderen Firma.');
+    const person = kontakt ? kontaktName(kontakt) : '';
+
+    if (deal.phase === 'vernetzung') {
+      const vorher = db.kontakte.find((k) => k.id === deal.kontakt_id);
+      const tage = tageSeitVernetzung(db.aktivitaeten, deal.id, this.today());
+      await this.log({
+        firma_id: deal.firma_id,
+        kontakt_id: deal.kontakt_id,
+        deal_id: deal.id,
+        typ: 'notiz',
+        text: `LinkedIn-Anfrage${vorher ? ` an ${kontaktName(vorher)}` : ''} nicht angenommen${tage === null ? '' : ` (${tageText(tage)})`}`,
+      });
+    } else {
+      deal = await this.changePhase(deal.id, 'vernetzung', expectedGeaendertAm, '', input.ich);
+      expectedGeaendertAm = deal.geaendert_am;
+    }
+
+    [deal] = await this.store.update('deals', [
+      {
+        id: deal.id,
+        changes: {
+          kontakt_id: kontakt?.id ?? deal.kontakt_id,
+          naechster_schritt: vernetzungSchritt(person),
+          naechster_schritt_am: addDays(this.today(), VERNETZUNG_TAGE),
+          ...this.changed(),
+        },
+        expectedGeaendertAm,
+      },
+    ]);
+    await this.log({ firma_id: deal.firma_id, kontakt_id: kontakt?.id ?? '', deal_id: deal.id, typ: 'notiz', text: vernetzungVermerk(person, input.notiz) });
+    return deal;
+  }
+
+  /**
+   * Outcome of a connection request. "angenommen" and "email" move the deal to "kontaktiert", "warten" gives it
+   * another seven days, "verloren" closes it with "Keine Reaktion". A request to another person is `sendeVernetzung`.
+   */
+  async vernetzungErgebnis(dealId: string, expectedGeaendertAm: string, ergebnis: Exclude<VernetzungErgebnis, 'andere'>, ich = ''): Promise<Deal> {
+    const db = await this.store.load();
+    const deal = CrmService.find(db.deals, dealId);
+    if (deal.phase !== 'vernetzung') throw new ValidationError('phase', `Der Deal ist nicht mehr in „Vernetzung“, sondern in „${phaseLabel(deal.phase)}“.`);
+    const kontakt = db.kontakte.find((k) => k.id === deal.kontakt_id);
+    const an = kontakt ? ` an ${kontaktName(kontakt)}` : '';
+    const tage = tageText(tageSeitVernetzung(db.aktivitaeten, deal.id, this.today()));
+    const eintrag = (text: string) => this.log({ firma_id: deal.firma_id, kontakt_id: deal.kontakt_id, deal_id: deal.id, typ: 'notiz', text });
+
+    switch (ergebnis) {
+      case 'angenommen':
+        await eintrag(`LinkedIn-Anfrage${an} angenommen${tage ? ` (${tage})` : ''} · ${kontaktVermerk('LinkedIn', '')}`);
+        return this.changePhase(deal.id, 'kontaktiert', expectedGeaendertAm, '', ich);
+      case 'email':
+        await eintrag(`LinkedIn-Anfrage${an} nicht angenommen${tage ? ` (${tage})` : ''} · ${kontaktVermerk('E-Mail', '')}`);
+        return this.changePhase(deal.id, 'kontaktiert', expectedGeaendertAm, '', ich);
+      case 'verloren':
+        await eintrag(`LinkedIn-Anfrage${an} nicht angenommen${tage ? ` (${tage})` : ''}`);
+        return this.changePhase(deal.id, 'verloren', expectedGeaendertAm, VERNETZUNG_KEINE_REAKTION, ich);
+      case 'warten': {
+        await eintrag(`LinkedIn-Anfrage${an} noch offen${tage ? ` (${tage})` : ''}, ${VERNETZUNG_TAGE} Tage weiter warten`);
+        const [neu] = await this.store.update('deals', [
+          { id: deal.id, changes: { naechster_schritt_am: addDays(this.today(), VERNETZUNG_TAGE), ...this.changed() }, expectedGeaendertAm },
+        ]);
+        return neu;
+      }
+      default:
+        throw new ValidationError('ergebnis', `Unbekanntes Ergebnis „${String(ergebnis)}“.`);
+    }
   }
 
   // ─── Verlauf & Wiedervorlagen ──────────────────────────────────────────────
@@ -665,7 +765,7 @@ export class CrmService {
 
   /**
    * Records a message that was sent by hand: stores it, logs it in the firm's history and moves an early deal
-   * to "kontaktiert". Without an open deal one can be created on the way.
+   * (up to "vernetzung") to "kontaktiert". Without an open deal one can be created on the way.
    */
   async markiereGesendet(input: AnschreibenInput, optionen: { neuerDeal?: { titel: string; zustaendig: string }; ich?: string } = {}): Promise<Anschreiben> {
     const clean = prepareAnschreiben(input);
@@ -708,7 +808,7 @@ export class CrmService {
       typ: clean.kanal === 'email' ? 'mail' : 'notiz',
       text: verlaufText(anschreiben),
     });
-    if (deal && (deal.phase === 'neu' || deal.phase === 'qualifiziert')) {
+    if (deal && (deal.phase === 'neu' || deal.phase === 'qualifiziert' || deal.phase === 'vernetzung')) {
       await this.changePhase(deal.id, 'kontaktiert', deal.geaendert_am, '', optionen.ich);
     }
     return anschreiben;

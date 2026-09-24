@@ -1,11 +1,12 @@
 // Fixed vocabularies. Business logic depends on these values, so they live in code, not in the sheet.
 
-export const PHASEN = ['neu', 'qualifiziert', 'kontaktiert', 'gespraech', 'angebot', 'gewonnen', 'verloren'] as const;
+export const PHASEN = ['neu', 'qualifiziert', 'vernetzung', 'kontaktiert', 'gespraech', 'angebot', 'gewonnen', 'verloren'] as const;
 export type Phase = (typeof PHASEN)[number];
 
 export const PHASE_LABEL: Record<Phase, string> = {
   neu: 'Neu',
   qualifiziert: 'Qualifiziert',
+  vernetzung: 'Vernetzung',
   kontaktiert: 'Kontaktiert',
   gespraech: 'Gespräch',
   angebot: 'Angebot',
@@ -21,6 +22,7 @@ export const isAbgeschlossen = (phase: string) => phase === 'gewonnen' || phase 
 export const STANDARD_WAHRSCHEINLICHKEIT: Record<Phase, number> = {
   neu: 10,
   qualifiziert: 20,
+  vernetzung: 25,
   kontaktiert: 30,
   gespraech: 50,
   angebot: 70,
@@ -58,7 +60,33 @@ export const AKTIVITAET_LABEL: Record<string, string> = {
 export const KONTAKT_WEGE = ['E-Mail', 'LinkedIn', 'Instagram', 'Telefon', 'Persönlich', 'Sonstiges'] as const;
 
 /** Phases from which moving to "Kontaktiert" means a first contact, so the pipeline asks how it happened. */
-export const istErstkontakt = (von: string, nach: string) => nach === 'kontaktiert' && (von === 'neu' || von === 'qualifiziert');
+export const istErstkontakt = (von: string, nach: string) => nach === 'kontaktiert' && (von === 'neu' || von === 'qualifiziert' || von === 'vernetzung');
+
+/** Moving from "Qualifiziert" to one of these hands the lead to whoever moves it. */
+export const istZuteilung = (von: string, nach: string) => von === 'qualifiziert' && (nach === 'vernetzung' || nach === 'kontaktiert');
+
+/** Days until a LinkedIn connection request (sent without a message) is checked again. */
+export const VERNETZUNG_TAGE = 7;
+
+const VERNETZUNG_SCHRITT = 'Vernetzung prüfen';
+const VERNETZUNG_ANFRAGE = 'Vernetzungsanfrage auf LinkedIn';
+
+/** Next step of a deal in "Vernetzung": "Vernetzung prüfen: Max Muster". */
+export const vernetzungSchritt = (person: string) => `${VERNETZUNG_SCHRITT}${person ? `: ${person}` : ''}`;
+export const istVernetzungSchritt = (text: string) => text.startsWith(VERNETZUNG_SCHRITT);
+
+/** Verlauf note when a request goes out: "Vernetzungsanfrage auf LinkedIn an Max Muster: über das Magento-Ende". */
+export const vernetzungVermerk = (person: string, notiz: string) =>
+  `${VERNETZUNG_ANFRAGE} an ${person || 'die Firma'}${notiz.trim() ? `: ${notiz.trim()}` : ''}`;
+export const istVernetzungVermerk = (text: string) => text.startsWith(VERNETZUNG_ANFRAGE);
+
+/** What happens after a connection request was accepted or not. */
+export const VERNETZUNG_ERGEBNISSE = ['angenommen', 'email', 'warten', 'andere', 'verloren'] as const;
+export type VernetzungErgebnis = (typeof VERNETZUNG_ERGEBNISSE)[number];
+export const VERNETZUNG_KEINE_REAKTION = 'Keine Reaktion';
+
+/** "nach 4 Tagen", "am selben Tag" – how long a request was open. */
+export const tageText = (tage: number | null) => (tage === null ? '' : tage <= 0 ? 'am selben Tag' : tage === 1 ? 'nach 1 Tag' : `nach ${tage} Tagen`);
 
 /** Note for the Verlauf: "Kontaktiert über LinkedIn: Vernetzungsanfrage an die Geschäftsführerin". */
 export const kontaktVermerk = (weg: string, notiz: string) => `Kontaktiert über ${weg}${notiz.trim() ? `: ${notiz.trim()}` : ''}`;

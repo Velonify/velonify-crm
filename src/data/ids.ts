@@ -44,3 +44,12 @@ export function addDays(isoDay: string, days: number): string {
 }
 
 export const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
+
+/** Whole calendar days from one YYYY-MM-DD to another (negative when `bis` is earlier). */
+export function tageZwischen(von: string, bis: string): number {
+  const utc = (isoDay: string) => {
+    const [y, m, d] = isoDay.split('-').map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((utc(bis) - utc(von)) / 86_400_000);
+}
