@@ -35,6 +35,7 @@ export const WERKZEUGE: Werkzeug[] = [
       { label: 'Anfragen', pfad: '/crm/anfragen' },
       { label: 'Pipeline', pfad: '/crm/pipeline' },
       { label: 'Firmen', pfad: '/crm/firmen' },
+      { label: 'Aus LinkedIn', pfad: '/crm/linkedin' },
       { label: 'Import', pfad: '/crm/import' },
     ],
   },
