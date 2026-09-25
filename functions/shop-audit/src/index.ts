@@ -10,12 +10,15 @@ import { katalog } from './technik.js';
 import { kurzfassung } from './regeln.js';
 import { AnfrageFehler, leadRoute, ROUTEN, type Route } from './leads/api.js';
 import { echteBq } from './leads/bq.js';
+import * as linkedin from './linkedin.js';
 
 const MODELL = 'claude-opus-5';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 const DOMAIN = process.env.ALLOWED_DOMAIN ?? 'velonify.de';
 const PAGESPEED_KEY = process.env.PAGESPEED_API_KEY ?? '';
+// Injected from the Secret Manager secret "apify-token"; only the LinkedIn route needs it.
+const APIFY_TOKEN = process.env.APIFY_TOKEN ?? '';
 const ERLAUBTE_HERKUNFT = (process.env.ALLOWED_ORIGINS ?? 'https://crm.velonify.de,https://velonify.github.io')
   .split(',')
   .map((o) => o.trim())
@@ -38,6 +41,12 @@ const AnfrageSchema = z.object({
     .array(z.object({ id: z.string().trim().min(1).max(40), titel: z.string().trim().min(1).max(200), beschreibung: feld(1000), anlass: feld(1000) }))
     .max(20)
     .default([]),
+});
+
+/** A LinkedIn link and the deal titles the team uses, so Claude can pick one. */
+const LinkedinAnfrageSchema = z.object({
+  url: z.string().trim().min(10).max(2000),
+  deal_titel: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
 });
 
 const erlaubteHerkunft = (origin: string) =>
@@ -100,6 +109,52 @@ functions.http('shopAudit', async (req, res) => {
       console.error(`Lead-Route ${route} fehlgeschlagen`, error);
       return fehler(500, `Lead-Finder: ${route} ist fehlgeschlagen.`);
     }
+  }
+
+  if (/^\/linkedin\/?$/.test(req.path)) {
+    if (!limit.erlaubt(email)) return fehler(429, 'Zu viele Abrufe in kurzer Zeit. Bitte in ein paar Minuten erneut versuchen.');
+    if (!APIFY_TOKEN) return fehler(500, 'APIFY_TOKEN ist nicht gesetzt.');
+    const anfrage = LinkedinAnfrageSchema.safeParse(req.body);
+    if (!anfrage.success) return fehler(400, fehlerText(anfrage.error));
+    const start = Date.now();
+    let roh: linkedin.Rohdaten;
+    try {
+      roh = await linkedin.holeRohdaten(linkedin.erkenneLink(anfrage.data.url), linkedin.apifyLauf(APIFY_TOKEN));
+    } catch (error) {
+      if (error instanceof linkedin.LinkFehler) return fehler(400, error.message);
+      if (error instanceof linkedin.AbrufFehler) return fehler(502, error.message);
+      console.error('LinkedIn-Abruf fehlgeschlagen', error);
+      return fehler(500, 'Der LinkedIn-Abruf ist unerwartet fehlgeschlagen.');
+    }
+
+    // Claude only reads and sorts. If it fails, the lead is still built from the LinkedIn data.
+    const { deal_titel: dealTitel } = anfrage.data;
+    let ausgabe: linkedin.Ausgabe | null = null;
+    let hinweis = '';
+    let modell = '';
+    try {
+      const antwort = await client.beta.messages.create({
+        model: MODELL,
+        max_tokens: 6000,
+        betas: ['server-side-fallback-2026-07-01'],
+        fallbacks: 'default',
+        thinking: { type: 'adaptive' },
+        output_config: { effort: 'low', format: { type: 'json_schema', schema: linkedin.AUSGABE_SCHEMA } },
+        system: linkedin.SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: linkedin.nutzerNachricht(roh, dealTitel) }],
+      });
+      modell = antwort.model;
+      if (antwort.stop_reason === 'end_turn') {
+        ausgabe = linkedin.AusgabeSchema.parse(JSON.parse(antwort.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('')));
+      } else {
+        hinweis = 'Claude hat keine Einschätzung geliefert, die Felder stammen direkt aus LinkedIn.';
+      }
+      console.log(JSON.stringify({ email, route: 'linkedin', art: roh.art, dauer_ms: Date.now() - start, modell, usage: antwort.usage }));
+    } catch (error) {
+      hinweis = 'Claude war nicht erreichbar, die Felder stammen direkt aus LinkedIn.';
+      console.error('LinkedIn-Einschätzung fehlgeschlagen', error instanceof Anthropic.APIError ? `${error.status} ${error.message}` : error instanceof Error ? error.message : error);
+    }
+    return res.json(linkedin.baueLead(roh, ausgabe, dealTitel, { hinweis, modell }));
   }
 
   if (!limit.erlaubt(email)) return fehler(429, 'Zu viele Prüfungen in kurzer Zeit. Bitte in ein paar Minuten erneut versuchen.');

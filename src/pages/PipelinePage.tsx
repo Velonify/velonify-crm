@@ -79,6 +79,9 @@ export function PipelinePage() {
                 </option>
               ))}
             </select>
+            <Link to="/crm/linkedin" className="button">
+              Lead aus LinkedIn
+            </Link>
             <button type="button" className="button primary" onClick={() => setDialog({})}>
               Deal anlegen
             </button>

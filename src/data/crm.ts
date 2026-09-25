@@ -164,6 +164,22 @@ export interface UebernahmeErgebnis {
   deal: Deal | null;
 }
 
+export interface LinkedinLeadEingabe {
+  /** Firm the lead belongs to; without it a new one is created from `firma`. */
+  firmaId?: string;
+  firma: FirmaInput;
+  kontakt: KontaktInput | null;
+  deal: { titel: string; phase: 'neu' | 'qualifiziert'; zustaendig: string } | null;
+  /** Timeline entry: the LinkedIn link and why the lead matters. */
+  vermerk: string;
+}
+
+export interface LinkedinLeadErgebnis {
+  firma: Firma;
+  kontakt: Kontakt | null;
+  deal: Deal | null;
+}
+
 /**
  * All business operations of the CRM. Validation and side effects (activity log, firm status, Drive folders)
  * live here, so the UI stays a thin layer and every entry point behaves the same.
@@ -899,6 +915,36 @@ export class CrmService {
         expectedGeaendertAm: anfrage.geaendert_am,
       },
     ]);
+    return { firma, kontakt, deal };
+  }
+
+  /**
+   * Creates a lead from a LinkedIn job ad or profile: the firm (or the one already in the CRM), the person when
+   * known, a deal and a timeline entry with the link. A contact with the same LinkedIn profile or e-mail at that
+   * firm is reused instead of created twice.
+   */
+  async legeLinkedinLeadAn(eingabe: LinkedinLeadEingabe): Promise<LinkedinLeadErgebnis> {
+    const db = await this.store.load();
+    const firma = eingabe.firmaId ? CrmService.find(db.firmen, eingabe.firmaId) : await this.createFirma(eingabe.firma);
+
+    let kontakt: Kontakt | null = null;
+    if (eingabe.kontakt) {
+      const { linkedin, email } = eingabe.kontakt;
+      const gleich = (a: string, b: string) => a.trim() !== '' && a.trim().replace(/\/$/, '').toLowerCase() === b.trim().replace(/\/$/, '').toLowerCase();
+      kontakt =
+        db.kontakte.find((k) => k.firma_id === firma.id && !k.archiviert && (gleich(k.linkedin, linkedin) || gleich(k.email, email))) ??
+        (await this.saveKontakt(firma.id, eingabe.kontakt));
+    }
+
+    let deal: Deal | null = null;
+    if (eingabe.deal) {
+      deal = await this.saveDeal(firma.id, { ...EMPTY_DEAL_INPUT, titel: eingabe.deal.titel, kontakt_id: kontakt?.id ?? '', zustaendig: eingabe.deal.zustaendig });
+      if (eingabe.deal.phase !== 'neu') {
+        [deal] = await this.store.update('deals', [{ id: deal.id, changes: { phase: eingabe.deal.phase, ...this.changed() }, expectedGeaendertAm: deal.geaendert_am }]);
+      }
+    }
+
+    await this.log({ firma_id: firma.id, kontakt_id: kontakt?.id ?? '', deal_id: deal?.id ?? '', typ: 'notiz', text: eingabe.vermerk });
     return { firma, kontakt, deal };
   }
 

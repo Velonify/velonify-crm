@@ -24,6 +24,7 @@ import { FirmaNeuPage } from './pages/FirmaNeuPage';
 import { FirmenListePage } from './pages/FirmenListePage';
 import { ImportPage } from './pages/ImportPage';
 import { KalenderPage } from './pages/KalenderPage';
+import { LinkedinLeadPage } from './pages/LinkedinLeadPage';
 import { LoginPage } from './pages/LoginPage';
 import { MeinTagPage } from './pages/MeinTagPage';
 import { PipelinePage } from './pages/PipelinePage';
@@ -66,6 +67,7 @@ export function App() {
                 <Route path="firmen/neu" element={<FirmaNeuPage />} />
                 <Route path="firmen/:id" element={<FirmaAktePage />} />
                 <Route path="import" element={<ImportPage />} />
+                <Route path="linkedin" element={<LinkedinLeadPage />} />
               </Route>
               <Route path="angebote">
                 <Route index element={<AngebotePage />} />
