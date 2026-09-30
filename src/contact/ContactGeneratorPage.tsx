@@ -14,6 +14,8 @@ import {
   MAX_LEISTUNGEN,
   MODI,
   mitSignatur,
+  OFFERS,
+  offerText,
   offeneDeals,
   shopUrl,
   signaturSchluessel,
@@ -23,6 +25,7 @@ import {
   type Kanal,
   type LeistungsWahl,
   type Modus,
+  type OfferWahl,
   type Variante,
 } from '../data/anschreiben';
 import { KontaktDialog } from '../components/dialogs/KontaktDialog';
@@ -112,6 +115,8 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
   const [leistungIds, setLeistungIds] = useState<string[]>(() => (params.get('leistung') ? [params.get('leistung')!] : []));
   const [manuellAn, setManuellAn] = useState(false);
   const [manuell, setManuell] = useState({ titel: '', beschreibung: '' });
+  const [offerWahl, setOfferWahl] = useState<OfferWahl>('');
+  const [offerManuell, setOfferManuell] = useState('');
   const [absender, setAbsender] = useState(() => lies(ABSENDER_KEY) || vornameAus(user?.name ?? '', user?.email ?? ''));
   const [aufhaenger, setAufhaenger] = useState(() => params.get('aufhaenger') ?? '');
   // Hooks from the newest shop audit; null = the default (first hook per chosen service).
@@ -206,10 +211,11 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
     setFehler(undefined);
     if (!firma) return setFehler(Object.assign(new Error('Bitte eine Firma wählen.'), { field: 'firma_id' }));
     if (wahlen.length === 0) return setFehler(Object.assign(new Error('Bitte mindestens eine Leistung wählen oder manuell beschreiben.'), { field: 'leistung' }));
+    if (offerWahl === 'manuell' && !offerManuell.trim()) return setFehler(Object.assign(new Error('Bitte das Offer beschreiben oder „Kein Offer“ wählen.'), { field: 'offer' }));
     if (!generator) return setFehler(new Error('Die Adresse des Contact Generators fehlt (VITE_CONTACT_GENERATOR_URL).'));
     setBusy(true);
     try {
-      const anfrage = baueAnfrage({ kanal, sprache, anrede, absender, firma, kontakt, profil, leistungen: wahlen, aufhaenger: aufhaengerGesamt, hinweis: mitHinweis ? hinweis : '', modus });
+      const anfrage = baueAnfrage({ kanal, sprache, anrede, absender, firma, kontakt, profil, leistungen: wahlen, aufhaenger: aufhaengerGesamt, offer: offerText(offerWahl, offerManuell), hinweis: mitHinweis ? hinweis : '', modus });
       merke(ABSENDER_KEY, absender.trim());
       const neu = await generator.generiere(anfrage);
       setVarianten(neu);
@@ -428,6 +434,27 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
                     <textarea rows={3} value={manuell.beschreibung} onChange={(e) => setManuell((m) => ({ ...m, beschreibung: e.target.value }))} />
                   </Field>
                 </>
+              )}
+              <Field
+                label="Offer für Neukunden (optional)"
+                hint={offerWahl === 'manuell' ? undefined : OFFERS.find((o) => o.wert === offerWahl)?.text ?? 'Claude baut es als Grund für ein Gespräch ein, nicht als Werbung.'}
+                invalid={invalid === 'offer'}
+                wide
+              >
+                <select value={offerWahl} onChange={(e) => setOfferWahl(e.target.value as OfferWahl)}>
+                  <option value="">Kein Offer</option>
+                  {OFFERS.map((o) => (
+                    <option key={o.wert} value={o.wert}>
+                      {o.label}
+                    </option>
+                  ))}
+                  <option value="manuell">Manuell …</option>
+                </select>
+              </Field>
+              {offerWahl === 'manuell' && (
+                <Field label="Offer" hint="Nur Bedingungen nennen, die wirklich gelten. Claude erfindet keine Beträge oder Fristen dazu." invalid={invalid === 'offer'} wide>
+                  <textarea rows={2} value={offerManuell} onChange={(e) => setOfferManuell(e.target.value)} maxLength={1000} placeholder="z. B. Tracking-Check und Consent-Setup im ersten Monat ohne Aufpreis" />
+                </Field>
               )}
               <Field label="Absender" hint="Vorname, mit dem die Nachricht unterschrieben wird" invalid={invalid === 'absender'}>
                 <input value={absender} onChange={(e) => setAbsender(e.target.value)} autoComplete="given-name" />

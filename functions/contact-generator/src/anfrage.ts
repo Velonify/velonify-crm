@@ -55,6 +55,8 @@ export const AnfrageSchema = z.object({
   /** One or more services; with several, the message presents them as one offer. */
   leistungen: z.array(LeistungSchema).min(1).max(MAX_LEISTUNGEN),
   aufhaenger: feld(1000),
+  /** New-customer offer (e.g. first month free) as the team describes it; empty = none. */
+  offer: feld(1000),
   /** Extra instruction when regenerating, e.g. "kürzer". */
   hinweis: feld(500),
   modus: z.enum(MODI).default('komplex'),
