@@ -30,6 +30,27 @@ export const ANSCHREIBEN_STATUS = [
 
 export const anschreibenStatusLabel = (wert: string) => ANSCHREIBEN_STATUS.find((s) => s.wert === wert)?.label ?? (wert || '–');
 
+/** New-customer offers for a first message; `text` is what Claude gets. Plus "manuell" for a free text. */
+export const OFFERS = [
+  { wert: 'erster_monat', label: 'Erster Monat gratis', text: 'Der erste Monat der Zusammenarbeit ist kostenlos.' },
+  {
+    wert: 'audit_konzept',
+    label: 'Gratis Shop-Audit + Rework-Konzept',
+    text: 'Velonify prüft den Shop kostenlos und zeigt in einem Konzept, was am Shop überarbeitet werden sollte.',
+  },
+  {
+    wert: 'migration_service',
+    label: 'Günstigere Migration mit Servicevertrag',
+    text: 'Die Migration kostet weniger, wenn im Anschluss ein Servicevertrag für die laufende Betreuung geschlossen wird. Als Einladung zu einem Gespräch über die Konditionen formulieren, nicht als Rabattwerbung.',
+  },
+] as const;
+
+export type OfferWahl = '' | (typeof OFFERS)[number]['wert'] | 'manuell';
+
+/** What goes to Claude for the chosen offer; empty without one. */
+export const offerText = (wahl: OfferWahl, manuell: string) =>
+  wahl === 'manuell' ? manuell.trim() : (OFFERS.find((o) => o.wert === wahl)?.text ?? '');
+
 export type LeistungsWahl = { art: 'liste'; leistung: OutreachLeistung } | { art: 'manuell'; titel: string; beschreibung: string };
 
 export const leistungsTitel = (wahl: LeistungsWahl) => (wahl.art === 'liste' ? wahl.leistung.titel : wahl.titel.trim());
@@ -64,6 +85,8 @@ export interface GeneratorEingabe {
   /** One or more services, in list order; the message presents them as one offer. */
   leistungen: LeistungsWahl[];
   aufhaenger: string;
+  /** New-customer offer as text for Claude, see `offerText`; empty = none. */
+  offer?: string;
   hinweis?: string;
   modus: Modus;
 }
@@ -78,6 +101,7 @@ export interface GeneratorAnfrage {
   kontakt: (Pick<Kontakt, 'vorname' | 'nachname' | 'rolle'> & { profil: string }) | null;
   leistungen: { titel: string; unterpunkte: string[]; anlass: string; nutzen: string; beleg: string; beschreibung: string }[];
   aufhaenger: string;
+  offer: string;
   hinweis: string;
   modus: Modus;
 }
@@ -138,6 +162,7 @@ export function baueAnfrage(e: GeneratorEingabe): GeneratorAnfrage {
         : { titel: kurz(w.titel, 200), unterpunkte: [], anlass: '', nutzen: '', beleg: '', beschreibung: kurz(w.beschreibung, 2000) },
     ),
     aufhaenger: kurz(e.aufhaenger, 1000),
+    offer: kurz(e.offer ?? '', 1000),
     hinweis: kurz(e.hinweis ?? '', 500),
     modus: e.modus,
   };

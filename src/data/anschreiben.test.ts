@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { aktiveLeistungen, baueAnfrage, leistungenIds, leistungenTitel, mailtoLink, shopUrl, mitSignatur, prepareAnschreiben, verlaufText, vornameAus, zeichen, type AnschreibenInput } from './anschreiben';
+import { aktiveLeistungen, baueAnfrage, leistungenIds, OFFERS, offerText, leistungenTitel, mailtoLink, shopUrl, mitSignatur, prepareAnschreiben, verlaufText, vornameAus, zeichen, type AnschreibenInput, type LeistungsWahl } from './anschreiben';
 import { DemoGenerator } from './contactGenerator';
 import { CrmService } from './crm';
 import { MemoryCalendar, MemoryDrive } from './demo/memoryGoogle';
@@ -54,6 +54,7 @@ describe('Anfrage an den Contact Generator', () => {
     const basis = { kanal: 'instagram', sprache: 'de', anrede: 'du', absender: 'Lukas', firma, aufhaenger: '', modus: 'komplex' } as const;
     const anfrage = baueAnfrage({ ...basis, leistungen: [{ art: 'manuell', titel: 'Media Buying', beschreibung: 'Meta und TikTok' }] });
     expect(anfrage.kontakt).toBeNull();
+    expect(anfrage.offer).toBe('');
     expect(baueAnfrage({ ...basis, firma: { ...firma, notiz: 'ä'.repeat(2500) }, leistungen: [{ art: 'manuell', titel: 'X', beschreibung: '' }] }).firma.notiz).toHaveLength(2000);
     expect(anfrage.leistungen[0]).toMatchObject({ titel: 'Media Buying', beschreibung: 'Meta und TikTok', unterpunkte: [] });
     expect(() => baueAnfrage({ ...basis, absender: ' ', leistungen: [{ art: 'manuell', titel: 'X', beschreibung: '' }] })).toThrow(ValidationError);
@@ -71,6 +72,16 @@ describe('Anfrage an den Contact Generator', () => {
     expect(leistungenIds(wahlen)).toBe(`${a.id},${b.id}`);
     const fuenf = Array.from({ length: 5 }, () => ({ art: 'manuell', titel: 'X', beschreibung: '' }) as const);
     expect(() => baueAnfrage({ ...basis, leistungen: fuenf })).toThrow(ValidationError);
+  });
+
+  it('sends the chosen or manually written new-customer offer', () => {
+    const basis = { kanal: 'email', sprache: 'de', anrede: 'sie', absender: 'Lukas', firma: db.firmen[0], aufhaenger: '', modus: 'easy' } as const;
+    const leistungen = [{ art: 'manuell', titel: 'X', beschreibung: '' }] as LeistungsWahl[];
+    expect(offerText('', 'wird ignoriert')).toBe('');
+    expect(offerText('erster_monat', '')).toBe(OFFERS[0].text);
+    expect(offerText('manuell', ' Setup ohne Aufpreis ')).toBe('Setup ohne Aufpreis');
+    expect(baueAnfrage({ ...basis, leistungen, offer: offerText('audit_konzept', '') }).offer).toContain('Shop kostenlos');
+    expect(baueAnfrage({ ...basis, leistungen, offer: 'x'.repeat(1200) }).offer).toHaveLength(1000);
   });
 
   it('keeps demo texts for LinkedIn notes within 300 characters', async () => {

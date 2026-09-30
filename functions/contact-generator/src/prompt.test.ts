@@ -46,6 +46,17 @@ describe('nutzerNachricht', () => {
     expect(text).not.toContain('<aufhaenger>');
     expect(text).not.toContain('Zusätzlicher Wunsch');
     expect(text).not.toContain('zusammenhängendes Angebot');
+    expect(text).not.toContain('<offer>');
+    expect(text).not.toContain('Neukunden-Offer');
+  });
+
+  it('passes a new-customer offer with the rule not to invent conditions', () => {
+    const text = nutzerNachricht(AnfrageSchema.parse({ ...basis, offer: 'Der erste Monat der Zusammenarbeit ist kostenlos.' }), 'heute');
+    expect(text).toContain('<offer>\nAngebot für Neukunden: Der erste Monat der Zusammenarbeit ist kostenlos.\n</offer>');
+    expect(text).toContain('erfinde keine Beträge');
+    expect(text).not.toContain('Halbsatz');
+    const notiz = nutzerNachricht(AnfrageSchema.parse({ ...basis, kanal: 'linkedin_notiz', offer: 'Kostenloser Shop-Audit' }), 'heute');
+    expect(notiz).toContain('höchstens in einem Halbsatz');
   });
 
   it('adds one block per service and asks for a single offer when there are several', () => {

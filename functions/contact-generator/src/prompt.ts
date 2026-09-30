@@ -97,6 +97,11 @@ export function nutzerNachricht(anfrage: Anfrage, heute: string): string {
           `Leistungen: ${leistungen.length}. Stell sie als ein zusammenhängendes Angebot vor, das zu dieser Firma passt, statt sie aufzuzählen. Wo der Platz knapp ist, führ mit der Leistung, die am besten zur Firma passt, und nenn die übrigen nur kurz.`,
         ]
       : []),
+    ...(anfrage.offer
+      ? [
+          `Neukunden-Offer: Bau das Offer aus <offer> als konkreten, unverbindlichen Grund für ein kurzes Gespräch ein, nicht als Werbung oder Rabattaktion. Nenn nur die Bedingungen, die dort stehen, erfinde keine Beträge, Prozente oder Fristen und erzeug keine Verknappung.${anfrage.kanal === 'linkedin_notiz' ? ' In der Vernetzungsnotiz höchstens in einem Halbsatz.' : ''}`,
+        ]
+      : []),
     ...(anfrage.hinweis ? [`Zusätzlicher Wunsch für diese Fassung: ${sauber(anfrage.hinweis)}`] : []),
     '</auftrag>',
   ].join('\n');
@@ -130,6 +135,7 @@ export function nutzerNachricht(anfrage: Anfrage, heute: string): string {
         ['Beleg', leistung.beleg],
       ]),
     ),
+    block('offer', [['Angebot für Neukunden', anfrage.offer]]),
     block('aufhaenger', [['Beobachtung des Teams', anfrage.aufhaenger]]),
   ].filter(Boolean);
 
