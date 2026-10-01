@@ -1,0 +1,29 @@
+{
+  "name": "crm-mcp",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Remote-MCP-Server für das Velonify-CRM: Claude liest und schreibt das CRM mit dem Google-Konto der Person, über dieselben Regeln wie der Hub.",
+  "type": "module",
+  "main": "dist/index.js",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "gcp-build": "",
+    "start": "functions-framework --target=crmMcp",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^5.0.5"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.31.0",
+    "@types/node": "^24.13.5",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1",
+    "zod": "^4.6.5"
+  }
+}
