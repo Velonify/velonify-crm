@@ -13,7 +13,7 @@ import { fehlerSeite, freigabeSeite } from './seiten';
 import { Siegel } from './siegel';
 import { ANLEITUNG, leseTeamZuordnung, registriereWerkzeuge } from './werkzeuge';
 
-const VERSION = '0.1.1';
+const VERSION = '0.1.2';
 
 /** Team names for addresses the hub's name matching cannot place, e.g. TEAM_ZUORDNUNG="lukas@velonify.de=Lugge". */
 const TEAM_ZUORDNUNG = leseTeamZuordnung(process.env.TEAM_ZUORDNUNG ?? '');

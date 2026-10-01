@@ -167,3 +167,24 @@ describe('Teamname über TEAM_ZUORDNUNG', () => {
     expect((await rufe('ueberblick')).daten.angemeldet.team_name).toBe('Lugge');
   });
 });
+
+describe('archivieren', () => {
+  beforeEach(() => verbinde('lugge@velonify.de', 'Lugge'));
+
+  it('blendet eine Firma samt Deals aus und stellt sie wieder her', async () => {
+    const id = await firmaId('Bergwerk');
+    expect((await rufe('archivieren', { firma_id: id })).daten.archiviert).toBe(true);
+    const pipeline = await rufe('pipeline', { abgeschlossene_zeigen: true });
+    const firmen = pipeline.daten.phasen.flatMap((p: { deals: { firma_id: string }[] }) => p.deals.map((d) => d.firma_id));
+    expect(firmen).not.toContain(id);
+    expect((await rufe('suchen', { suchbegriff: 'bergwerk' })).daten.treffer).toEqual([]);
+
+    expect((await rufe('archivieren', { firma_id: id, archiviert: false })).daten.archiviert).toBe(false);
+    expect((await rufe('suchen', { suchbegriff: 'bergwerk' })).daten.treffer.length).toBeGreaterThan(0);
+  });
+
+  it('verlangt genau eine ID', async () => {
+    const { fehler } = await rufe('archivieren', {});
+    expect(fehler).toBe(true);
+  });
+});

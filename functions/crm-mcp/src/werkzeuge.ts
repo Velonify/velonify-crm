@@ -32,7 +32,7 @@ export const ANLEITUNG = `Velonify-CRM (Google Sheet hinter crm.velonify.de). Sc
 - Phasen: ${PHASEN.join(' → ')}. Phasenwechsel nur mit \`phase_aendern\`, LinkedIn-Anfragen mit Phase "vernetzung" und danach \`vernetzung_ergebnis\`.
 - "zustaendig" ist ein Vorname aus dem Team (siehe \`ueberblick\`), keine E-Mail.
 - Daten im Format JJJJ-MM-TT. Die Zeitzone ist Europe/Berlin.
-- Nichts wird gelöscht. Nur der Hub kann archivieren.`;
+- Nichts wird gelöscht. \`archivieren\` blendet Firmen, Deals oder Kontakte aus und lässt sich rückgängig machen; vorher nachfragen.`;
 
 // ─── Ausgabe ────────────────────────────────────────────────────────────────
 
@@ -631,6 +631,41 @@ export function registriereWerkzeuge(server: McpServer, { service, person, teamN
       finde(db.wiedervorlagen, wiedervorlage_id, 'Wiedervorlage');
       const w = await service.setWiedervorlageErledigt(wiedervorlage_id, erledigt ?? true);
       return antwort({ wiedervorlage: kompakt(w) });
+    }),
+  );
+
+  server.registerTool(
+    'archivieren',
+    {
+      title: 'Archivieren',
+      description:
+        'Archiviert eine Firma, einen Deal oder einen Kontakt (genau eine ID angeben), z. B. Testeinträge oder Dubletten. Archivierte Einträge verschwinden aus Pipeline und Mein Tag, bleiben aber im Sheet; mit archiviert: false wieder herstellen. Eine archivierte Firma blendet auch ihre Deals aus.',
+      inputSchema: {
+        firma_id: z.string().optional(),
+        deal_id: z.string().optional(),
+        kontakt_id: z.string().optional(),
+        archiviert: z.boolean().optional().describe('Standard true; false stellt wieder her'),
+      },
+      annotations: { ...schreiben, idempotentHint: true },
+    },
+    sicher(async ({ firma_id, deal_id, kontakt_id, archiviert }) => {
+      const ids = [firma_id, deal_id, kontakt_id].filter(Boolean);
+      if (ids.length !== 1) return fehler('Genau eine von firma_id, deal_id oder kontakt_id angeben.');
+      const ziel = archiviert ?? true;
+      const db = await service.load();
+      if (firma_id) {
+        const firma = finde(db.firmen, firma_id, 'Firma');
+        const neu = await service.setFirmaArchiviert(firma.id, ziel, firma.geaendert_am);
+        return antwort({ firma: neu.name, firma_id: neu.id, archiviert: neu.archiviert, hub: firmaLink(neu.id) });
+      }
+      if (deal_id) {
+        const deal = finde(db.deals, deal_id, 'Deal');
+        const neu = await service.setDealArchiviert(deal.id, ziel, deal.geaendert_am);
+        return antwort({ deal: neu.titel, deal_id: neu.id, firma: db.firmen.find((f) => f.id === neu.firma_id)?.name, archiviert: neu.archiviert });
+      }
+      const kontakt = finde(db.kontakte, kontakt_id!, 'Kontakt');
+      const neu = await service.setKontaktArchiviert(kontakt.id, ziel, kontakt.geaendert_am);
+      return antwort({ kontakt: kontaktName(neu), kontakt_id: neu.id, archiviert: neu.archiviert });
     }),
   );
 }
