@@ -4,7 +4,7 @@ Remote-MCP-Server für das Velonify-CRM. Claude (claude.ai, Desktop, Handy, Clau
 
 ## Aufbau
 
-- **Werkzeuge** (`src/werkzeuge.ts`): `ueberblick`, `suchen`, `firma_anzeigen`, `pipeline`, `mein_tag` (lesen) sowie `lead_anlegen`, `firma_aendern`, `kontakt_speichern`, `deal_speichern`, `phase_aendern`, `vernetzung_ergebnis`, `notiz_hinzufuegen`, `wiedervorlage_setzen`, `wiedervorlage_erledigt` (schreiben). Gelöscht wird nichts.
+- **Werkzeuge** (`src/werkzeuge.ts`): `ueberblick`, `suchen`, `firma_anzeigen`, `pipeline`, `mein_tag` (lesen) sowie `lead_anlegen`, `firma_aendern`, `kontakt_speichern`, `deal_speichern`, `phase_aendern`, `vernetzung_ergebnis`, `notiz_hinzufuegen`, `wiedervorlage_setzen`, `wiedervorlage_erledigt`, `archivieren` (schreiben). Gelöscht wird nichts, archivieren lässt sich rückgängig machen.
 - **Anmeldung** (`src/oauth.ts`, `src/google.ts`): Der Server ist sein eigener OAuth-Server (Client ID Metadata Documents von claude.ai sowie Dynamic Client Registration, PKCE S256). Die eigentliche Anmeldung läuft über Google, nur mit @velonify.de. Das Google-Refresh-Token steckt AES-256-GCM-verschlüsselt in den eigenen Codes und Tokens (`src/siegel.ts`), deshalb ohne Datenbank. Zugangstoken gelten 1 Stunde. Nach 90 Tagen ist eine neue Anmeldung fällig. Wer den Zugriff unter myaccount.google.com → Sicherheit → Drittanbieter-Apps entzieht, ist beim nächsten Erneuern draußen.
 - **Transport**: Streamable HTTP, zustandslos, unter `/mcp`. Metadaten unter `/.well-known/oauth-protected-resource/mcp` und `/.well-known/oauth-authorization-server`.
 
