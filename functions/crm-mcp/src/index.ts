@@ -11,9 +11,12 @@ import { GoogleAbgelaufen, googleAnmeldeUrl, GoogleTokens, tauscheGoogleCode, Zu
 import { AuthServer, OAuthFehler, ressourceUrl, schutzMetadaten, SCOPE, serverMetadaten, type OAuthKonfig } from './oauth';
 import { fehlerSeite, freigabeSeite } from './seiten';
 import { Siegel } from './siegel';
-import { ANLEITUNG, registriereWerkzeuge } from './werkzeuge';
+import { ANLEITUNG, leseTeamZuordnung, registriereWerkzeuge } from './werkzeuge';
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.1';
+
+/** Team names for addresses the hub's name matching cannot place, e.g. TEAM_ZUORDNUNG="lukas@velonify.de=Lugge". */
+const TEAM_ZUORDNUNG = leseTeamZuordnung(process.env.TEAM_ZUORDNUNG ?? '');
 
 interface Laufzeit {
   konfig: OAuthKonfig;
@@ -107,7 +110,12 @@ async function mcp(req: Request, res: Response, lz: Laufzeit): Promise<void> {
   });
 
   const server = new McpServer({ name: 'velonify-crm', title: 'Velonify CRM', version: VERSION }, { instructions: ANLEITUNG });
-  registriereWerkzeuge(server, { service, person: { email: zugang.email, name: zugang.name }, heute: () => isoDate(new Date()) });
+  registriereWerkzeuge(server, {
+    service,
+    person: { email: zugang.email, name: zugang.name },
+    teamName: TEAM_ZUORDNUNG.get(zugang.email),
+    heute: () => isoDate(new Date()),
+  });
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on('close', () => {
     void transport.close();

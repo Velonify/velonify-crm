@@ -5,15 +5,15 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createDemoBackend } from '../../../src/data/demo/seed';
 import { isoDate } from '../../../src/data/ids';
 import type { CrmService } from '../../../src/data/crm';
-import { ANLEITUNG, registriereWerkzeuge } from './werkzeuge';
+import { ANLEITUNG, leseTeamZuordnung, registriereWerkzeuge } from './werkzeuge';
 
 let service: CrmService;
 let client: Client;
 
-async function verbinde(email: string, name: string) {
+async function verbinde(email: string, name: string, teamName?: string) {
   ({ service } = await createDemoBackend(() => email));
   const server = new McpServer({ name: 'velonify-crm', version: 'test' }, { instructions: ANLEITUNG });
-  registriereWerkzeuge(server, { service, person: { email, name }, heute: () => isoDate(new Date()) });
+  registriereWerkzeuge(server, { service, person: { email, name }, teamName, heute: () => isoDate(new Date()) });
   const [a, b] = InMemoryTransport.createLinkedPair();
   client = new Client({ name: 'test', version: '1' });
   await Promise.all([server.connect(a), client.connect(b)]);
@@ -136,5 +136,34 @@ describe('CRM-Werkzeuge', () => {
     const { fehler, text } = await rufe('wiedervorlage_setzen', { firma_id: id, titel: 'x', faellig_am: '2026-10-02', zustaendig: 'lugge@velonify.de' });
     expect(fehler).toBe(true);
     expect(text).toContain('nicht im Team');
+  });
+});
+
+describe('Teamname über TEAM_ZUORDNUNG', () => {
+  it('liest die Zuordnung, mit ; oder , getrennt', () => {
+    expect(leseTeamZuordnung('Lukas@velonify.de=Lugge; julian@velonify.de = Julian,kaputt')).toEqual(
+      new Map([['lukas@velonify.de', 'Lugge'], ['julian@velonify.de', 'Julian']]),
+    );
+  });
+
+  it('erkennt ohne Zuordnung niemanden, wenn Name und Adresse nicht passen', async () => {
+    await verbinde('lukas@velonify.de', 'Lukas Muster');
+    expect((await rufe('ueberblick')).daten.angemeldet.team_name).toBeNull();
+  });
+
+  it('nutzt den festen Teamnamen für Mein Tag und die Zuteilung', async () => {
+    await verbinde('lukas@velonify.de', 'Lukas Muster', 'Lugge');
+    expect((await rufe('ueberblick')).daten.angemeldet.team_name).toBe('Lugge');
+    expect((await rufe('mein_tag')).daten.fuer).toBe('Lugge');
+
+    const id = await firmaId('Bergwerk');
+    const deal = (await service.load()).deals.find((d) => d.firma_id === id)!;
+    const { daten } = await rufe('phase_aendern', { deal_id: deal.id, phase: 'kontaktiert', kontaktweg: 'E-Mail' });
+    expect(daten.erledigt).toContain('zugeteilt an Lugge');
+  });
+
+  it('übergeht einen Namen, der nicht im Team ist', async () => {
+    await verbinde('lugge@velonify.de', 'Lugge', 'Lukas');
+    expect((await rufe('ueberblick')).daten.angemeldet.team_name).toBe('Lugge');
   });
 });
