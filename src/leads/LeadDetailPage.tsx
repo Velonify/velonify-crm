@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { MailLink } from '../components/MailLink';
 import { Card, ErrorBox, Loading, PageHeader } from '../components/ui';
 import { AUSSCHLUSS_LABEL, BEREICHE, bereichVon, reichweiteLabel, systemLabel, tierVon, type Bereich } from '../data/leadFinder';
 import { formatDateTime, shortUser } from '../lib/format';
@@ -120,7 +121,7 @@ export function LeadDetailPage() {
             <Item label="USt-IdNr.">{f.ust_id}</Item>
             <Item label="Geschäftsführung">{f.geschaeftsfuehrer.join(', ')}</Item>
             <Item label="Adresse">{[f.strasse, `${f.plz} ${f.ort}`.trim()].filter(Boolean).join(', ')}</Item>
-            <Item label="E-Mail">{f.email && <a href={`mailto:${f.email}`}>{f.email}</a>}</Item>
+            <Item label="E-Mail">{f.email && <MailLink email={f.email} />}</Item>
             <Item label="Telefon">{f.telefon && <a href={`tel:${f.telefon.replace(/[^+\d]/g, '')}`}>{f.telefon}</a>}</Item>
             <Item label="Impressum">
               {f.url && (

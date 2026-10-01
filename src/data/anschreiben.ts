@@ -180,9 +180,6 @@ export function shopUrl(domain: string): string {
   return /^https?:\/\//i.test(d) ? d : `https://${d}`;
 }
 
-export const mailtoLink = (email: string, betreff: string, text: string) =>
-  `mailto:${email.trim()}?subject=${encodeURIComponent(betreff)}&body=${encodeURIComponent(text)}`;
-
 /** Key in "einstellungen" for the personal e-mail signature. */
 export const signaturSchluessel = (email: string) => `signatur_${email.trim().toLowerCase()}`;
 

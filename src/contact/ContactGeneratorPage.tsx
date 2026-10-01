@@ -10,7 +10,6 @@ import {
   kanalInfo,
   leistungenIds,
   leistungenTitel,
-  mailtoLink,
   MAX_LEISTUNGEN,
   MODI,
   mitSignatur,
@@ -29,6 +28,7 @@ import {
   type Variante,
 } from '../data/anschreiben';
 import { KontaktDialog } from '../components/dialogs/KontaktDialog';
+import { useGmail } from '../components/MailLink';
 import { useCrm } from '../data/CrmContext';
 import { phaseLabel } from '../data/constants';
 import type { CrmService } from '../data/crm';
@@ -90,6 +90,7 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
   const [params] = useSearchParams();
   const { state, expire } = useAuth();
   const toast = useToast();
+  const gmail = useGmail();
   const generator = useGenerator();
   const [ich] = useIch(db.listen.team);
   const user = state.status === 'signedOut' ? null : state.user;
@@ -146,6 +147,8 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
   const kontakte = db.kontakte.filter((k) => k.firma_id === firmaId && !k.archiviert);
   const kontakt = kontakte.find((k) => k.id === kontaktId);
   const deals = offeneDeals(db.deals, firmaId);
+  // Without a contact address the draft goes to the company's general address, or Gmail asks for one.
+  const empfaenger = kontakt?.email || firma?.email_allgemein || '';
   // List order, the manual service last.
   const wahlen: LeistungsWahl[] = [
     ...leistungen.filter((l) => leistungIds.includes(l.id)).map((leistung): LeistungsWahl => ({ art: 'liste', leistung })),
@@ -579,12 +582,24 @@ function Generator({ db, daten, aendern }: { db: Database; daten: ContactDaten; 
                   <button type="button" className="button" onClick={() => kopieren(istEmail ? mitSignatur(variante.text, signatur) : variante.text, 'Text kopiert')}>
                     Text kopieren
                   </button>
-                  {istEmail && kontakt?.email && (
-                    <a className="button" href={mailtoLink(kontakt.email, variante.betreff, mitSignatur(variante.text, signatur))}>
-                      In Mail öffnen
+                  {istEmail && (
+                    <a
+                      className="button"
+                      href={gmail({ an: empfaenger, betreff: variante.betreff, text: mitSignatur(variante.text, signatur) })}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      In Gmail öffnen ↗
                     </a>
                   )}
                 </div>
+                {istEmail && (
+                  <p className="small muted">
+                    {empfaenger
+                      ? `Gmail öffnet einen Entwurf an ${empfaenger} mit Betreff und Text.`
+                      : 'Keine E-Mail-Adresse hinterlegt. Gmail öffnet den Entwurf ohne Empfänger.'}
+                  </p>
+                )}
 
                 <div className="contact-neu">
                   <div className="input-row">

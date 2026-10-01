@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { MailLink } from '../components/MailLink';
 import { ErrorBox, Loading, PageHeader } from '../components/ui';
 import { ANLASS_BEREICH, ANLASS_LABEL, anlaesseIn, BEREICHE, bereichVon, reichweiteLabel, scoreIn, systemLabel, tierVon, type ListenZeile } from '../data/leadFinder';
 import { useLoad } from '../lib/useLoad';
@@ -176,9 +177,7 @@ export function BacklogPage() {
                         </div>
                         {z.email && (
                           <div className="row-sub">
-                            <a href={`mailto:${z.email}`} onClick={(e) => e.stopPropagation()}>
-                              {z.email}
-                            </a>
+                            <MailLink email={z.email} onClick={(e) => e.stopPropagation()} />
                           </div>
                         )}
                       </td>
