@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { MailLink } from '../components/MailLink';
 import { Card, Field, FormError } from '../components/ui';
 import { anfrageDubletten, anfrageFirmenname } from '../data/eingang';
 import type { Anfrage, Firma } from '../data/types';
@@ -57,7 +58,7 @@ export function AnfrageKarte({ anfrage, firmen, team, ich, onUebernehmen, onVerw
     >
       <dl className="items">
         <Item label="E-Mail">
-          <a href={`mailto:${anfrage.email}`}>{anfrage.email}</a>
+          <MailLink email={anfrage.email} />
         </Item>
         {anfrage.shop && (
           <Item label="Shop">

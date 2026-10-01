@@ -8,6 +8,7 @@ import { wahrscheinlichkeit } from '../../data/selectors';
 import type { Aktivitaet, Database, Deal, Firma, Kontakt, Wiedervorlage } from '../../data/types';
 import { faelligText, formatDate, formatDateTime, formatEuro, shortUser } from '../../lib/format';
 import { DealDialog } from '../dialogs/DealDialog';
+import { MailLink } from '../MailLink';
 import { KontaktDialog } from '../dialogs/KontaktDialog';
 import { TerminDialog } from '../dialogs/TerminDialog';
 import { WiedervorlageDialog } from '../dialogs/WiedervorlageDialog';
@@ -128,7 +129,7 @@ export function KontakteKarte({ firma, db }: { firma: Firma; db: Database }) {
             </div>
             {k.rolle && <div className="row-sub">{k.rolle}</div>}
             <div className="contact-links">
-              {k.email && <a href={`mailto:${k.email}`}>{k.email}</a>}
+              {k.email && <MailLink email={k.email} />}
               {k.telefon && <a href={`tel:${k.telefon.replace(/[^\d+]/g, '')}`}>{k.telefon}</a>}
               {k.linkedin && (
                 <a href={k.linkedin} target="_blank" rel="noreferrer noopener">

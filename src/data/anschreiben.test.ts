@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { aktiveLeistungen, baueAnfrage, leistungenIds, OFFERS, offerText, leistungenTitel, mailtoLink, shopUrl, mitSignatur, prepareAnschreiben, verlaufText, vornameAus, zeichen, type AnschreibenInput, type LeistungsWahl } from './anschreiben';
+import { aktiveLeistungen, baueAnfrage, leistungenIds, OFFERS, offerText, leistungenTitel, shopUrl, mitSignatur, prepareAnschreiben, verlaufText, vornameAus, zeichen, type AnschreibenInput, type LeistungsWahl } from './anschreiben';
 import { DemoGenerator } from './contactGenerator';
 import { CrmService } from './crm';
 import { MemoryCalendar, MemoryDrive } from './demo/memoryGoogle';
@@ -96,8 +96,7 @@ describe('Anfrage an den Contact Generator', () => {
 });
 
 describe('Hilfen', () => {
-  it('builds mail links, signatures, first names and history entries', () => {
-    expect(mailtoLink('mara@shop.example', 'Frage & Idee', 'Zeile 1\nZeile 2')).toBe('mailto:mara@shop.example?subject=Frage%20%26%20Idee&body=Zeile%201%0AZeile%202');
+  it('builds signatures, first names and history entries', () => {
     expect(mitSignatur('Viele Grüße\n', ' Lukas\nVelonify ')).toBe('Viele Grüße\n\nLukas\nVelonify');
     expect(mitSignatur('Text', '  ')).toBe('Text');
     expect(shopUrl(' shop.example ')).toBe('https://shop.example');
