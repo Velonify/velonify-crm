@@ -32,12 +32,14 @@ Die Adresse ist die deterministische Cloud-Run-URL `https://crm-mcp-<PROJEKTNUMM
 npm install && npm test && npm run build
 gcloud functions deploy crm-mcp --gen2 --region=europe-west3 --runtime=nodejs24 --source=. --entry-point=crmMcp \
   --trigger-http --no-allow-unauthenticated --service-account=crm-mcp@<PROJEKT>.iam.gserviceaccount.com \
-  --set-env-vars=TZ=Europe/Berlin,BASIS_URL=<URL>,SPREADSHEET_ID=<SHEET-ID>,GOOGLE_CLIENT_ID=<CLIENT-ID> \
+  --set-env-vars=TZ=Europe/Berlin,BASIS_URL=<URL>,SPREADSHEET_ID=<SHEET-ID>,GOOGLE_CLIENT_ID=<CLIENT-ID>,TEAM_ZUORDNUNG=<EMAIL>=<TEAMNAME> \
   --set-secrets=GOOGLE_CLIENT_SECRET=crm-mcp-google-secret:latest,CRM_MCP_SCHLUESSEL=crm-mcp-schluessel:latest
 gcloud run services update crm-mcp --region=europe-west3 --no-invoker-iam-check
 ```
 
 `gcp-build` ist absichtlich leer: Cloud Build bekommt das fertige `dist/index.js` und installiert nur das Functions Framework. Die Org-Policy verbietet `allUsers`, deshalb `--no-invoker-iam-check`. Die Function prüft jede Anfrage selbst.
+
+`TEAM_ZUORDNUNG` ordnet Adressen einem Teamnamen aus der Liste `team` zu, wenn Vorname und Adresse nicht passen (mehrere mit `;` getrennt). Ohne Eintrag sucht der Server wie `useIch` im Hub nach Vorname oder Adresse.
 
 Wird `crm-mcp-schluessel` gewechselt, müssen sich alle neu verbinden.
 

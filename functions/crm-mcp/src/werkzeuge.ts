@@ -152,18 +152,36 @@ const ohneUndefined = <T extends object>(eintrag: T) =>
 export interface Kontext {
   service: CrmService;
   person: Person;
+  /** Fixed team name for the person (TEAM_ZUORDNUNG), when name and address do not give it away ("lukas" → "Lugge"). */
+  teamName?: string;
   heute: () => string;
 }
 
-/** The team name of the signed-in person ("Lugge"), as the hub's useIch finds it. */
-const ichAus = (db: Database, person: Person) => findeTeamMitglied(db.listen.team ?? [], person.name, person.email);
+/** The team name of the signed-in person: the fixed one if it is in the team, else found like the hub's useIch does. */
+function ichAus(db: Database, person: Person, teamName?: string): string | null {
+  const team = db.listen.team ?? [];
+  if (teamName && team.includes(teamName)) return teamName;
+  return findeTeamMitglied(team, person.name, person.email);
+}
+
+/** "lukas@velonify.de=Lugge; julian@velonify.de=Julian" → address → team name. */
+export function leseTeamZuordnung(wert: string): Map<string, string> {
+  const zuordnung = new Map<string, string>();
+  for (const eintrag of wert.split(/[;,]/)) {
+    const [email, name] = eintrag.split('=').map((t) => t.trim());
+    if (email && name) zuordnung.set(email.toLowerCase(), name);
+  }
+  return zuordnung;
+}
 
 function pruefeTeam(db: Database, name: string | undefined): void {
   const team = db.listen.team ?? [];
   if (name && team.length > 0 && !team.includes(name)) throw new Error(`„${name}“ ist nicht im Team. Möglich: ${team.join(', ')}.`);
 }
 
-export function registriereWerkzeuge(server: McpServer, { service, person, heute }: Kontext): void {
+export function registriereWerkzeuge(server: McpServer, { service, person, teamName, heute }: Kontext): void {
+  const meinName = (db: Database) => ichAus(db, person, teamName);
+
   const lesen = { readOnlyHint: true, openWorldHint: false } as const;
   const schreiben = { readOnlyHint: false, destructiveHint: false, openWorldHint: false } as const;
 
@@ -188,7 +206,7 @@ export function registriereWerkzeuge(server: McpServer, { service, person, heute
       const db = await service.load();
       const offen = offeneDeals(db.deals.filter((d) => !d.archiviert));
       return antwort({
-        angemeldet: { email: person.email, team_name: ichAus(db, person) },
+        angemeldet: { email: person.email, team_name: meinName(db) },
         heute: heute(),
         team: db.listen.team ?? [],
         verlustgruende: db.listen.verlustgrund ?? [],
@@ -299,7 +317,7 @@ export function registriereWerkzeuge(server: McpServer, { service, person, heute
     },
     sicher(async ({ person: wer, tage }) => {
       const db = await service.load();
-      const ich = wer === 'alle' ? null : wer || ichAus(db, person);
+      const ich = wer === 'alle' ? null : wer || meinName(db);
       if (ich) pruefeTeam(db, ich);
       const firmen = indexById(db.firmen);
       const tag = meinTag(db, ich, heute(), tage ?? 7);
@@ -341,7 +359,7 @@ export function registriereWerkzeuge(server: McpServer, { service, person, heute
     sicher(async ({ firma_id, firma, kontakt, deal, vermerk, trotzdem_anlegen }) => {
       if (!firma_id && !firma) return fehler('Entweder firma_id oder firma angeben.');
       const db = await service.load();
-      const ich = ichAus(db, person) ?? '';
+      const ich = meinName(db) ?? '';
       if (firma_id) finde(db.firmen, firma_id, 'Firma');
 
       const firmaInput = { ...EMPTY_FIRMA_INPUT, quelle: 'Claude', zustaendig: ich, ...ohneUndefined(firma ?? { name: '' }) };
@@ -450,7 +468,7 @@ export function registriereWerkzeuge(server: McpServer, { service, person, heute
       }
       if (!firma_id) return fehler('Für einen neuen Deal firma_id angeben.');
       finde(db.firmen, firma_id, 'Firma');
-      const deal = await service.saveDeal(firma_id, { ...EMPTY_DEAL_INPUT, zustaendig: ichAus(db, person) ?? '', ...aenderungen });
+      const deal = await service.saveDeal(firma_id, { ...EMPTY_DEAL_INPUT, zustaendig: meinName(db) ?? '', ...aenderungen });
       return antwort({ neu: true, deal: dealZeile(deal, indexById(db.firmen)) });
     }),
   );
@@ -483,7 +501,7 @@ export function registriereWerkzeuge(server: McpServer, { service, person, heute
       const deal = finde(db.deals, deal_id, 'Deal');
       const firma = finde(db.firmen, deal.firma_id, 'Firma');
       if (deal.phase === phase) return antwort({ hinweis: `Der Deal ist schon in „${phaseLabel(phase)}“.` });
-      const ich = ichAus(db, person) ?? '';
+      const ich = meinName(db) ?? '';
       if (kontakt_id) {
         const kontakt = finde(db.kontakte, kontakt_id, 'Kontakt');
         if (kontakt.firma_id !== firma.id) return fehler('Der Kontakt gehört zu einer anderen Firma.');
@@ -546,7 +564,7 @@ export function registriereWerkzeuge(server: McpServer, { service, person, heute
     sicher(async ({ deal_id, ergebnis }) => {
       const db = await service.load();
       const deal = finde(db.deals, deal_id, 'Deal');
-      const neu = await service.vernetzungErgebnis(deal.id, deal.geaendert_am, ergebnis, ichAus(db, person) ?? '');
+      const neu = await service.vernetzungErgebnis(deal.id, deal.geaendert_am, ergebnis, meinName(db) ?? '');
       return antwort({ deal: dealZeile(neu, indexById(db.firmen)) });
     }),
   );
@@ -595,7 +613,7 @@ export function registriereWerkzeuge(server: McpServer, { service, person, heute
       finde(db.firmen, firma_id, 'Firma');
       if (deal_id && finde(db.deals, deal_id, 'Deal').firma_id !== firma_id) return fehler('Der Deal gehört zu einer anderen Firma.');
       pruefeTeam(db, zustaendig);
-      const w = await service.saveWiedervorlage({ firma_id, titel, faellig_am, deal_id: deal_id ?? '', zustaendig: zustaendig ?? ichAus(db, person) ?? '' });
+      const w = await service.saveWiedervorlage({ firma_id, titel, faellig_am, deal_id: deal_id ?? '', zustaendig: zustaendig ?? meinName(db) ?? '' });
       return antwort({ wiedervorlage_id: w.id, wiedervorlage: kompakt(w) });
     }),
   );
