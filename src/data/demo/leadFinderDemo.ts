@@ -1,3 +1,4 @@
+import { BRANCHEN as BRANCHEN_FILTER, type BranchenErgebnis } from '../leadFinder';
 import type { Bereich, Entscheidung, EntscheidungEintrag, LeadDetail, LeadFinderApi, LeadKandidat, LeadStatistik, ListenZeile, PoolKandidat, ZaehlerTag } from '../leadFinder';
 
 const WERBUNG = [['Meta', 'Google Ads'], ['Microsoft Ads'], [], ['Meta'], ['Meta', 'TikTok', 'Pinterest'], []];
@@ -72,10 +73,20 @@ function kandidat(p: PoolKandidat, i: number): LeadKandidat {
   };
 }
 
+/** Industry from the invented domain name, as Claude would guess it from the homepage. */
+const DEMO_BRANCHE: Record<string, string> = {
+  garten: 'garten', moebel: 'wohnen', angel: 'sport', musik: 'hobby', tee: 'lebensmittel', fahrrad: 'fahrzeuge', lampen: 'wohnen', werkzeug: 'garten',
+  spielwaren: 'kinder', wein: 'lebensmittel', outdoor: 'sport', kaffee: 'lebensmittel', mode: 'mode', deko: 'wohnen', reitsport: 'sport', grill: 'garten', buero: 'b2b', bad: 'wohnen',
+};
+const DEMO_WORT: [RegExp, string][] = [[/outdoor|sport/, 'sport'], [/kaffee|tee|wein/, 'lebensmittel'], [/schmuck/, 'schmuck'], [/werkzeug|garten/, 'garten'], [/heimtextil|moebel|deko/, 'wohnen'], [/kosmetik|beauty/, 'beauty'], [/mode|fashion/, 'mode']];
+const demoBranche = (domain: string) => DEMO_BRANCHE[domain.split('-')[0]] ?? DEMO_WORT.find(([muster]) => muster.test(domain))?.[1] ?? BRANCHEN_FILTER.at(-1)!.id;
+
 export class DemoLeadFinder implements LeadFinderApi {
   private readonly pool = Array.from({ length: 60 }, (_, i) => pool(i));
   private readonly pruefungen = new Map<string, LeadKandidat>();
   private readonly entscheidungen = new Map<string, EntscheidungEintrag & { am: string }>();
+  /** Like the function: shops get their industry only after a /leads/branchen call. */
+  private readonly branchenJe = new Map<string, string>();
 
   constructor(private readonly dauerMs = 400) {
     for (const [i, p] of this.pool.slice(0, 18).entries()) this.pruefungen.set(p.domain, kandidat(p, i));
@@ -97,6 +108,7 @@ export class DemoLeadFinder implements LeadFinderApi {
       entscheidung: this.entscheidungen.get(k.domain)?.entscheidung ?? null, prioritaet: this.pool.find((p) => p.domain === k.domain)?.prioritaet,
       bereiche: k.bereiche ?? [], score_migration: k.scores?.migration ?? 0, score_ads: k.scores?.ads ?? 0, score_klaviyo: k.scores?.klaviyo ?? 0,
       werbung: k.werbung ?? [], gtm: k.gtm ?? false, email_tools: k.email_tools, email: k.firma.email || null,
+      branche: this.branchenJe.get(k.domain) ?? null,
     };
   }
 
@@ -129,7 +141,7 @@ export class DemoLeadFinder implements LeadFinderApi {
     return { kandidat: this.mitEmail(k), geprueft_am: k.geprueft_am, von: 'demo@velonify.de', entscheidung: e?.entscheidung ?? null, grund: e?.grund ?? null, entschieden_am: e?.am ?? null, entschieden_von: e ? 'demo@velonify.de' : null, firma_id: e?.firma_id ?? null };
   }
   async details(domains: string[]) {
-    return domains.flatMap((d) => (this.pruefungen.has(d) ? [this.mitEmail(this.pruefungen.get(d)!)] : []));
+    return domains.flatMap((d) => (this.pruefungen.has(d) ? [{ ...this.mitEmail(this.pruefungen.get(d)!), branche: this.branchenJe.get(d) ?? null }] : []));
   }
   async entscheide(eintraege: EntscheidungEintrag[]) {
     for (const e of eintraege) this.entscheidungen.set(e.domain, { ...e, am: new Date().toISOString() });
@@ -150,6 +162,19 @@ export class DemoLeadFinder implements LeadFinderApi {
       abgelehnt: entschieden.filter((e) => e.entscheidung === 'abgelehnt').length,
       offen_ab_25: this.pool.filter((p) => !this.pruefungen.has(p.domain)).length,
     };
+  }
+  async branchen(n: number): Promise<BranchenErgebnis> {
+    await this.warte();
+    const offen = [...(await this.backlog()), ...(await this.manuell())].filter((z, i, alle) => !z.branche && alle.findIndex((x) => x.domain === z.domain) === i);
+    const eingeordnet = offen.slice(0, n).map((z) => ({ domain: z.domain, branche: demoBranche(z.domain) }));
+    for (const e of eingeordnet) this.branchenJe.set(e.domain, e.branche);
+    return { eingeordnet, fehler: 0, offen: offen.length - eingeordnet.length };
+  }
+  async branchenFuer(domains: string[]): Promise<BranchenErgebnis> {
+    await this.warte();
+    const eingeordnet = domains.map((domain) => ({ domain, branche: this.branchenJe.get(domain) ?? demoBranche(domain) }));
+    for (const e of eingeordnet) this.branchenJe.set(e.domain, e.branche);
+    return { eingeordnet, fehler: 0, offen: 0 };
   }
   async importiere() {
     await this.warte();

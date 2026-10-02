@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { BranchenFilter, useBranchenFilter } from '../components/BranchenFilter';
 import { MailLink } from '../components/MailLink';
 import { ErrorBox, Loading, PageHeader } from '../components/ui';
-import { ANLASS_BEREICH, ANLASS_LABEL, anlaesseIn, BEREICHE, bereichVon, reichweiteLabel, scoreIn, systemLabel, tierVon, type ListenZeile } from '../data/leadFinder';
+import { passtBranche, zahlJeBranche } from '../data/branchen';
+import { ANLASS_BEREICH, ANLASS_LABEL, anlaesseIn, BEREICHE, brancheLabel, bereichVon, reichweiteLabel, scoreIn, systemLabel, tierVon, type ListenZeile } from '../data/leadFinder';
 import { useLoad } from '../lib/useLoad';
 import { AnlassBadges, EntscheidungsLeiste, MeinZaehler, ToolBadges } from './LeadTeile';
-import { NICHT_EINGERICHTET, useLeadFinderApi } from './useLeadFinder';
+import { NICHT_EINGERICHTET, useBranchenEinordnung, useLeadFinderApi } from './useLeadFinder';
 
 const REICHWEITEN = [10_000, 50_000, 100_000, 500_000];
 const SEITE = 100;
@@ -19,9 +21,11 @@ export function BacklogPage() {
   const [erledigt, setErledigt] = useState<Set<string>>(new Set());
   const [anzahl, setAnzahl] = useState(SEITE);
   const [zaehlerStand, setZaehlerStand] = useState(0);
+  const einordnung = useBranchenEinordnung(api, liste.data);
 
   const ansicht = bereichVon(params.get('ansicht') ?? 'migration');
   const filter = { q: params.get('q') ?? '', system: params.get('system') ?? '', anlass: params.get('anlass') ?? '', reichweite: params.get('reichweite') ?? '', plz: params.get('plz') ?? '' };
+  const branchen = useBranchenFilter(() => setAnzahl(SEITE));
   const setFilter = (key: keyof typeof filter | 'ansicht', value: string) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
@@ -33,10 +37,14 @@ export function BacklogPage() {
     if (key === 'ansicht') setAuswahl(new Set());
   };
 
-  const alle = useMemo(() => (liste.data ?? []).filter((z) => !erledigt.has(z.domain)), [liste.data, erledigt]);
+  const alle = useMemo(
+    () => (liste.data ?? []).filter((z) => !erledigt.has(z.domain)).map((z) => (z.branche || !einordnung.neu[z.domain] ? z : { ...z, branche: einordnung.neu[z.domain] })),
+    [liste.data, erledigt, einordnung.neu],
+  );
   const zeilen = useMemo(() => alle.filter((z) => z.bereiche.includes(ansicht)).sort((a, b) => scoreIn(b, ansicht) - scoreIn(a, ansicht) || a.domain.localeCompare(b.domain)), [alle, ansicht]);
   const zahlJe = useMemo(() => Object.fromEntries(BEREICHE.map((b) => [b.id, alle.filter((z) => z.bereiche.includes(b.id)).length])), [alle]);
   const systeme = useMemo(() => [...new Set(zeilen.map((z) => z.system))].sort(), [zeilen]);
+  const zahlenJeBranche = useMemo(() => zahlJeBranche(zeilen.map((z) => z.branche)), [zeilen]);
   const sichtbar = useMemo(() => {
     const q = filter.q.trim().toLowerCase();
     const max = Number(filter.reichweite) || 0;
@@ -46,9 +54,10 @@ export function BacklogPage() {
         (!filter.system || z.system === filter.system) &&
         (!filter.anlass || z.anlaesse.includes(filter.anlass)) &&
         (!max || (z.rang_de !== null && z.rang_de <= max)) &&
-        (!filter.plz || z.plz.startsWith(filter.plz)),
+        (!filter.plz || z.plz.startsWith(filter.plz)) &&
+        passtBranche(branchen.wert, z.branche),
     );
-  }, [zeilen, filter.q, filter.system, filter.anlass, filter.reichweite, filter.plz]);
+  }, [zeilen, filter.q, filter.system, filter.anlass, filter.reichweite, filter.plz, branchen.wert]);
 
   const gezeigt = sichtbar.slice(0, anzahl);
   const gewaehlt = [...auswahl].filter((d) => sichtbar.some((z) => z.domain === d));
@@ -137,6 +146,12 @@ export function BacklogPage() {
             </select>
           </div>
 
+          <BranchenFilter wert={branchen.wert} setze={branchen.setze} zahlen={zahlenJeBranche}>
+            {einordnung.fehler
+              ? `Branchen konnten nicht eingeordnet werden: ${einordnung.fehler}`
+              : einordnung.laeuft && `Branchen werden eingeordnet, noch ${einordnung.offen.toLocaleString('de-DE')} Shops …`}
+          </BranchenFilter>
+
           <div className="lead-leiste">
             <span className="muted small">{gewaehlt.length > 0 ? `${gewaehlt.length} ausgewählt` : 'Shops auswählen, dann entscheiden.'}</span>
             <EntscheidungsLeiste api={api} domains={gewaehlt} bereich={ansicht} onErledigt={entschieden} />
@@ -152,6 +167,7 @@ export function BacklogPage() {
                   <th>Firma</th>
                   <th>{ansicht === 'ads' ? 'Pixel & GTM' : ansicht === 'klaviyo' ? 'E-Mail-Tool' : 'System'}</th>
                   <th>Anlass</th>
+                  <th className="hide-sm">Branche</th>
                   <th className="hide-sm">Reichweite</th>
                   <th className="hide-md">Ort</th>
                   <th className="zahl">Score</th>
@@ -195,6 +211,7 @@ export function BacklogPage() {
                         <AnlassBadges anlaesse={anlaesse.map((a) => a.id)} />
                         <div className="row-sub">{anlaesse[0]?.text}</div>
                       </td>
+                      <td className="hide-sm">{z.branche ? brancheLabel(z.branche) : <span className="muted">–</span>}</td>
                       <td className="hide-sm">{reichweiteLabel(z.rang_de)}</td>
                       <td className="hide-md">{z.ort ? `${z.plz} ${z.ort}` : <span className="muted">–</span>}</td>
                       <td className="zahl">

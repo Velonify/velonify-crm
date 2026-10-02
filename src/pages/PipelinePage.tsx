@@ -1,10 +1,13 @@
 import { useMemo, useState, type DragEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { BranchenFilter, useBranchenFilter } from '../components/BranchenFilter';
+import { BranchenNachtrag } from '../components/BranchenNachtrag';
 import { DealDialog } from '../components/dialogs/DealDialog';
 import { usePhaseChange } from '../components/dialogs/PhaseChange';
 import { VernetzungKnoepfe } from '../components/dialogs/Vernetzung';
 import { ErrorBox, Loading, PageHeader, TierBadge } from '../components/ui';
 import { isAbgeschlossen, PHASEN, phaseLabel } from '../data/constants';
+import { brancheLabel, passtBranche, zahlJeBranche } from '../data/branchen';
 import { useCrm } from '../data/CrmContext';
 import { addDays, isoDate } from '../data/ids';
 import { wahrscheinlichkeit } from '../data/selectors';
@@ -21,32 +24,39 @@ export function PipelinePage() {
   const [dialog, setDialog] = useState<{ deal?: Deal } | null>(null);
   const [ziehend, setZiehend] = useState<string | null>(null);
   const [ueber, setUeber] = useState<string | null>(null);
+  const branchen = useBranchenFilter();
   const phaseChange = usePhaseChange();
   const heute = isoDate(new Date());
 
-  const spalten = useMemo(() => {
+  // Deals on the board before the industry filter, so the chips count what the other filters leave.
+  const sichtbareDeals = useMemo(() => {
     if (!db) return [];
     const firmen = new Map(db.firmen.map((f) => [f.id, f]));
     const grenze = addDays(heute, -ABGESCHLOSSEN_TAGE);
-    const deals = db.deals.filter((d) => {
+    return db.deals.flatMap((d) => {
       const firma = firmen.get(d.firma_id);
-      if (!firma || firma.archiviert || d.archiviert) return false;
-      if (zustaendig && d.zustaendig !== zustaendig) return false;
+      if (!firma || firma.archiviert || d.archiviert) return [];
+      if (zustaendig && d.zustaendig !== zustaendig) return [];
       // Won/lost columns only show the last month, so they don't grow forever.
-      return !isAbgeschlossen(d.phase) || d.abgeschlossen_am >= grenze;
-    });
-    return PHASEN.map((phase) => {
-      const inPhase = deals
-        .filter((d) => d.phase === phase)
-        .sort((a, b) => (a.naechster_schritt_am || '9999').localeCompare(b.naechster_schritt_am || '9999') || (b.wert_eur ?? 0) - (a.wert_eur ?? 0));
-      return {
-        phase,
-        deals: inPhase.map((deal) => ({ deal, firma: firmen.get(deal.firma_id)! })),
-        summe: inPhase.reduce((sum, d) => sum + (d.wert_eur ?? 0), 0),
-        gewichtet: inPhase.reduce((sum, d) => sum + ((d.wert_eur ?? 0) * wahrscheinlichkeit(d)) / 100, 0),
-      };
+      return !isAbgeschlossen(d.phase) || d.abgeschlossen_am >= grenze ? [{ deal: d, firma }] : [];
     });
   }, [db, zustaendig, heute]);
+  const zahlenJeBranche = useMemo(() => zahlJeBranche(sichtbareDeals.map((x) => x.firma.branche)), [sichtbareDeals]);
+
+  const spalten = useMemo(() => {
+    const deals = sichtbareDeals.filter((x) => passtBranche(branchen.wert, x.firma.branche));
+    return PHASEN.map((phase) => {
+      const inPhase = deals
+        .filter((x) => x.deal.phase === phase)
+        .sort((a, b) => (a.deal.naechster_schritt_am || '9999').localeCompare(b.deal.naechster_schritt_am || '9999') || (b.deal.wert_eur ?? 0) - (a.deal.wert_eur ?? 0));
+      return {
+        phase,
+        deals: inPhase,
+        summe: inPhase.reduce((sum, x) => sum + (x.deal.wert_eur ?? 0), 0),
+        gewichtet: inPhase.reduce((sum, x) => sum + ((x.deal.wert_eur ?? 0) * wahrscheinlichkeit(x.deal)) / 100, 0),
+      };
+    });
+  }, [sichtbareDeals, branchen.wert]);
 
   if (!db) return <div className="page">{error ? <ErrorBox error={error} onRetry={refresh} /> : loading && <Loading />}</div>;
 
@@ -89,6 +99,9 @@ export function PipelinePage() {
         }
       />
       {error && <ErrorBox error={error} onRetry={refresh} />}
+      <BranchenFilter wert={branchen.wert} setze={branchen.setze} zahlen={zahlenJeBranche}>
+        <BranchenNachtrag />
+      </BranchenFilter>
       <p className="muted small pipeline-hint">
         Karten zwischen Spalten ziehen oder die Phase auf der Karte wählen. Gewonnen und Verloren zeigen die letzten {ABGESCHLOSSEN_TAGE} Tage.
       </p>
@@ -142,6 +155,7 @@ export function PipelinePage() {
                     <button type="button" className="link-button board-card-title" onClick={() => setDialog({ deal })}>
                       {deal.titel}
                     </button>
+                    {firma.branche && <div className="row-sub">{brancheLabel(firma.branche)}</div>}
                     <div className="board-card-meta">
                       <span>{formatEuro(deal.wert_eur)}</span>
                       {deal.zustaendig && <span className="avatar small" title={deal.zustaendig}>{deal.zustaendig.slice(0, 1)}</span>}

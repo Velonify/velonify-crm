@@ -62,7 +62,7 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
     return service.changePhase(dealId, ziel, d.geaendert_am, grund);
   };
 
-  const nordlicht = await firma({ name: 'Nordlicht Outdoor GmbH', domain: 'nordlicht-outdoor.example', tier: 'A', score: 92, plattform: 'magento2', version: '2.4.6', eol: 'eol', ort: 'Hamburg', register: 'HRB 000001 (AG Hamburg)', email_allgemein: 'info@nordlicht-outdoor.example', telefon_allgemein: '040 000000', tech_info: 'ga4, meta_pixel, trustedshops · 812 Katalog-URLs', zustaendig: 'Lugge' });
+  const nordlicht = await firma({ name: 'Nordlicht Outdoor GmbH', domain: 'nordlicht-outdoor.example', tier: 'A', score: 92, plattform: 'magento2', version: '2.4.6', eol: 'eol', ort: 'Hamburg', register: 'HRB 000001 (AG Hamburg)', email_allgemein: 'info@nordlicht-outdoor.example', telefon_allgemein: '040 000000', tech_info: 'ga4, meta_pixel, trustedshops · 812 Katalog-URLs', zustaendig: 'Lugge', branche: 'sport' });
   const nk = await kontakt(nordlicht.id, { vorname: 'Mara', nachname: 'Holm', rolle: 'Head of E-Commerce', email: 'mara.holm@nordlicht-outdoor.example', telefon: '040 000001' });
   const nd = await deal(nordlicht.id, { kontakt_id: nk.id, wert_eur: 48000, zustaendig: 'Lugge', naechster_schritt: 'Angebot nachfassen', naechster_schritt_am: addDays(heute, -1) });
   await service.legeLeadOrdnerAn(nordlicht.id, 'NLO');
@@ -83,7 +83,7 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   await service.saveWiedervorlage({ firma_id: kleinod.id, deal_id: kd.id, titel: 'Budgetfreigabe erfragen', faellig_am: addDays(heute, 2), zustaendig: 'Julian' });
   await service.addAktivitaet({ firma_id: kleinod.id, kontakt_id: kk.id, deal_id: kd.id, typ: 'anruf', datum: new Date(Date.now() - 3 * 86_400_000).toISOString(), text: 'Erstgespräch: Magento-Wartung wird zu teuer, Relaunch für Q1 geplant.' });
 
-  const alpenglanz = await firma({ name: 'Alpenglanz Kosmetik AG', domain: 'alpenglanz.example', kuerzel: 'AGK', status: 'kunde', plattform: 'shopify_plus', ort: 'Innsbruck', quelle: 'Empfehlung', zustaendig: 'Johannes', slack_channel: 'client-agk-general' });
+  const alpenglanz = await firma({ name: 'Alpenglanz Kosmetik AG', domain: 'alpenglanz.example', kuerzel: 'AGK', status: 'kunde', plattform: 'shopify_plus', ort: 'Innsbruck', quelle: 'Empfehlung', zustaendig: 'Johannes', slack_channel: 'client-agk-general', branche: 'beauty' });
   const ad = await deal(alpenglanz.id, { titel: 'Shopify-Plus-Relaunch', wert_eur: 65000, zustaendig: 'Johannes' });
   await phase(ad.id, 'gewonnen');
   await service.saveWiedervorlage({ firma_id: alpenglanz.id, deal_id: '', titel: 'Quartalsreport schicken', faellig_am: addDays(heute, -3), zustaendig: 'Johannes' });

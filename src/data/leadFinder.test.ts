@@ -32,6 +32,11 @@ describe('importZeilen', () => {
     expect(z.kontakt).toMatchObject({ vorname: 'Anna', nachname: 'Beispiel', rolle: 'Geschäftsführung', hauptkontakt: true });
   });
 
+  it('gibt die Branche aus dem Lead-Finder an die neue Firma weiter', () => {
+    const [z] = planeImport(importZeilen([kandidat({ branche: 'mode' })]), leereDb, { tiers: ['A', 'B', 'C', 'D', 'sonstige'], zustaendig: '', dealAnlegen: false, dealTitel: '' }).zeilen;
+    expect(z.firma?.branche).toBe('mode');
+  });
+
   it('nimmt die Domain als Namen, wenn das Impressum keinen hergibt', () => {
     const k = kandidat({ firma: { ...kandidat().firma, name: '', geschaeftsfuehrer: [] } });
     const [z] = planeImport(importZeilen([k]), leereDb, { tiers: ['A', 'B', 'C', 'D', 'sonstige'], zustaendig: '', dealAnlegen: false, dealTitel: '' }).zeilen;

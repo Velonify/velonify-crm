@@ -1,5 +1,6 @@
 import { AuthExpiredError } from './errors';
 import { IMPORT_SPALTEN } from './importCsv';
+export { BRANCHEN, brancheLabel } from './branchen';
 
 /*
  * Lead finder: the pool of German shops lives in BigQuery, checked shops wait in a backlog there, and only what a
@@ -55,6 +56,8 @@ export interface ListenZeile {
   email_tools: string[] | null;
   /** Contact e-mail from the Impressum, or the one entered when releasing the shop by hand. */
   email: string | null;
+  /** Industry Claude picked from the homepage (BRANCHEN), null until it has been classified. */
+  branche: string | null;
 }
 
 /** Score of a list row in one view. */
@@ -118,6 +121,8 @@ export interface LeadKandidat {
   lcp_ms: number | null;
   pagespeed_mobil: number | null;
   belege: string[];
+  /** Latest industry of the shop; only set by /leads/details and /leads/detail, not by a fresh check. */
+  branche?: string | null;
 }
 
 export interface LeadDetail {
@@ -174,7 +179,18 @@ export interface LeadFinderApi {
   /** The signed-in user's own decisions per day, last two weeks. Nobody sees anyone else's. */
   zaehler(): Promise<ZaehlerTag[]>;
   importiere(): Promise<{ crawl_datum: string; crux_monat: number }>;
+  /** Classifies the next n shops without an industry; `offen` is how many are still left after this call. */
+  branchen(n: number): Promise<BranchenErgebnis>;
+  /** Industries of these domains (at most 12): known ones from the lead finder, the rest classified now. */
+  branchenFuer(domains: string[]): Promise<BranchenErgebnis>;
 }
+
+export interface BranchenErgebnis {
+  eingeordnet: { domain: string; branche: string }[];
+  fehler: number;
+  offen: number;
+}
+
 
 // ─── Labels ──────────────────────────────────────────────────────────────────
 
@@ -255,7 +271,7 @@ export function plattformVon(k: Pick<LeadKandidat, 'system' | 'version'>): strin
   return { sfcc: 'salesforce_cc', sap: 'sap_commerce', xtcommerce: 'xt_commerce' }[k.system] ?? k.system;
 }
 
-export const IMPORT_KOPF = [...IMPORT_SPALTEN, 'ansprechpartner_rolle', 'letztes_deploy', 'score_gruende', 'quelle'] as const;
+export const IMPORT_KOPF = [...IMPORT_SPALTEN, 'ansprechpartner_rolle', 'letztes_deploy', 'score_gruende', 'quelle', 'branche'] as const;
 
 /**
  * Checked candidates as rows in the import format, so taking them over goes through the same planning as a CSV
@@ -290,6 +306,7 @@ export function importZeilen(kandidaten: LeadKandidat[], bereich: Bereich = 'mig
       letztes_deploy: k.letztes_deploy,
       score_gruende: [...anlaesse.map((a) => a.text), ...(f.geschaeftsfuehrer.length > 1 ? [`weitere Geschäftsführung: ${f.geschaeftsfuehrer.slice(1).join(', ')}`] : [])].join(' | '),
       quelle: 'Lead-Finder',
+      branche: k.branche ?? '',
     };
     return IMPORT_KOPF.map((spalte) => werte[spalte]);
   });
@@ -352,6 +369,14 @@ export class CloudLeadFinder implements LeadFinderApi {
   }
   importiere() {
     return this.post<{ crawl_datum: string; crux_monat: number }>('import');
+  }
+  async branchen(n: number) {
+    const e = await this.post<BranchenErgebnis>('branchen', { n });
+    return { ...e, fehler: Number(e.fehler), offen: Number(e.offen) };
+  }
+  async branchenFuer(domains: string[]) {
+    const e = await this.post<BranchenErgebnis>('branchen', { domains });
+    return { ...e, fehler: Number(e.fehler), offen: Number(e.offen) };
   }
 }
 

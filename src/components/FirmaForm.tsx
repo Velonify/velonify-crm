@@ -1,5 +1,6 @@
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { BRANCHEN, brancheLabel } from '../data/branchen';
 import { EOL, EOL_LABEL, STATUS, statusLabel, TIERS } from '../data/constants';
 import { findeDubletten, type DublettenTreffer } from '../data/dubletten';
 import { DuplicateError, ValidationError } from '../data/errors';
@@ -114,6 +115,7 @@ export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel, al
             'Score',
             <input id={`${formId}-score`} inputMode="numeric" value={scoreText} onChange={(e) => setScoreText(e.target.value)} placeholder="0–100" />,
           )}
+          {field('branche', 'Branche', select('branche', BRANCHEN.map((b) => b.id), brancheLabel))}
           {field('quelle', 'Quelle', text('quelle', { placeholder: 'z. B. Magento Lauf 1, Empfehlung' }))}
           {field('plattform', 'Plattform', text('plattform', { placeholder: 'magento2' }))}
           {field('version', 'Version', text('version', { placeholder: '2.4.6' }))}

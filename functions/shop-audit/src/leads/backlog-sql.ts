@@ -64,6 +64,7 @@ export function tabellenSql(dataset: string): string[] {
   am TIMESTAMP NOT NULL
 )`,
     `ALTER TABLE \`${dataset}.entscheidungen\` ADD COLUMN IF NOT EXISTS email STRING`,
+    brancheTabelleSql(dataset),
     `CREATE OR REPLACE VIEW \`${dataset}.letzte_pruefung\` AS
 SELECT * FROM \`${dataset}.pruefungen\`
 QUALIFY ROW_NUMBER() OVER (PARTITION BY domain ORDER BY geprueft_am DESC) = 1`,
@@ -113,23 +114,54 @@ const LISTE_SPALTEN = `domain, geprueft_am, score, ausschluss, anlaesse, anlass_
   IFNULL(score_migration, score) AS score_migration, IFNULL(score_ads, 0) AS score_ads, IFNULL(score_klaviyo, 0) AS score_klaviyo,
   werbung, IFNULL(gtm, FALSE) AS gtm, email_tools, email`;
 
-export const backlogSql = (dataset: string) => `SELECT ${LISTE_SPALTEN}, entscheidung FROM \`${dataset}.backlog\` ORDER BY score DESC, domain LIMIT 5000`;
-export const manuellSql = (dataset: string) => `SELECT ${LISTE_SPALTEN}, prioritaet FROM \`${dataset}.manuell\` ORDER BY prioritaet DESC, domain LIMIT 1000`;
+/** Industries, like checks only ever appended; the latest per domain counts. */
+export const brancheTabelleSql = (dataset: string) => `CREATE TABLE IF NOT EXISTS \`${dataset}.branchen\` (
+  domain STRING NOT NULL,
+  branche STRING NOT NULL,
+  modell STRING,
+  am TIMESTAMP NOT NULL
+)`;
+const LETZTE_BRANCHE = (dataset: string) =>
+  `LEFT JOIN (SELECT domain, branche FROM \`${dataset}.branchen\` QUALIFY ROW_NUMBER() OVER (PARTITION BY domain ORDER BY am DESC) = 1) USING (domain)`;
+
+export const backlogSql = (dataset: string) => `SELECT ${LISTE_SPALTEN}, entscheidung, branche FROM \`${dataset}.backlog\` ${LETZTE_BRANCHE(dataset)} ORDER BY score DESC, domain LIMIT 5000`;
+export const manuellSql = (dataset: string) => `SELECT ${LISTE_SPALTEN}, prioritaet, branche FROM \`${dataset}.manuell\` ${LETZTE_BRANCHE(dataset)} ORDER BY prioritaet DESC, domain LIMIT 1000`;
+
+/** Latest industry of each of these domains, where there is one. Parameter @domains. */
+export const branchenVonSql = (dataset: string) => `
+SELECT domain, branche FROM \`${dataset}.branchen\`
+WHERE domain IN UNNEST(@domains)
+QUALIFY ROW_NUMBER() OVER (PARTITION BY domain ORDER BY am DESC) = 1`;
+
+/** Shops in the backlog or "manuell prüfen" without an industry yet, best first, plus how many there are. Parameter @n. */
+export const ohneBrancheSql = (dataset: string) => `
+SELECT o.domain, ANY_VALUE(o.firma) AS firma, MAX(o.score) AS score, COUNT(*) OVER () AS offen
+FROM (
+  SELECT domain, firma, score FROM \`${dataset}.backlog\`
+  UNION ALL SELECT domain, firma, score FROM \`${dataset}.manuell\`
+) o
+LEFT JOIN \`${dataset}.branchen\` b USING (domain)
+WHERE b.domain IS NULL
+GROUP BY o.domain
+ORDER BY score DESC, o.domain
+LIMIT @n`;
 
 /** Full data of the latest check of one domain. Parameter @domain. */
 export const detailSql = (dataset: string) => `
 SELECT p.daten, p.geprueft_am, p.von, e.entscheidung, e.grund, e.am AS entschieden_am, e.von AS entschieden_von, e.firma_id,
-  NULLIF(e.email, '') AS email
+  NULLIF(e.email, '') AS email, branche
 FROM \`${dataset}.letzte_pruefung\` p
 LEFT JOIN \`${dataset}.letzte_entscheidung\` e USING (domain)
-WHERE p.domain = @domain`;
+${LETZTE_BRANCHE(dataset)}
+WHERE domain = @domain`;
 
 /** Full data of the latest checks of several domains, for taking them over into the CRM. Parameter @domains. */
 export const detailsSql = (dataset: string) => `
-SELECT p.domain, p.daten, NULLIF(e.email, '') AS email
+SELECT domain, p.daten, NULLIF(e.email, '') AS email, branche
 FROM \`${dataset}.letzte_pruefung\` p
 LEFT JOIN \`${dataset}.letzte_entscheidung\` e USING (domain)
-WHERE p.domain IN UNNEST(@domains)`;
+${LETZTE_BRANCHE(dataset)}
+WHERE domain IN UNNEST(@domains)`;
 
 /** Days the personal counter looks back. */
 export const ZAEHLER_TAGE = 14;
