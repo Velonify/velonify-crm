@@ -10,6 +10,7 @@ import { katalog } from './technik.js';
 import { kurzfassung } from './regeln.js';
 import { AnfrageFehler, leadRoute, ROUTEN, type Route } from './leads/api.js';
 import { echteBq } from './leads/bq.js';
+import { AUSGABE_SCHEMA_BRANCHE, BrancheSchema, MODELL_BRANCHE, SYSTEM_PROMPT_BRANCHE } from './leads/branche.js';
 import * as linkedin from './linkedin.js';
 
 const MODELL = 'claude-opus-5';
@@ -31,6 +32,20 @@ const limit = new Limit(60, 10 * 60 * 1000);
 const leadLimit = new Limit(2000, 10 * 60 * 1000);
 const LEADS_DATASET = process.env.LEADS_DATASET ?? 'velonify-crm.leads';
 let bq: ReturnType<typeof echteBq> | null = null;
+
+/** One short Haiku call per shop: picks the industry from the fixed list, nothing else. */
+async function einordnen(nachricht: string) {
+  const antwort = await client.messages.create({
+    model: MODELL_BRANCHE,
+    max_tokens: 256,
+    output_config: { format: { type: 'json_schema', schema: AUSGABE_SCHEMA_BRANCHE } },
+    system: SYSTEM_PROMPT_BRANCHE,
+    messages: [{ role: 'user', content: nachricht }],
+  });
+  if (antwort.stop_reason !== 'end_turn') throw new Error(`Einordnung endete mit ${antwort.stop_reason}`);
+  const text = antwort.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');
+  return { branche: BrancheSchema.parse(JSON.parse(text)).branche, modell: antwort.model };
+}
 
 const feld = (max: number) => z.string().trim().max(max).default('');
 
@@ -101,6 +116,7 @@ functions.http('shopAudit', async (req, res) => {
           katalog: katalog(),
           pagespeed: PAGESPEED_KEY ? (url, strategie) => pagespeed(url, strategie, PAGESPEED_KEY) : undefined,
         },
+        einordnen,
       });
       console.log(JSON.stringify({ email, route, dauer_ms: Date.now() - start, domain: (req.body as { domain?: string })?.domain }));
       return res.json(antwort);

@@ -72,7 +72,8 @@ const gleicherShop = (a: string, b: string) => {
   return x === y || x.endsWith(`.${y}`) || y.endsWith(`.${x}`);
 };
 
-async function ladeStartseite(domain: string, laden: Abhaengigkeiten['laden']): Promise<Seite> {
+/** Homepage, falling back to www. and plain http like older shops need. */
+export async function ladeStartseite(domain: string, laden: Abhaengigkeiten['laden']): Promise<Seite> {
   let home = await laden(`https://${domain}/`);
   if (!home.ok && !domain.startsWith('www.')) {
     const www = await laden(`https://www.${domain}/`);

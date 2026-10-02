@@ -5,7 +5,7 @@ import { useCrm } from '../data/CrmContext';
 import { DemoLeadFinder } from '../data/demo/leadFinderDemo';
 import { AuthExpiredError } from '../data/errors';
 import { planeImport } from '../data/importCsv';
-import { BEREICHE, CloudLeadFinder, importZeilen, type Bereich, type EntscheidungEintrag, type LeadFinderApi, type LeadKandidat } from '../data/leadFinder';
+import { BEREICHE, CloudLeadFinder, importZeilen, type Bereich, type EntscheidungEintrag, type LeadFinderApi, type LeadKandidat, type ListenZeile } from '../data/leadFinder';
 
 // One demo instance for the whole session, so decisions survive switching pages.
 let demo: DemoLeadFinder | null = null;
@@ -109,6 +109,102 @@ export function useLeadStapel(api: LeadFinderApi | null, onFertig: () => void) {
   }, []);
 
   return { stand, laeuft, starte, stoppe };
+}
+
+export interface BranchenStand {
+  laeuft: boolean;
+  /** Industries classified during this visit, by domain; the list merges them over its rows. */
+  neu: Record<string, string>;
+  offen: number;
+  fehler: string;
+}
+
+/**
+ * Classifies the industry of every listed shop that has none yet, a dozen per call, as soon as the list is loaded.
+ * Runs once per visit; stops when nothing is left or a call classifies nothing (then the rest stays without one).
+ */
+export function useBranchenEinordnung(api: LeadFinderApi | null, zeilen: ListenZeile[] | undefined): BranchenStand {
+  const { expire } = useAuth();
+  const [stand, setStand] = useState<BranchenStand>({ laeuft: false, neu: {}, offen: 0, fehler: '' });
+  const gestartet = useRef(false);
+  // Not an effect cleanup flag: StrictMode would cancel the first run and skip the second.
+  const angezeigt = useRef(true);
+  useEffect(() => {
+    angezeigt.current = true;
+    return () => {
+      angezeigt.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!api || !zeilen || gestartet.current) return;
+    const ohne = zeilen.filter((z) => !z.branche).length;
+    if (ohne === 0) return;
+    gestartet.current = true;
+    const setze = (f: (s: BranchenStand) => BranchenStand) => angezeigt.current && setStand(f);
+    (async () => {
+      setze((s) => ({ ...s, laeuft: true, offen: ohne }));
+      try {
+        while (angezeigt.current) {
+          const e = await api.branchen(12);
+          setze((s) => ({ ...s, neu: { ...s.neu, ...Object.fromEntries(e.eingeordnet.map((x) => [x.domain, x.branche])) }, offen: e.offen }));
+          if (e.offen === 0 || e.eingeordnet.length === 0) break;
+        }
+      } catch (err) {
+        if (err instanceof AuthExpiredError) expire();
+        setze((s) => ({ ...s, fehler: err instanceof Error ? err.message : String(err) }));
+      } finally {
+        setze((s) => ({ ...s, laeuft: false }));
+      }
+    })();
+  }, [api, zeilen, expire]);
+
+  return stand;
+}
+
+export interface NachtragStand {
+  laeuft: boolean;
+  erledigt: number;
+  gesamt: number;
+  ergaenzt: number;
+  fehler: string;
+}
+
+const NACHTRAG_JE_AUFRUF = 12;
+const GUELTIGE_DOMAIN = /^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$/;
+
+/**
+ * Fills the industry of CRM firms that have none: the lead finder returns what it already knows and classifies the
+ * rest. Only empty fields are written, so a hand-picked industry stays. Started by a click, a dozen firms per call.
+ */
+export function useBranchenNachtrag(api: LeadFinderApi | null) {
+  const { db, mutate } = useCrm();
+  const { expire } = useAuth();
+  const [stand, setStand] = useState<NachtragStand>({ laeuft: false, erledigt: 0, gesamt: 0, ergaenzt: 0, fehler: '' });
+  const offen = useMemo(() => (db?.firmen ?? []).filter((f) => !f.archiviert && !f.branche && GUELTIGE_DOMAIN.test(f.domain)), [db]);
+
+  const starte = useCallback(async () => {
+    if (!api || stand.laeuft || offen.length === 0) return;
+    const liste = [...offen];
+    setStand({ laeuft: true, erledigt: 0, gesamt: liste.length, ergaenzt: 0, fehler: '' });
+    try {
+      for (let i = 0; i < liste.length; i += NACHTRAG_JE_AUFRUF) {
+        const stapel = liste.slice(i, i + NACHTRAG_JE_AUFRUF);
+        const e = await api.branchenFuer(stapel.map((f) => f.domain));
+        const nachDomain = new Map(e.eingeordnet.map((x) => [x.domain, x.branche]));
+        const werte = stapel.flatMap((f) => (nachDomain.has(f.domain) ? [{ firmaId: f.id, branche: nachDomain.get(f.domain)! }] : []));
+        const ergaenzt = werte.length ? await mutate((s) => s.ergaenzeBranchen(werte)) : 0;
+        setStand((s) => ({ ...s, erledigt: s.erledigt + stapel.length, ergaenzt: s.ergaenzt + ergaenzt }));
+      }
+    } catch (err) {
+      if (err instanceof AuthExpiredError) expire();
+      setStand((s) => ({ ...s, fehler: err instanceof Error ? err.message : String(err) }));
+    } finally {
+      setStand((s) => ({ ...s, laeuft: false }));
+    }
+  }, [api, stand.laeuft, offen, mutate, expire]);
+
+  return { stand, offen: offen.length, starte };
 }
 
 export type Ziel = 'pipeline' | 'firma';

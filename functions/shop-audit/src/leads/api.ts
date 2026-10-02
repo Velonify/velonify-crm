@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { normalisiereDomain } from '../laden.js';
-import { backlogSql, detailSql, detailsSql, ENTSCHEIDUNGEN, manuellSql, naechsteSql, statistikSql, tabellenSql, zaehlerSql } from './backlog-sql.js';
+import { backlogSql, brancheTabelleSql, branchenVonSql, detailSql, detailsSql, ENTSCHEIDUNGEN, manuellSql, naechsteSql, ohneBrancheSql, statistikSql, tabellenSql, zaehlerSql } from './backlog-sql.js';
 import { mergeSql, neuesteQuellenSql, poolTabelleSql, prioViewSql } from './pool-sql.js';
-import { pruefeKandidat, type Abhaengigkeiten, type Kandidat, type PoolDaten } from './pruefen.js';
+import { nutzerNachrichtBranche, startseitenAuszug, type BrancheId } from './branche.js';
+import { ladeStartseite, pruefeKandidat, type Abhaengigkeiten, type Kandidat, type PoolDaten } from './pruefen.js';
 
 /** The little of BigQuery the lead routes need; faked in tests. */
 export interface Bq {
@@ -27,6 +28,11 @@ const PoolSchema = z.object({
 });
 
 const Schemas = {
+  branchen: z.object({
+    n: z.number().int().min(1).max(30).default(12),
+    /** Firms already in the CRM: their industries, classified where the lead finder does not know them yet. */
+    domains: z.array(z.string().trim().min(3).max(300)).min(1).max(12).optional(),
+  }),
   naechste: z.object({ n: z.number().int().min(1).max(500).default(200), bereich: z.enum(['migration', 'ads', 'klaviyo']).default('migration') }),
   pruefen: z.object({ domain: z.string().trim().min(3).max(300), pool: PoolSchema.nullable().default(null) }),
   detail: z.object({ domain: z.string().trim().min(3).max(300) }),
@@ -49,7 +55,7 @@ const Schemas = {
   }),
 } as const;
 
-export const ROUTEN = ['naechste', 'pruefen', 'backlog', 'manuell', 'detail', 'details', 'entscheiden', 'statistik', 'zaehler', 'import', 'einrichten'] as const;
+export const ROUTEN = ['naechste', 'pruefen', 'backlog', 'manuell', 'detail', 'details', 'entscheiden', 'statistik', 'zaehler', 'branchen', 'import', 'einrichten'] as const;
 export type Route = (typeof ROUTEN)[number];
 
 export interface Kontext {
@@ -57,6 +63,19 @@ export interface Kontext {
   dataset: string;
   email: string;
   pruefDeps: Abhaengigkeiten;
+  /** Claude picks the industry from what the homepage says; unset when no API key is configured. */
+  einordnen?: (nachricht: string) => Promise<{ branche: BrancheId; modell: string }>;
+}
+
+/** Homepages loaded and classified at the same time by one /leads/branchen call. */
+const BRANCHEN_GLEICHZEITIG = 6;
+
+// The backlog joins the industry table, so it has to exist before the first list is read. Once per instance.
+const brancheTabelleDa = new Set<string>();
+async function brancheTabelle(bq: Bq, dataset: string) {
+  if (brancheTabelleDa.has(dataset)) return;
+  await bq.query(brancheTabelleSql(dataset));
+  brancheTabelleDa.add(dataset);
 }
 
 const parse = <T extends z.ZodType>(schema: T, body: unknown): z.infer<T> => {
@@ -124,20 +143,61 @@ export async function leadRoute(route: Route, body: unknown, ctx: Kontext): Prom
       return kandidat;
     }
     case 'backlog':
+      await brancheTabelle(bq, dataset);
       return { zeilen: await bq.query(backlogSql(dataset)) };
     case 'manuell':
+      await brancheTabelle(bq, dataset);
       return { zeilen: await bq.query(manuellSql(dataset)) };
+    case 'branchen': {
+      // Shops without an industry: load the homepage, let Claude pick one, append it. Either the next n of the
+      // backlog, or given domains of CRM firms, where industries the lead finder already knows are just returned.
+      const { n, domains } = parse(Schemas.branchen, body);
+      const einordnen = ctx.einordnen;
+      if (!einordnen) throw new AnfrageFehler('Die Branchen-Einordnung ist nicht eingerichtet (ANTHROPIC_API_KEY fehlt).', 500);
+      await brancheTabelle(bq, dataset);
+      let bekannt: { domain: string; branche: string }[] = [];
+      let offen: { domain: string; firma: string | null; offen?: number }[];
+      if (domains) {
+        const gefragt = [...new Set(domains.map(domainOder400))];
+        bekannt = await bq.query<{ domain: string; branche: string }>(branchenVonSql(dataset), { domains: gefragt });
+        offen = gefragt.filter((d) => !bekannt.some((b) => b.domain === d)).map((domain) => ({ domain, firma: null }));
+      } else {
+        offen = await bq.query<{ domain: string; firma: string | null; offen: number }>(ohneBrancheSql(dataset), { n });
+      }
+      const zeilen: Record<string, unknown>[] = [];
+      let fehler = 0;
+      const warteschlange = [...offen];
+      const arbeiter = async () => {
+        for (let shop = warteschlange.shift(); shop; shop = warteschlange.shift()) {
+          try {
+            const home = await ladeStartseite(shop.domain, ctx.pruefDeps.laden);
+            const auszug = startseitenAuszug(home);
+            const { branche, modell } = await einordnen(nutzerNachrichtBranche(shop.domain, shop.firma ?? '', auszug));
+            zeilen.push({ domain: shop.domain, branche, modell, am: new Date().toISOString() });
+          } catch (error) {
+            fehler += 1;
+            console.error(`Branche für ${shop.domain} fehlgeschlagen`, error instanceof Error ? error.message : error);
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(BRANCHEN_GLEICHZEITIG, offen.length) }, arbeiter));
+      await bq.insert('branchen', zeilen);
+      const neu = zeilen.map((z) => ({ domain: z.domain as string, branche: z.branche as string }));
+      if (domains) return { eingeordnet: [...bekannt, ...neu], fehler, offen: 0 };
+      const gesamt = Number(offen[0]?.offen ?? 0);
+      return { eingeordnet: neu, fehler, offen: Math.max(0, gesamt - zeilen.length) };
+    }
     case 'detail': {
       const domain = domainOder400(parse(Schemas.detail, body).domain);
-      const [zeile] = await bq.query<{ daten: string } & Record<string, unknown>>(detailSql(dataset), { domain });
+      const [zeile] = await bq.query<{ daten: string; branche?: string | null } & Record<string, unknown>>(detailSql(dataset), { domain });
       if (!zeile) throw new AnfrageFehler('Diese Domain wurde noch nicht geprüft.', 404);
-      const { daten, email, ...rest } = zeile;
-      return { ...rest, kandidat: mitEmail(JSON.parse(daten) as Kandidat, email) };
+      const { daten, email, branche, ...rest } = zeile;
+      return { ...rest, kandidat: { ...mitEmail(JSON.parse(daten) as Kandidat, email), branche: branche ?? null } };
     }
     case 'details': {
       const domains = parse(Schemas.details, body).domains.map(domainOder400);
-      const zeilen = await bq.query<{ domain: string; daten: string; email: string | null }>(detailsSql(dataset), { domains });
-      return { kandidaten: zeilen.map((z) => mitEmail(JSON.parse(z.daten) as Kandidat, z.email)) };
+      const zeilen = await bq.query<{ domain: string; daten: string; email: string | null; branche?: string | null }>(detailsSql(dataset), { domains });
+      return { kandidaten: zeilen.map((z) => ({ ...mitEmail(JSON.parse(z.daten) as Kandidat, z.email), branche: z.branche ?? null })) };
     }
     case 'entscheiden': {
       const { eintraege } = parse(Schemas.entscheiden, body);

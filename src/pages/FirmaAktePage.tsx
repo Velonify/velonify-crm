@@ -4,6 +4,7 @@ import { AuditKarte } from '../audit/AuditKarte';
 import { DealsKarte, KontakteKarte, VerlaufKarte, WiedervorlagenKarte } from '../components/akte/AkteKarten';
 import { DriveKarte, TermineKarte } from '../components/akte/GoogleKarten';
 import { usePhaseChange } from '../components/dialogs/PhaseChange';
+import { brancheLabel } from '../data/branchen';
 import { FirmaForm } from '../components/FirmaForm';
 import { useToast } from '../components/Toasts';
 import { Card, ErrorBox, Loading, PageHeader, StatusBadge, TierBadge } from '../components/ui';
@@ -178,6 +179,7 @@ export function FirmaAktePage() {
           <Card title="Einordnung">
             <dl className="items">
               <Item label="Score">{f.score}</Item>
+              <Item label="Branche">{brancheLabel(f.branche)}</Item>
               <Item label="Quelle">{f.quelle}</Item>
               <Item label="Plattform">{[f.plattform, f.version].filter(Boolean).join(' ')}</Item>
               <Item label="Support">{f.eol && (EOL_LABEL[f.eol] ?? f.eol)}</Item>

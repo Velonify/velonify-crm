@@ -79,13 +79,13 @@ describe('leadRoute', () => {
 
   it('liefert das Detail mit ausgepacktem Ergebnis, 404 ohne Prüfung', async () => {
     const f = fakeBq({ 'letzte_pruefung': [{ daten: '{"domain":"a.de","score":70}', geprueft_am: '2026-09-19', entscheidung: null }] });
-    expect(await leadRoute('detail', { domain: 'a.de' }, kontext(f.bq))).toMatchObject({ kandidat: { domain: 'a.de', score: 70 }, entscheidung: null });
+    expect(await leadRoute('detail', { domain: 'a.de' }, kontext(f.bq))).toMatchObject({ kandidat: { domain: 'a.de', score: 70, branche: null }, entscheidung: null });
     await expect(leadRoute('detail', { domain: 'b.de' }, kontext(fakeBq().bq))).rejects.toMatchObject({ status: 404 });
   });
 
   it('liefert mehrere Details auf einmal', async () => {
-    const f = fakeBq({ 'IN UNNEST(@domains)': [{ domain: 'a.de', daten: '{"domain":"a.de"}' }] });
-    expect(await leadRoute('details', { domains: ['www.a.de'] }, kontext(f.bq))).toEqual({ kandidaten: [{ domain: 'a.de' }] });
+    const f = fakeBq({ 'IN UNNEST(@domains)': [{ domain: 'a.de', daten: '{"domain":"a.de"}', branche: 'mode' }] });
+    expect(await leadRoute('details', { domains: ['www.a.de'] }, kontext(f.bq))).toEqual({ kandidaten: [{ domain: 'a.de', branche: 'mode' }] });
     expect(f.abfragen[0].params).toEqual({ domains: ['a.de'] });
   });
 
@@ -97,7 +97,7 @@ describe('leadRoute', () => {
       ],
     });
     expect(await leadRoute('details', { domains: ['a.de', 'b.de'] }, kontext(f.bq))).toEqual({
-      kandidaten: [{ domain: 'a.de', firma: { email: 'kontakt@a.de' } }, { domain: 'b.de', firma: { email: 'info@b.de' } }],
+      kandidaten: [{ domain: 'a.de', firma: { email: 'kontakt@a.de' }, branche: null }, { domain: 'b.de', firma: { email: 'info@b.de' }, branche: null }],
     });
   });
 
@@ -113,6 +113,55 @@ describe('leadRoute', () => {
     await expect(leadRoute('entscheiden', { eintraege: [{ domain: 'a.de', entscheidung: 'freigegeben', email: 'kein-at' }] }, kontext(f.bq))).rejects.toBeInstanceOf(AnfrageFehler);
     await leadRoute('entscheiden', { eintraege: [{ domain: 'a.de', entscheidung: 'freigegeben', email: ' Info@A.de ' }] }, kontext(f.bq));
     expect(f.eingefuegt[0].zeilen[0]).toMatchObject({ domain: 'a.de', entscheidung: 'freigegeben', email: 'info@a.de' });
+  });
+
+  it('ordnet Shops ohne Branche ein und speichert, was Claude wählt', async () => {
+    const f = fakeBq({ 'AS offen': [{ domain: 'muster.de', firma: 'Muster Handel GmbH', offen: 5 }, { domain: 'kaputt.de', firma: null, offen: 5 }] });
+    const nachrichten: string[] = [];
+    const ctx: Kontext = {
+      ...kontext(f.bq),
+      einordnen: async (nachricht) => {
+        nachrichten.push(nachricht);
+        if (nachricht.includes('kaputt.de')) throw new Error('API down');
+        return { branche: 'mode', modell: 'claude-haiku-4-5' };
+      },
+    };
+    expect(await leadRoute('branchen', { n: 2 }, ctx)).toEqual({ eingeordnet: [{ domain: 'muster.de', branche: 'mode' }], fehler: 1, offen: 4 });
+    expect(f.abfragen.some((a) => a.sql.includes('CREATE TABLE IF NOT EXISTS'))).toBe(true);
+    expect(f.abfragen.find((a) => a.sql.includes('AS offen'))!.params).toEqual({ n: 2 });
+    expect(nachrichten.find((n) => n.includes('muster.de'))).toContain('Titel: Muster Shop');
+    expect(f.eingefuegt).toEqual([{ tabelle: 'branchen', zeilen: [expect.objectContaining({ domain: 'muster.de', branche: 'mode', modell: 'claude-haiku-4-5' })] }]);
+  });
+
+  it('liefert bekannte Branchen von CRM-Firmen und ordnet nur die übrigen neu ein', async () => {
+    const f = fakeBq({ 'IN UNNEST(@domains)': [{ domain: 'bekannt.de', branche: 'beauty' }] });
+    const gefragt: string[] = [];
+    const ctx: Kontext = {
+      ...kontext(f.bq),
+      einordnen: async (nachricht) => {
+        gefragt.push(nachricht);
+        return { branche: 'mode', modell: 'claude-haiku-4-5' };
+      },
+    };
+    expect(await leadRoute('branchen', { domains: ['www.bekannt.de', 'https://muster.de/'] }, ctx)).toEqual({
+      eingeordnet: [{ domain: 'bekannt.de', branche: 'beauty' }, { domain: 'muster.de', branche: 'mode' }],
+      fehler: 0,
+      offen: 0,
+    });
+    expect(f.abfragen.find((a) => a.sql.includes('IN UNNEST(@domains)'))!.params).toEqual({ domains: ['bekannt.de', 'muster.de'] });
+    expect(gefragt).toHaveLength(1);
+    expect(f.eingefuegt[0].zeilen).toEqual([expect.objectContaining({ domain: 'muster.de', branche: 'mode' })]);
+    await expect(leadRoute('branchen', { domains: Array.from({ length: 13 }, (_, i) => `d${i}.de`) }, ctx)).rejects.toBeInstanceOf(AnfrageFehler);
+  });
+
+  it('meldet fehlende Einrichtung der Einordnung', async () => {
+    await expect(leadRoute('branchen', {}, kontext(fakeBq().bq))).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('liest den Backlog mit der jeweils neuesten Branche', async () => {
+    const f = fakeBq();
+    await leadRoute('backlog', {}, kontext(f.bq));
+    expect(f.abfragen.at(-1)!.sql).toMatch(/branche FROM `p\.leads\.backlog` LEFT JOIN \(SELECT domain, branche FROM `p\.leads\.branchen`/);
   });
 
   it('importiert den neuesten Crawl mit typisiertem Datum', async () => {

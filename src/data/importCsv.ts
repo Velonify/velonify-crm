@@ -1,5 +1,6 @@
 import { TIERS } from './constants';
 import { dublettenText, findeDubletten } from './dubletten';
+import { istBranche } from './branchen';
 import { normalizeDomain, splitName } from './rules';
 import type { Database, Firma, FirmaInput, KontaktInput } from './types';
 import { EMPTY_FIRMA_INPUT, EMPTY_KONTAKT_INPUT } from './types';
@@ -88,8 +89,8 @@ export const PFLICHTSPALTEN = ['domain'];
 
 /**
  * The import format, identical to the flat output of the Magento lead qualifier (CRM_COLUMNS in src/qualify.py there).
- * Also read when present: ansprechpartner_rolle, letztes_deploy (into Technik), score_gruende (into Notiz) and
- * quelle (instead of "Magento <lauf>", used by the lead finder).
+ * Also read when present: ansprechpartner_rolle, letztes_deploy (into Technik), score_gruende (into Notiz),
+ * quelle (instead of "Magento <lauf>", used by the lead finder) and branche (an id from BRANCHEN, others are ignored).
  */
 export const IMPORT_SPALTEN = [
   'tier', 'score', 'domain', 'firma', 'plattform', 'version', 'eol', 'register', 'ust_id',
@@ -111,7 +112,7 @@ const ALIASE: Record<string, string> = {
 
 /** Fields filled from the CSV. Everything else in a firm stays untouched on import. */
 const IMPORT_FELDER: (keyof FirmaInput)[] = [
-  'name', 'tier', 'score', 'plattform', 'version', 'eol', 'register', 'ust_id', 'email_allgemein', 'telefon_allgemein', 'ort', 'tech_info', 'quelle', 'notiz',
+  'name', 'tier', 'score', 'plattform', 'version', 'eol', 'register', 'ust_id', 'email_allgemein', 'telefon_allgemein', 'ort', 'tech_info', 'quelle', 'notiz', 'branche',
 ];
 
 function firmaAusZeile(get: (column: string) => string): FirmaInput {
@@ -142,6 +143,7 @@ function firmaAusZeile(get: (column: string) => string): FirmaInput {
     quelle: get('quelle') || (lauf ? `Magento ${lauf}` : 'CSV-Import'),
     // Why the qualifier rated the lead – useful context before the first call.
     notiz: gruende ? `Lead-Scoring: ${gruende}` : '',
+    branche: istBranche(get('branche')) ? get('branche') : '',
   };
 }
 

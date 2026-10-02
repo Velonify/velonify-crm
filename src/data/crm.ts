@@ -18,6 +18,7 @@ import {
 import { NotConfiguredError, NotFoundError, ValidationError } from './errors';
 import type { CalendarApi, CalendarEvent, TerminDaten } from './google/calendar';
 import { isFolder, SPREADSHEET_MIME, type DriveApi, type DriveFile } from './google/drive';
+import { istBranche } from './branchen';
 import { addDays, ID_PREFIX, isIsoDate, isoDate, newId } from './ids';
 import { anzahlPosten, parseAuswahl, prepareAngebot, statusLabel } from './angebote';
 import { auditVerlaufText, auditZeile, firmaAbgleich, type AuditErgebnis } from './audit';
@@ -262,6 +263,20 @@ export class CrmService {
       { id, changes: { ...prepareFirma(changes, db.firmen, id), ...this.changed() }, expectedGeaendertAm },
     ]);
     return firma;
+  }
+
+  /**
+   * Fills the industry of several firms in one write. Only firms whose industry is still empty get it, so a value
+   * someone chose by hand is never overwritten. Returns how many firms changed.
+   */
+  async ergaenzeBranchen(werte: { firmaId: string; branche: string }[]): Promise<number> {
+    const db = await this.store.load();
+    const nachId = new Map(db.firmen.map((f) => [f.id, f]));
+    const updates = werte
+      .filter((w) => istBranche(w.branche) && nachId.get(w.firmaId)?.branche === '')
+      .map((w) => ({ id: w.firmaId, changes: { branche: w.branche, ...this.changed() }, expectedGeaendertAm: nachId.get(w.firmaId)!.geaendert_am }));
+    await this.store.update('firmen', updates);
+    return updates.length;
   }
 
   async setFirmaArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<Firma> {
