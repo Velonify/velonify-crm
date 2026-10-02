@@ -155,6 +155,37 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
     themen: 'Shopify-Migration', nachricht: 'We are on Magento 2.4.4 and want to move before support ends.',
   });
 
+  // Lead magnets: one live skill set with four sign-ups from LinkedIn, one still in preparation.
+  const skills = await service.saveMagnet({
+    slug: 'shopify-skills', titel: 'Shopify-Ops-Skillset', beschreibung: '8 Claude-Skills für E-Com-Manager in Shopify-Shops', stichwort: 'SKILLS',
+    datei_url: 'https://drive.google.com/drive/folders/demo-skills', mail_betreff: '', mail_text: '', aktiv: true,
+  });
+  await service.saveMagnet({
+    slug: 'umzug-checkliste', titel: 'Checkliste Shopify-Umzug', beschreibung: 'Livegang-Checkliste für Magento → Shopify', stichwort: 'UMZUG',
+    datei_url: '', mail_betreff: '', mail_text: '', aktiv: false,
+  });
+  const magnetLead = (id: string, stunden: number, felder: Partial<Record<string, string | number | boolean>>) => {
+    const eingegangen = new Date(Date.now() - stunden * 3600_000).toISOString();
+    return new SheetStore(sheets).insert('magnet_leads', [
+      {
+        id, magnet: skills.slug, eingegangen_am: eingegangen, vorname: '', email: '', shop: '', shopsystem: '',
+        utm_source: 'linkedin', utm_medium: 'social', utm_campaign: skills.slug, utm_content: 'dm', token: `demo-${id}`,
+        mail_gesendet_am: eingegangen, download_am: '', downloads: 0, newsletter_einwilligung: false, newsletter_text: '',
+        newsletter_bestaetigt_am: '', newsletter_abgemeldet_am: '', status: 'neu', firma_id: '', kontakt_id: '', erledigt_am: '', erledigt_von: '',
+        erstellt_am: eingegangen, erstellt_von: 'Website', geaendert_am: eingegangen, geaendert_von: 'Website',
+        ...felder,
+      },
+    ]);
+  };
+  const spaeter = (stunden: number) => new Date(Date.now() - stunden * 3600_000).toISOString();
+  await magnetLead('ML-DEMO1', 2, { vorname: 'Svenja', email: 'svenja@hafenkontor-shop.example', shop: 'hafenkontor-shop.example', shopsystem: 'magento', download_am: spaeter(1), downloads: 2 });
+  await magnetLead('ML-DEMO2', 5, {
+    vorname: 'Tarek', email: 'tarek@kraeuterwerk.example', shop: 'https://kraeuterwerk.example', shopsystem: 'shopify', download_am: spaeter(4), downloads: 1,
+    newsletter_einwilligung: true, newsletter_text: 'Ja, schickt mir auch den Velonify-Newsletter.', newsletter_bestaetigt_am: spaeter(4),
+  });
+  await magnetLead('ML-DEMO3', 20, { vorname: 'Jana', email: 'jana.lorenz@gmail.com', shopsystem: 'keins', newsletter_einwilligung: true, newsletter_text: 'Ja, schickt mir auch den Velonify-Newsletter.' });
+  await magnetLead('ML-DEMO4', 30, { vorname: 'Ole', email: 'ole@nordwind-moebel.example', shop: 'nordwind-moebel.example', shopsystem: 'shopware', utm_source: '', utm_medium: '', utm_campaign: '', utm_content: '' });
+
   // Team plant: Johannes has already watered today.
   await service.giesseMonstera('Johannes');
 

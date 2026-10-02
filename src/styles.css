@@ -427,6 +427,7 @@ a.row-title:hover { color: var(--accent); }
 .kpi.panel :is(.kpi-label, .kpi-sub) { color: var(--on-panel-muted); }
 .anfragen { display: flex; flex-direction: column; gap: var(--space-4); }
 .anfragen .notiz { margin: var(--space-2) 0 var(--space-3); }
+.anfragen .items + .grid { margin-top: var(--space-4); }
 .anfragen-erledigt { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 14px; }
 
 .tag-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--space-4); align-items: start; }
@@ -597,6 +598,7 @@ input[type='checkbox']:indeterminate::before { transform: scale(1); height: 3px;
 .outreach-liste > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: start; padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
 .outreach-liste > li.is-archived { opacity: 0.55; }
 .outreach-liste h3 { margin: 0 0 4px; }
+.magnet-aktionen { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-2); }
 .outreach-liste dl { margin: var(--space-1) 0 0; display: grid; gap: 4px; }
 .outreach-liste dl div { display: grid; grid-template-columns: 72px 1fr; gap: var(--space-2); font-size: 13.5px; }
 .outreach-liste dt { color: var(--ink-muted); font-weight: 600; }

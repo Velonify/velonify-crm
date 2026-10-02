@@ -496,6 +496,68 @@ export interface SocialDaten {
   dms: SocialDm[];
 }
 
+/** A lead magnet: something to download that people get by e-mail after signing up on velonify.de/ressourcen/<slug>/. */
+export interface Magnet extends Meta {
+  id: string;
+  /** Address part of the landing page and the value the form sends; never change it once links are out. */
+  slug: string;
+  titel: string;
+  /** Internal note: what is inside, for whom. */
+  beschreibung: string;
+  /** Comment keyword of the LinkedIn post, e.g. SKILLS. */
+  stichwort: string;
+  /** Where the download button in the mail leads, usually a shared Google Drive file. */
+  datei_url: string;
+  mail_betreff: string;
+  /** Opening of the mail; empty uses the standard text. Paragraphs separated by an empty line. */
+  mail_text: string;
+  /** Only active magnets send mails; sign-ups for inactive ones are still recorded. */
+  aktiv: boolean;
+  sortierung: number | null;
+  archiviert: boolean;
+}
+export type MagnetInput = Pick<Magnet, 'slug' | 'titel' | 'beschreibung' | 'stichwort' | 'datei_url' | 'mail_betreff' | 'mail_text' | 'aktiv'>;
+
+/** A sign-up for a lead magnet, written by the Apps Script behind the form on velonify.de. */
+export interface MagnetLead extends Meta {
+  id: string;
+  /** Slug of the magnet. */
+  magnet: string;
+  eingegangen_am: string;
+  vorname: string;
+  email: string;
+  shop: string;
+  shopsystem: string;
+  utm_source: string;
+  utm_medium: string;
+  utm_campaign: string;
+  utm_content: string;
+  /** Secret part of the links in the mail. */
+  token: string;
+  mail_gesendet_am: string;
+  /** First click on the download link – proves the address is real. */
+  download_am: string;
+  downloads: number | null;
+  /** The newsletter box was ticked; only counts once confirmed. */
+  newsletter_einwilligung: boolean;
+  /** Wording of the box at the time, as proof of what was agreed to. */
+  newsletter_text: string;
+  newsletter_bestaetigt_am: string;
+  newsletter_abgemeldet_am: string;
+  /** 'neu', 'uebernommen' or 'verworfen', as in the inbox. */
+  status: string;
+  firma_id: string;
+  kontakt_id: string;
+  erledigt_am: string;
+  erledigt_von: string;
+}
+
+/** Everything the lead magnet tool works with, loaded in one request. */
+export interface MagnetDaten {
+  magnete: Magnet[];
+  leads: MagnetLead[];
+}
+
 export type Listen = Record<string, string[]>;
 export type Einstellungen = Record<string, string>;
 
@@ -521,6 +583,8 @@ export interface EntityMap {
   social_texte: SocialText;
   social_werte: SocialWert;
   social_dms: SocialDm;
+  magnete: Magnet;
+  magnet_leads: MagnetLead;
 }
 
 /** An inquiry from the website form, written into the sheet by the Apps Script behind the Netlify webhook. */
