@@ -1,5 +1,5 @@
 import type { EntityTab } from './schema';
-import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, MonsteraEintrag, SocialDaten, SpieleDaten, WordleErgebnis } from './types';
+import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, MagnetDaten, MonsteraEintrag, SocialDaten, SpieleDaten, WordleErgebnis } from './types';
 
 export interface RecordUpdate<T> {
   id: string;
@@ -30,6 +30,8 @@ export interface Store {
   loadSpiele(): Promise<SpieleDaten>;
   /** Plan, content, tasks and numbers of the social media tool. Throws SchemaError while its tabs are not set up. */
   loadSocialDaten(): Promise<SocialDaten>;
+  /** Magnets and their sign-ups. Throws SchemaError while the tabs are not set up. */
+  loadMagnetDaten(): Promise<MagnetDaten>;
   /** Forget which tabs exist, after the setup created new ones. */
   vergissStruktur(): void;
   insert<K extends EntityTab>(tab: K, records: EntityMap[K][]): Promise<void>;

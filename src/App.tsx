@@ -36,6 +36,8 @@ import { SocialMessungPage } from './social/MessungPage';
 import { SocialPlanPage } from './social/PlanPage';
 import { SocialStrategiePage } from './social/StrategiePage';
 import { SocialUebersichtPage } from './social/UebersichtPage';
+import { MagnetLeadsPage } from './magnete/LeadsPage';
+import { MagnetePage } from './magnete/MagnetePage';
 import { WordlePage } from './wordle/WordlePage';
 
 /** Links from before the start page (/#/firmen/…) now live under /crm. */
@@ -99,6 +101,10 @@ export function App() {
                 <Route path="manuell" element={<ManuellPage />} />
                 <Route path="suche" element={<SuchePage />} />
                 <Route path="shop/:domain" element={<LeadDetailPage />} />
+              </Route>
+              <Route path="magnete">
+                <Route index element={<MagnetLeadsPage />} />
+                <Route path="liste" element={<MagnetePage />} />
               </Route>
               <Route path="einrichtung" element={<EinrichtungPage />} />
               <Route path="pipeline" element={<AlteCrmAdresse />} />

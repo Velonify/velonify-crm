@@ -23,6 +23,7 @@ import { addDays, ID_PREFIX, isIsoDate, isoDate, newId } from './ids';
 import { anzahlPosten, parseAuswahl, prepareAngebot, statusLabel } from './angebote';
 import { auditVerlaufText, auditZeile, firmaAbgleich, type AuditErgebnis } from './audit';
 import { ANFRAGE_STATUS, anfrageText, firmaAusAnfrage, istOffen, kontaktAusAnfrage } from './eingang';
+import { firmaAusLead, istOffenerLead, kontaktAusLead, LEAD_STATUS, leadText, prepareMagnet } from './magnete';
 import { ANSCHREIBEN_STATUS, prepareAnschreiben, prepareOutreachLeistung, verlaufText, type AnschreibenInput } from './anschreiben';
 import type { ImportPlan } from './importCsv';
 import { baueKalkulation, kalkulationsThema } from './kalkulation';
@@ -79,6 +80,10 @@ import type {
   Leistungskategorie,
   LeistungskategorieInput,
   Meta,
+  Magnet,
+  MagnetDaten,
+  MagnetInput,
+  MagnetLead,
   MonsteraEintrag,
   SocialAufgabe,
   SocialAufgabeInput,
@@ -973,6 +978,95 @@ export class CrmService {
       },
     ]);
     return anfrage;
+  }
+
+  // ─── Lead-Magnete ──────────────────────────────────────────────────────────
+
+  loadMagnetDaten(): Promise<MagnetDaten> {
+    return this.store.loadMagnetDaten();
+  }
+
+  async saveMagnet(input: MagnetInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<Magnet> {
+    const { magnete } = await this.store.loadMagnetDaten();
+    const clean = prepareMagnet(input, magnete, existing?.id);
+    if (existing) {
+      const [magnet] = await this.store.update('magnete', [
+        { id: existing.id, changes: { ...clean, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm },
+      ]);
+      return magnet;
+    }
+    const magnet: Magnet = { ...clean, id: newId(ID_PREFIX.magnete), sortierung: naechsteSortierung(magnete), archiviert: false, ...this.created() };
+    await this.store.insert('magnete', [magnet]);
+    return magnet;
+  }
+
+  async setMagnetArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<Magnet> {
+    // An archived magnet must not keep sending mails.
+    const changes = archiviert ? { archiviert, aktiv: false } : { archiviert };
+    const [magnet] = await this.store.update('magnete', [{ id, changes: { ...changes, ...this.changed() }, expectedGeaendertAm }]);
+    return magnet;
+  }
+
+  /**
+   * Turns a magnet sign-up into a firm, a contact and a timeline entry, like an inquiry from the website. The
+   * contact is reused when the same address is already on file at that firm.
+   */
+  async uebernimmMagnetLead(id: string, eingabe: UebernahmeEingabe): Promise<UebernahmeErgebnis> {
+    const { magnete, leads } = await this.store.loadMagnetDaten();
+    const lead = CrmService.find(leads, id);
+    if (!istOffenerLead(lead)) throw new ValidationError('status', 'Dieser Eintrag ist schon bearbeitet.');
+
+    const db = await this.store.load();
+    const firma = eingabe.firmaId
+      ? CrmService.find(db.firmen, eingabe.firmaId)
+      : await this.createFirma({ ...firmaAusLead(lead, eingabe.zustaendig), ...eingabe.firma });
+
+    const bekannt = db.kontakte.find((k) => k.firma_id === firma.id && k.email.toLowerCase() === lead.email.toLowerCase() && !k.archiviert);
+    const kontakt = bekannt ?? (await this.saveKontakt(firma.id, kontaktAusLead(lead)));
+
+    const deal = eingabe.dealAnlegen
+      ? await this.saveDeal(firma.id, {
+          ...EMPTY_DEAL_INPUT,
+          kontakt_id: kontakt.id,
+          titel: db.einstellungen[EINSTELLUNG.dealTitel] || DEFAULT_DEAL_TITEL,
+          zustaendig: eingabe.zustaendig,
+        })
+      : null;
+
+    const magnet = magnete.find((m) => m.slug === lead.magnet);
+    await this.log({ firma_id: firma.id, kontakt_id: kontakt.id, deal_id: deal?.id ?? '', typ: 'notiz', text: leadText(lead, magnet) });
+    await this.store.update('magnet_leads', [
+      {
+        id: lead.id,
+        changes: {
+          status: LEAD_STATUS.uebernommen,
+          firma_id: firma.id,
+          kontakt_id: kontakt.id,
+          erledigt_am: this.timestamp(),
+          erledigt_von: this.currentUser(),
+          ...this.changed(),
+        },
+        expectedGeaendertAm: lead.geaendert_am,
+      },
+    ]);
+    return { firma, kontakt, deal };
+  }
+
+  /**
+   * Students, competitors, test entries: stay in the sheet (and in the numbers), but out of the to-do list. Reads
+   * the row fresh, because the Apps Script touches it on every click in the mail – that is no conflict.
+   */
+  async verwirfMagnetLead(id: string): Promise<MagnetLead> {
+    const aktuell = CrmService.find((await this.store.loadMagnetDaten()).leads, id);
+    if (!istOffenerLead(aktuell)) throw new ValidationError('status', 'Dieser Eintrag ist schon bearbeitet.');
+    const [lead] = await this.store.update('magnet_leads', [
+      {
+        id,
+        changes: { status: LEAD_STATUS.verworfen, erledigt_am: this.timestamp(), erledigt_von: this.currentUser(), ...this.changed() },
+        expectedGeaendertAm: aktuell.geaendert_am,
+      },
+    ]);
+    return lead;
   }
 
   // ─── Wort des Tages ────────────────────────────────────────────────────────

@@ -172,6 +172,26 @@ export const SCHEMA = {
     ],
     boolean: ['qualifiziert'],
   },
+  magnete: {
+    name: 'magnete',
+    columns: [
+      'id', 'slug', 'titel', 'beschreibung', 'stichwort', 'datei_url', 'mail_betreff', 'mail_text', 'aktiv',
+      'sortierung', 'archiviert', ...META,
+    ],
+    numeric: ['sortierung'],
+    boolean: ['aktiv', 'archiviert'],
+  },
+  magnet_leads: {
+    name: 'magnet_leads',
+    columns: [
+      'id', 'magnet', 'eingegangen_am', 'vorname', 'email', 'shop', 'shopsystem', 'utm_source', 'utm_medium',
+      'utm_campaign', 'utm_content', 'token', 'mail_gesendet_am', 'download_am', 'downloads',
+      'newsletter_einwilligung', 'newsletter_text', 'newsletter_bestaetigt_am', 'newsletter_abgemeldet_am',
+      'status', 'firma_id', 'kontakt_id', 'erledigt_am', 'erledigt_von', ...META,
+    ],
+    numeric: ['downloads'],
+    boolean: ['newsletter_einwilligung'],
+  },
   listen: {
     name: 'listen',
     columns: ['liste', 'wert'],
@@ -200,6 +220,11 @@ export const MONSTERA_TABS = ['monstera'] as const;
 export const EINGANG_TABS = ['eingang'] as const;
 /** Tabs of the social media tool, loaded together only when it is opened. */
 export const SOCIAL_TABS = ['social_plan', 'social_inhalte', 'social_hooks', 'social_aufgaben', 'social_texte', 'social_werte', 'social_dms'] as const;
+/**
+ * Tabs of the lead magnets: the magnets are kept in the hub, the sign-ups are written by the Apps Script behind
+ * the form on velonify.de (apps-script/magnete). Loaded only when the tool is opened.
+ */
+export const MAGNET_TABS = ['magnete', 'magnet_leads'] as const;
 export type EntityTab =
   | (typeof ENTITY_TABS)[number]
   | (typeof ANGEBOTS_TABS)[number]
@@ -208,7 +233,8 @@ export type EntityTab =
   | (typeof WORDLE_TABS)[number]
   | (typeof MONSTERA_TABS)[number]
   | (typeof EINGANG_TABS)[number]
-  | (typeof SOCIAL_TABS)[number];
+  | (typeof SOCIAL_TABS)[number]
+  | (typeof MAGNET_TABS)[number];
 
 /** Editable select values, written to the "listen" tab on setup and maintained there afterwards. */
 export const LISTEN_DEFAULTS: Record<string, string[]> = {

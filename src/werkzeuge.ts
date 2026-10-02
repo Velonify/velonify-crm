@@ -96,6 +96,16 @@ export const WERKZEUGE: Werkzeug[] = [
       { label: 'Suche', pfad: '/leads/suche' },
     ],
   },
+  {
+    id: 'magnete',
+    name: 'Lead-Magnete',
+    beschreibung: 'Downloads gegen E-Mail: Einträge von velonify.de/ressourcen, Mails und Übernahme ins CRM',
+    pfad: '/magnete',
+    navigation: [
+      { label: 'Leads', pfad: '/magnete', end: true },
+      { label: 'Magnete', pfad: '/magnete/liste' },
+    ],
+  },
 ];
 
 export const istGeplant = (w: Werkzeug) => !w.pfad;

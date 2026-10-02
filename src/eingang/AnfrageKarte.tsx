@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { MailLink } from '../components/MailLink';
 import { Card, Field, FormError } from '../components/ui';
 import { anfrageDubletten, anfrageFirmenname } from '../data/eingang';
+import type { DublettenTreffer } from '../data/dubletten';
 import type { Anfrage, Firma } from '../data/types';
 import { formatDateTime } from '../lib/format';
 
@@ -21,30 +22,13 @@ interface Props {
   firmen: readonly Firma[];
   team: readonly string[];
   ich: string | null;
-  onUebernehmen(eingabe: { firmaId?: string; firma?: { name: string }; zustaendig: string; dealAnlegen: boolean }): Promise<void>;
+  onUebernehmen(eingabe: UebernahmeAuswahl): Promise<void>;
   onVerwerfen(): Promise<void>;
 }
 
 /** One open inquiry with everything needed to decide: what came in, which firm it fits, what happens on takeover. */
 export function AnfrageKarte({ anfrage, firmen, team, ich, onUebernehmen, onVerwerfen }: Props) {
   const treffer = useMemo(() => anfrageDubletten(anfrage, firmen), [anfrage, firmen]);
-  const [firmaId, setFirmaId] = useState(treffer[0]?.firma.id ?? '');
-  const [name, setName] = useState(anfrageFirmenname(anfrage));
-  const [zustaendig, setZustaendig] = useState(ich ?? '');
-  const [dealAnlegen, setDealAnlegen] = useState(true);
-  const [laeuft, setLaeuft] = useState<'' | 'uebernehmen' | 'verwerfen'>('');
-  const [fehler, setFehler] = useState<unknown>(null);
-
-  const fuehre = async (was: 'uebernehmen' | 'verwerfen', aktion: () => Promise<void>) => {
-    setLaeuft(was);
-    setFehler(null);
-    try {
-      await aktion();
-    } catch (err) {
-      setFehler(err);
-      setLaeuft('');
-    }
-  };
 
   return (
     <Card
@@ -70,7 +54,62 @@ export function AnfrageKarte({ anfrage, firmen, team, ich, onUebernehmen, onVerw
         {anfrage.themen && <Item label="Themen">{anfrage.themen}</Item>}
       </dl>
       {anfrage.nachricht && <p className="notiz">{anfrage.nachricht}</p>}
+      <Uebernahme
+        treffer={treffer}
+        firmen={firmen}
+        team={team}
+        ich={ich}
+        firmenname={anfrageFirmenname(anfrage)}
+        onUebernehmen={onUebernehmen}
+        onVerwerfen={onVerwerfen}
+      />
+    </Card>
+  );
+}
 
+export type UebernahmeAuswahl = { firmaId?: string; firma?: { name: string }; zustaendig: string; dealAnlegen: boolean };
+
+/**
+ * The decision part of an inbox card: which firm (suggested matches first), who is responsible, whether a deal
+ * is created – and the two buttons. Shared by website inquiries and lead magnet sign-ups.
+ */
+export function Uebernahme({
+  treffer,
+  firmen,
+  team,
+  ich,
+  firmenname,
+  onUebernehmen,
+  onVerwerfen,
+}: {
+  treffer: readonly DublettenTreffer[];
+  firmen: readonly Firma[];
+  team: readonly string[];
+  ich: string | null;
+  firmenname: string;
+  onUebernehmen(eingabe: UebernahmeAuswahl): Promise<void>;
+  onVerwerfen(): Promise<void>;
+}) {
+  const [firmaId, setFirmaId] = useState(treffer[0]?.firma.id ?? '');
+  const [name, setName] = useState(firmenname);
+  const [zustaendig, setZustaendig] = useState(ich ?? '');
+  const [dealAnlegen, setDealAnlegen] = useState(true);
+  const [laeuft, setLaeuft] = useState<'' | 'uebernehmen' | 'verwerfen'>('');
+  const [fehler, setFehler] = useState<unknown>(null);
+
+  const fuehre = async (was: 'uebernehmen' | 'verwerfen', aktion: () => Promise<void>) => {
+    setLaeuft(was);
+    setFehler(null);
+    try {
+      await aktion();
+    } catch (err) {
+      setFehler(err);
+      setLaeuft('');
+    }
+  };
+
+  return (
+    <>
       <div className="grid">
         <Field label="Firma" hint={treffer.length > 0 ? 'Sieht aus wie eine Firma, die schon im CRM steht.' : 'Wird neu angelegt.'}>
           <select value={firmaId} onChange={(e) => setFirmaId(e.target.value)}>
@@ -126,7 +165,7 @@ export function AnfrageKarte({ anfrage, firmen, team, ich, onUebernehmen, onVerw
           Verwerfen
         </button>
       </div>
-    </Card>
+    </>
   );
 }
 
