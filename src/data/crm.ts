@@ -24,6 +24,7 @@ import { anzahlPosten, parseAuswahl, prepareAngebot, statusLabel } from './angeb
 import { auditVerlaufText, auditZeile, firmaAbgleich, type AuditErgebnis } from './audit';
 import { ANFRAGE_STATUS, anfrageText, firmaAusAnfrage, istOffen, kontaktAusAnfrage } from './eingang';
 import { firmaAusLead, istOffenerLead, kontaktAusLead, LEAD_STATUS, leadText, prepareMagnet } from './magnete';
+import { bereinigeReport, pruefeFreigabe, reportEntwurf, reportVon, type Report } from './roast';
 import { ANSCHREIBEN_STATUS, prepareAnschreiben, prepareOutreachLeistung, verlaufText, type AnschreibenInput } from './anschreiben';
 import type { ImportPlan } from './importCsv';
 import { baueKalkulation, kalkulationsThema } from './kalkulation';
@@ -1035,6 +1036,11 @@ export class CrmService {
 
     const magnet = magnete.find((m) => m.slug === lead.magnet);
     await this.log({ firma_id: firma.id, kontakt_id: kontakt.id, deal_id: deal?.id ?? '', typ: 'notiz', text: leadText(lead, magnet) });
+    // The roast audit moves to the new firm, so it shows up in the firm's file and in the Contact Generator.
+    if (lead.audit_id) {
+      const audit = (await this.store.loadAudits()).find((a) => a.id === lead.audit_id);
+      if (audit && !audit.firma_id) await this.ordneAuditZu(audit.id, firma.id, audit.geaendert_am);
+    }
     await this.store.update('magnet_leads', [
       {
         id: lead.id,
@@ -1067,6 +1073,51 @@ export class CrmService {
       },
     ]);
     return lead;
+  }
+
+  // ─── Shop-Roast (Magnete vom Typ „audit“) ──────────────────────────────────
+
+  /** Reads the sign-up fresh: the Apps Script writes to the same row (newsletter clicks, report views). */
+  private async frischerLead(id: string): Promise<MagnetLead> {
+    return CrmService.find((await this.store.loadMagnetDaten()).leads, id);
+  }
+
+  /** After "Shop prüfen": the audit the report is built on, and a first draft of the report from its findings. */
+  async verknuepfeRoastAudit(leadId: string, audit: Audit): Promise<MagnetLead> {
+    const lead = await this.frischerLead(leadId);
+    if (lead.report_freigegeben_am) throw new ValidationError('report', 'Der Report ist schon freigegeben. Erst die Freigabe zurücknehmen, dann neu prüfen.');
+    const [neu] = await this.store.update('magnet_leads', [
+      { id: leadId, changes: { audit_id: audit.id, report: JSON.stringify(reportEntwurf(audit)), ...this.changed() } },
+    ]);
+    return neu;
+  }
+
+  async speichereReport(leadId: string, report: Report, von: string): Promise<MagnetLead> {
+    const lead = await this.frischerLead(leadId);
+    if (lead.report_freigegeben_am) throw new ValidationError('report', 'Der Report ist freigegeben. Für Änderungen erst die Freigabe zurücknehmen.');
+    const audit = (await this.store.loadAudits()).find((a) => a.id === lead.audit_id);
+    const sauber = bereinigeReport(report, audit ?? { nicht_geprueft: '' });
+    const [neu] = await this.store.update('magnet_leads', [
+      { id: leadId, changes: { report: JSON.stringify(sauber), report_von: von.trim(), ...this.changed() } },
+    ]);
+    return neu;
+  }
+
+  /** Released reports are visible on velonify.de/roast/<token>/; taking it back hides the page again. */
+  async gibReportFrei(leadId: string, frei: boolean): Promise<MagnetLead> {
+    const lead = await this.frischerLead(leadId);
+    if (frei) pruefeFreigabe(reportVon(lead), lead.report_von);
+    const [neu] = await this.store.update('magnet_leads', [
+      { id: leadId, changes: { report_freigegeben_am: frei ? this.timestamp() : '', ...this.changed() } },
+    ]);
+    return neu;
+  }
+
+  async markiereReportGesendet(leadId: string): Promise<MagnetLead> {
+    const lead = await this.frischerLead(leadId);
+    if (!lead.report_freigegeben_am) throw new ValidationError('report', 'Der Report ist noch nicht freigegeben.');
+    const [neu] = await this.store.update('magnet_leads', [{ id: leadId, changes: { report_gesendet_am: this.timestamp(), ...this.changed() } }]);
+    return neu;
   }
 
   // ─── Wort des Tages ────────────────────────────────────────────────────────

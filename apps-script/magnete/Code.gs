@@ -3,6 +3,10 @@
  * den Tab „magnet_leads“ der CRM-Datenbank und verschickt die Mail mit dem Download (und, falls angehakt, dem
  * Bestätigungslink für den Newsletter). Außerdem vermerkt es die Klicks auf diese Links.
  *
+ * Magnete vom Typ „audit“ (Shop-Roast) haben keine Datei: Die Mail bestätigt nur, dass wir den Shop prüfen (oder
+ * dass die Plätze voll sind und der Eintrag auf der Warteliste steht). Den Report schreibt das Team im Hub, die
+ * Website zeigt ihn nach der Freigabe unter velonify.de/roast/<token>/ (Aktion „report“).
+ *
  * Aufgerufen wird es nur von den Netlify-Funktionen der Website (submission-created.mjs, magnet-link.mjs und
  * ressourcen-seite.mjs), nie direkt vom Browser. Die Landingpages füllt die Website mit den Texten aus dem Tab
  * „magnete“ (Aktion „inhalt“). Einrichtung siehe README.md. Das Skript läuft als die Person, die
@@ -18,7 +22,8 @@ var LEAD_SPALTEN = [
   'id', 'magnet', 'eingegangen_am', 'vorname', 'email', 'shop', 'shopsystem', 'utm_source', 'utm_medium',
   'utm_campaign', 'utm_content', 'token', 'mail_gesendet_am', 'download_am', 'downloads',
   'newsletter_einwilligung', 'newsletter_text', 'newsletter_bestaetigt_am', 'newsletter_abgemeldet_am',
-  'status', 'firma_id', 'kontakt_id', 'erledigt_am', 'erledigt_von',
+  'status', 'firma_id', 'kontakt_id', 'erledigt_am', 'erledigt_von', 'warteliste', 'audit_id', 'report',
+  'report_von', 'report_freigegeben_am', 'report_gesendet_am', 'report_geoeffnet_am', 'report_aufrufe',
   'erstellt_am', 'erstellt_von', 'geaendert_am', 'geaendert_von',
 ];
 // Dieselbe Schreibweise wie die IDs der App (src/data/ids.ts).
@@ -54,6 +59,8 @@ function doPost(e) {
         return abmelden(koerper.token);
       case 'inhalt':
         return inhalt(koerper.magnet);
+      case 'report':
+        return report(koerper.token, koerper.zaehlen !== false);
       default:
         return antwort(400, 'Unbekannte Aktion.');
     }
@@ -120,6 +127,14 @@ function eintrag(einsendung) {
         kontakt_id: '',
         erledigt_am: '',
         erledigt_von: '',
+        warteliste: istAudit(magnet) && !platzFrei(magnet, leads),
+        audit_id: '',
+        report: '',
+        report_von: '',
+        report_freigegeben_am: '',
+        report_gesendet_am: '',
+        report_geoeffnet_am: '',
+        report_aufrufe: 0,
         erstellt_am: jetzt.toISOString(),
         erstellt_von: 'Website',
         geaendert_am: jetzt.toISOString(),
@@ -132,7 +147,7 @@ function eintrag(einsendung) {
       neuEingewilligt = true;
     }
 
-    if (!magnet || !wahr(magnet.aktiv) || !magnet.datei_url) return antwort(200, 'Gespeichert, Magnet ist nicht aktiv – keine Mail.');
+    if (!magnet || !wahr(magnet.aktiv) || !(magnet.datei_url || istAudit(magnet))) return antwort(200, 'Gespeichert, Magnet ist nicht aktiv – keine Mail.');
     // Wer gerade erst den Newsletter dazu angehakt hat, braucht die Mail mit dem Bestätigungslink sofort.
     if (vorhanden && !neuEingewilligt && vorhanden.mail_gesendet_am && jetzt - new Date(vorhanden.mail_gesendet_am) < ERNEUT_NACH_MS) {
       return antwort(200, 'Mail ging gerade erst raus – nicht noch einmal.');
@@ -189,20 +204,55 @@ function abmelden(token) {
 
 /**
  * Texte der Landingpage für die Website (netlify/functions/ressourcen-seite.mjs). Nur für aktive Magnete und nur
- * das, was ohnehin öffentlich auf der Seite steht – Datei-Link, Mailtext und Notiz bleiben im CRM.
+ * das, was ohnehin öffentlich auf der Seite steht – Datei-Link, Mailtext und Notiz bleiben im CRM. Bei
+ * Audit-Magneten mit begrenzten Plätzen kommt dazu, wie viele noch frei sind.
  */
 function inhalt(slug) {
   slug = String(slug || '').toLowerCase();
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return antwort(400, 'Ungültige Adresse.');
   var magnet = finde(lies(TAB_MAGNETE), function (m) {
-    return m.slug === slug && wahr(m.aktiv) && !wahr(m.archiviert) && m.datei_url;
+    return m.slug === slug && wahr(m.aktiv) && !wahr(m.archiviert) && (m.datei_url || istAudit(m));
   });
   if (!magnet) return antwort(404, 'Kein aktiver Magnet unter dieser Adresse.');
+  var plaetze = istAudit(magnet) ? anzahlPlaetze(magnet) : null;
   return antwort(200, 'Inhalt.', {
     titel: String(magnet.titel || ''),
     untertitel: String(magnet.untertitel || ''),
     inhalt: String(magnet.inhalt || ''),
     knopf: String(magnet.knopf || ''),
+    typ: istAudit(magnet) ? 'audit' : 'datei',
+    plaetze: plaetze,
+    frei: plaetze === null ? null : Math.max(0, plaetze - vergebenePlaetze(magnet, lies(TAB_LEADS))),
+  });
+}
+
+/**
+ * Der Shop-Roast-Report für velonify.de/roast/<token>/ (netlify/functions/roast-seite.mjs). Nur freigegebene
+ * Reports, und nur das, was auf der Seite steht: Vorname, Shop, der Report selbst und wer geprüft hat. Jeder
+ * Aufruf zählt mit, außer die Website fragt mit „zaehlen: false“ (Vorschau).
+ */
+function report(token, zaehlen) {
+  return mitLead(token, function (leads, lead) {
+    if (!lead.report_freigegeben_am || !lead.report) return antwort(404, 'Diesen Report gibt es (noch) nicht.');
+    var inhalt;
+    try {
+      inhalt = JSON.parse(String(lead.report));
+    } catch (fehler) {
+      return antwort(500, 'Der Report ist beschädigt.');
+    }
+    if (zaehlen) {
+      aendere(leads, lead, {
+        report_geoeffnet_am: lead.report_geoeffnet_am || new Date().toISOString(),
+        report_aufrufe: (Number(lead.report_aufrufe) || 0) + 1,
+      });
+    }
+    return antwort(200, 'Report.', {
+      vorname: String(lead.vorname || ''),
+      shop: String(lead.shop || ''),
+      von: String(lead.report_von || ''),
+      freigegeben_am: String(lead.report_freigegeben_am),
+      report: inhalt,
+    });
   });
 }
 
@@ -219,6 +269,28 @@ function mitLead(token, aktion) {
   });
 }
 
+function istAudit(magnet) {
+  return Boolean(magnet) && String(magnet.typ || '').toLowerCase() === 'audit';
+}
+
+/** Leer = unbegrenzt. */
+function anzahlPlaetze(magnet) {
+  var zahl = Number(magnet.plaetze);
+  return String(magnet.plaetze === undefined ? '' : magnet.plaetze).trim() === '' || !isFinite(zahl) ? null : zahl;
+}
+
+/** Wie im Hub (src/data/roast.ts, roastPlaetze): alle außer Warteliste und Verworfenen. */
+function vergebenePlaetze(magnet, leads) {
+  return leads.zeilen.filter(function (l) {
+    return l.magnet === magnet.slug && !wahr(l.warteliste) && l.status !== 'verworfen';
+  }).length;
+}
+
+function platzFrei(magnet, leads) {
+  var plaetze = anzahlPlaetze(magnet);
+  return plaetze === null || vergebenePlaetze(magnet, leads) < plaetze;
+}
+
 function mailsHeute(leads, email, jetzt) {
   return leads.zeilen.filter(function (l) {
     return (email === null || String(l.email).toLowerCase() === email) && l.mail_gesendet_am && jetzt - new Date(l.mail_gesendet_am) < 24 * 3600 * 1000;
@@ -229,19 +301,40 @@ function mailsHeute(leads, email, jetzt) {
 
 function sendeMail(magnet, lead) {
   var basis = eigenschaft('BASIS_URL') || STANDARD.BASIS_URL;
-  var downloadUrl = basis + '/m/d/' + lead.token;
+  var audit = istAudit(magnet);
+  var downloadUrl = audit ? '' : basis + '/m/d/' + lead.token;
   var newsletterUrl = basis + '/ressourcen/newsletter/?t=' + lead.token;
   var zeigeNewsletter = wahr(lead.newsletter_einwilligung) && !lead.newsletter_bestaetigt_am;
   var vorname = String(lead.vorname || '').trim();
   var anrede = vorname ? 'Hi ' + vorname + ',' : 'Hi,';
-  var absaetze = String(magnet.mail_text || '').trim()
-    ? String(magnet.mail_text).trim().split(/\n\s*\n/)
-    : ['danke für dein Interesse! Hier ist wie versprochen „' + magnet.titel + '“.'];
-  var betreff = String(magnet.mail_betreff || '').trim() || 'Dein Download: ' + magnet.titel;
+  var eigenerText = String(magnet.mail_text || '').trim();
+  var absaetze;
+  var betreff;
+  if (audit) {
+    var shop = shopName(lead.shop) || 'deinen Shop';
+    if (wahr(lead.warteliste)) {
+      absaetze = [
+        'danke für deine Anmeldung zum „' + magnet.titel + '“! Die Plätze für diese Runde sind leider schon vergeben.',
+        'Wir haben ' + shop + ' auf die Warteliste gesetzt und melden uns, sobald wir wieder Shops prüfen.',
+      ];
+      betreff = magnet.titel + ': du stehst auf der Warteliste';
+    } else {
+      absaetze = eigenerText
+        ? eigenerText.split(/\n\s*\n/)
+        : [
+            'danke, dass du uns ' + shop + ' zeigst! Wir prüfen den Shop in vier Bereichen: Plattform und Version, Geschwindigkeit, Tracking und E-Mail-Marketing, Shop-Basics und SEO. Dazu schreibt dir jemand aus unserem Team drei eigene Beobachtungen.',
+            'Innerhalb von zwei Werktagen bekommst du den Report per Mail.',
+          ];
+      betreff = String(magnet.mail_betreff || '').trim() || magnet.titel + ': wir schauen uns ' + shop + ' an';
+    }
+  } else {
+    absaetze = eigenerText ? eigenerText.split(/\n\s*\n/) : ['danke für dein Interesse! Hier ist wie versprochen „' + magnet.titel + '“.'];
+    betreff = String(magnet.mail_betreff || '').trim() || 'Dein Download: ' + magnet.titel;
+  }
   var signatur = eigenschaft('SIGNATUR_NAME') || STANDARD.SIGNATUR_NAME;
 
   var text = [anrede, ''].concat(absaetze.map(function (a) { return a + '\n'; }));
-  text.push('Zum Download: ' + downloadUrl, '');
+  if (downloadUrl) text.push('Zum Download: ' + downloadUrl, '');
   if (zeigeNewsletter) {
     text.push('Du wolltest außerdem unseren Newsletter. Bitte bestätige das noch mit einem Klick, erst dann tragen wir dich ein:', newsletterUrl, '');
   }
@@ -282,7 +375,7 @@ function mailHtml(m) {
   m.absaetze.forEach(function (a) {
     inhalt.push(p(esc(a.trim()).replace(/\n/g, '<br>')));
   });
-  inhalt.push(knopf(m.downloadUrl, 'Jetzt herunterladen', true));
+  if (m.downloadUrl) inhalt.push(knopf(m.downloadUrl, 'Jetzt herunterladen', true));
   if (m.newsletterUrl) {
     inhalt.push('<hr style="border: 0; border-top: 1px solid #E4DDE0; margin: 8px 0 24px;">');
     inhalt.push(p('Du wolltest außerdem unseren Newsletter. Bitte bestätige das noch mit einem Klick – erst dann tragen wir dich ein:'));
@@ -406,6 +499,11 @@ function zelle(wert) {
   if (typeof wert === 'boolean' || typeof wert === 'number') return wert;
   var text = String(wert);
   return /^([=+\-@\d.]|true$|false$)/i.test(text) ? "'" + text : text;
+}
+
+/** "https://www.shop.de/kategorie" → "shop.de" */
+function shopName(url) {
+  return String(url || '').trim().toLowerCase().replace(/^[a-z]+:\/\//, '').split(/[\/?#]/)[0].replace(/^www\./, '');
 }
 
 function esc(text) {

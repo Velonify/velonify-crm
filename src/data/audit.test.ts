@@ -84,7 +84,7 @@ describe('CrmService und Shop-Audit', () => {
 
   it('refuses unknown companies before writing', async () => {
     await expect(service.speichereAudit(await ergebnis('x.example'), 'F-GIBTSNICHT')).rejects.toThrow();
-    expect(await service.loadAudits()).toHaveLength(0);
+    expect((await service.loadAudits()).filter((a) => a.domain === 'x.example')).toHaveLength(0);
   });
 });
 

@@ -4,6 +4,7 @@ import { useToast } from '../components/Toasts';
 import { ErrorBox, Field, FormError, Loading, PageHeader } from '../components/ui';
 import type { CrmService } from '../data/crm';
 import { dmLink, dmText, magnetZahlen, RESSOURCEN_BASIS } from '../data/magnete';
+import { istAuditMagnet, roastPlaetze } from '../data/roast';
 import type { Magnet, MagnetInput, MagnetLead } from '../data/types';
 import { errorMessage, fieldOf } from '../lib/errors';
 import { useMagnetDaten } from './useMagnetDaten';
@@ -12,6 +13,7 @@ type Aendern = <T>(action: (s: CrmService) => Promise<T>) => Promise<T>;
 
 const LEER: MagnetInput = {
   slug: '', titel: '', beschreibung: '', stichwort: '', datei_url: '', mail_betreff: '', mail_text: '', aktiv: false, untertitel: '', inhalt: '', knopf: '',
+  typ: 'datei', plaetze: null,
 };
 
 const INHALT_BEISPIEL = '## Was drin ist\n- Lieferantendaten rein, fertige Produkttexte raus\n- Matrixify-Import vorher auf Fehler prüfen\n\n## Für wen\nE-Com-Manager in Shopify-Shops.';
@@ -23,12 +25,14 @@ function MagnetDialog({ magnet, hatLeads, aendern, onClose }: { magnet?: Magnet;
       ? {
           slug: magnet.slug, titel: magnet.titel, beschreibung: magnet.beschreibung, stichwort: magnet.stichwort, datei_url: magnet.datei_url,
           mail_betreff: magnet.mail_betreff, mail_text: magnet.mail_text, aktiv: magnet.aktiv, untertitel: magnet.untertitel, inhalt: magnet.inhalt, knopf: magnet.knopf,
+          typ: magnet.typ === 'audit' ? 'audit' : 'datei', plaetze: magnet.plaetze,
         }
       : LEER,
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
-  const feld = (name: Exclude<keyof MagnetInput, 'aktiv'>) => ({
+  const audit = werte.typ === 'audit';
+  const feld = (name: Exclude<keyof MagnetInput, 'aktiv' | 'typ' | 'plaetze'>) => ({
     value: werte[name],
     onChange: (e: { target: { value: string } }) => setWerte((w) => ({ ...w, [name]: e.target.value })),
   });
@@ -82,9 +86,28 @@ function MagnetDialog({ magnet, hatLeads, aendern, onClose }: { magnet?: Magnet;
         <Field label="Stichwort" hint="Was unter den Post kommentiert wird">
           <input {...feld('stichwort')} placeholder="SKILLS" autoComplete="off" />
         </Field>
-        <Field label="Datei-Link" hint="Google-Drive-Datei oder -Ordner, freigegeben für „Jeder mit dem Link“ (nur Betrachter)" invalid={fieldOf(error) === 'datei_url'} wide>
-          <input {...feld('datei_url')} type="url" placeholder="https://drive.google.com/…" autoComplete="off" />
+        <Field label="Art" hint={audit ? 'Shop-Roast: Die Mail bestätigt nur. Ihr prüft den Shop im Hub und schickt den Report von Hand.' : 'Die Mail enthält den Download.'}>
+          <select value={werte.typ} onChange={(e) => setWerte((w) => ({ ...w, typ: e.target.value === 'audit' ? 'audit' : 'datei' }))}>
+            <option value="datei">Download</option>
+            <option value="audit">Shop-Roast (Audit)</option>
+          </select>
         </Field>
+        {audit ? (
+          <Field label="Plätze" hint="Danach kommt die Wartelisten-Mail; die Landingpage zeigt, wie viele noch frei sind. Leer = unbegrenzt." invalid={fieldOf(error) === 'plaetze'}>
+            <input
+              type="number"
+              min={1}
+              max={1000}
+              value={werte.plaetze ?? ''}
+              onChange={(e) => setWerte((w) => ({ ...w, plaetze: e.target.value === '' ? null : Number(e.target.value) }))}
+              placeholder="30"
+            />
+          </Field>
+        ) : (
+          <Field label="Datei-Link" hint="Google-Drive-Datei oder -Ordner, freigegeben für „Jeder mit dem Link“ (nur Betrachter)" invalid={fieldOf(error) === 'datei_url'} wide>
+            <input {...feld('datei_url')} type="url" placeholder="https://drive.google.com/…" autoComplete="off" />
+          </Field>
+        )}
         <p className="form-abschnitt">Landingpage</p>
         <Field label="Untertitel" hint="Ein Satz unter der Überschrift. Erscheint auch als Vorschautext, wenn der Link in einer DM geteilt wird." invalid={fieldOf(error) === 'untertitel'} wide>
           <textarea rows={2} {...feld('untertitel')} placeholder="8 Claude-Skills, die wir selbst jeden Tag im Shopify-Alltag nutzen – jeweils mit Anleitung." />
@@ -96,10 +119,14 @@ function MagnetDialog({ magnet, hatLeads, aendern, onClose }: { magnet?: Magnet;
           <input {...feld('knopf')} maxLength={40} autoComplete="off" />
         </Field>
         <p className="form-abschnitt">Mail</p>
-        <Field label="Betreff der Mail" hint="Leer: „Dein Download: <Titel>“" wide>
+        <Field label="Betreff der Mail" hint={audit ? 'Leer: „<Titel>: wir schauen uns <Shop> an“. Die Wartelisten-Mail hat einen festen Betreff.' : 'Leer: „Dein Download: <Titel>“'} wide>
           <input {...feld('mail_betreff')} autoComplete="off" />
         </Field>
-        <Field label="Text der Mail" hint="Steht nach „Hi <Vorname>,“ und vor dem Download-Knopf. Leerzeile = neuer Absatz. Leer: Standardtext." wide>
+        <Field
+          label="Text der Mail"
+          hint={audit ? 'Steht nach „Hi <Vorname>,“. Leer: Standardtext („Wir prüfen den Shop in vier Bereichen … innerhalb von zwei Werktagen“).' : 'Steht nach „Hi <Vorname>,“ und vor dem Download-Knopf. Leerzeile = neuer Absatz. Leer: Standardtext.'}
+          wide
+        >
           <textarea rows={5} {...feld('mail_text')} />
         </Field>
         <p className="form-abschnitt">Intern</p>
@@ -109,7 +136,7 @@ function MagnetDialog({ magnet, hatLeads, aendern, onClose }: { magnet?: Magnet;
         <Field label="Status" invalid={(fieldOf(error) === 'datei_url' || fieldOf(error) === 'untertitel') && werte.aktiv}>
           <label className="checkbox">
             <input type="checkbox" checked={werte.aktiv} onChange={(e) => setWerte((w) => ({ ...w, aktiv: e.target.checked }))} />
-            Aktiv – Landingpage ist online, Einträge bekommen die Mail mit dem Download
+            {audit ? 'Aktiv – Landingpage ist online, Einträge bekommen die Bestätigung' : 'Aktiv – Landingpage ist online, Einträge bekommen die Mail mit dem Download'}
           </label>
         </Field>
       </div>
@@ -151,7 +178,17 @@ function MagnetZeile({ magnet, leads, onBearbeiten }: { magnet: Magnet; leads: M
             velonify.de/ressourcen/{magnet.slug}/
           </a>
           {' · '}
-          {zahlen.eintraege} Einträge, {zahlen.geladen} geladen, {zahlen.newsletter} Newsletter, {zahlen.uebernommen} im CRM
+          {istAuditMagnet(magnet) ? (
+            <>
+              {magnet.plaetze !== null ? `${roastPlaetze(magnet, leads).vergeben} von ${magnet.plaetze} Plätzen` : `${zahlen.eintraege} Einträge`}
+              {leads.some((l) => l.warteliste) && `, ${leads.filter((l) => l.warteliste).length} auf der Warteliste`}, {leads.filter((l) => l.report_gesendet_am).length} Reports gesendet,{' '}
+              {zahlen.uebernommen} im CRM
+            </>
+          ) : (
+            <>
+              {zahlen.eintraege} Einträge, {zahlen.geladen} geladen, {zahlen.newsletter} Newsletter, {zahlen.uebernommen} im CRM
+            </>
+          )}
         </p>
         {magnet.beschreibung && <p className="muted small">{magnet.beschreibung}</p>}
         {!magnet.archiviert && (

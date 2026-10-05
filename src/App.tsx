@@ -38,6 +38,7 @@ import { SocialStrategiePage } from './social/StrategiePage';
 import { SocialUebersichtPage } from './social/UebersichtPage';
 import { MagnetLeadsPage } from './magnete/LeadsPage';
 import { MagnetePage } from './magnete/MagnetePage';
+import { RoastPage } from './magnete/RoastPage';
 import { WordlePage } from './wordle/WordlePage';
 
 /** Links from before the start page (/#/firmen/…) now live under /crm. */
@@ -105,6 +106,7 @@ export function App() {
               <Route path="magnete">
                 <Route index element={<MagnetLeadsPage />} />
                 <Route path="liste" element={<MagnetePage />} />
+                <Route path="roast/:id" element={<RoastPage />} />
               </Route>
               <Route path="einrichtung" element={<EinrichtungPage />} />
               <Route path="pipeline" element={<AlteCrmAdresse />} />

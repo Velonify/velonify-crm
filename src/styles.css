@@ -1006,3 +1006,38 @@ fieldset.plain.invalid legend { color: var(--danger); }
 .social-hook-gruppe + .social-hook-gruppe { margin-top: var(--space-3); }
 .social-hook-gruppe .subheading { display: flex; align-items: center; gap: var(--space-1); }
 .card.is-archived { opacity: 0.6; }
+
+/* Shop-Roast (src/magnete/RoastPage.tsx) */
+.ampel { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: 0; flex-shrink: 0; background: var(--line-strong); }
+.ampel-rot { background: var(--danger); }
+.ampel-gelb { background: var(--warn); }
+.ampel-gruen { background: var(--ok); }
+.roast-editor { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.roast-editor:disabled { opacity: 0.75; }
+.roast-claude { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+.roast-bereich { display: flex; flex-direction: column; gap: var(--space-2); border-top: 1px solid var(--line); padding-top: var(--space-2); }
+.roast-bereich .subheading, .roast-vorschau h3 { display: flex; align-items: center; gap: 8px; }
+.roast-punkt-edit { display: flex; flex-direction: column; gap: 6px; }
+.roast-punkt-edit input { font-weight: 700; }
+.roast-punkt-edit.invalid input:placeholder-shown, .roast-punkt-edit.invalid textarea:placeholder-shown { border-color: var(--danger); }
+.roast-punkt-kopf { display: flex; gap: var(--space-1); align-items: baseline; }
+.roast-punkt-kopf .muted { flex: 1; min-width: 0; }
+.roast-schritte { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.roast-schritte li { display: grid; grid-template-columns: 26px 1fr; gap: var(--space-1); }
+.roast-schritt-nr { width: 22px; height: 22px; border: var(--border-rule) solid var(--line-strong); display: grid; place-items: center; font-size: 11px; font-weight: 700; }
+.roast-schritte li.is-done .roast-schritt-nr { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+.roast-schritt-inhalt { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; margin-top: 4px; }
+.roast-knoepfe { display: flex; gap: 6px; flex-wrap: wrap; }
+.roast-vorschau { max-width: 680px; display: flex; flex-direction: column; gap: var(--space-3); }
+.roast-vorschau h2 { margin: 0; }
+.roast-vorschau h3 { margin: 0 0 var(--space-1); }
+.roast-vorschau h4 { margin: 0 0 4px; }
+.roast-vorschau p { margin: 0; }
+.roast-einleitung { font-size: 1.05em; }
+.roast-kennzahlen { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-1); margin: 0; }
+.roast-kennzahlen div { border: 1px solid var(--line); padding: 8px 10px; }
+.roast-kennzahlen dt { font-size: 11px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.roast-kennzahlen dd { margin: 2px 0 0; font-weight: 700; }
+.roast-ampeln { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.roast-ampeln li { display: flex; gap: 8px; align-items: center; }
+.roast-punkt { margin-bottom: var(--space-2); }

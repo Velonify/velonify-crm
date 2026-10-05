@@ -176,9 +176,9 @@ export const SCHEMA = {
     name: 'magnete',
     columns: [
       'id', 'slug', 'titel', 'beschreibung', 'stichwort', 'datei_url', 'mail_betreff', 'mail_text', 'aktiv',
-      'sortierung', 'archiviert', 'untertitel', 'inhalt', 'knopf', ...META,
+      'sortierung', 'archiviert', 'untertitel', 'inhalt', 'knopf', 'typ', 'plaetze', ...META,
     ],
-    numeric: ['sortierung'],
+    numeric: ['sortierung', 'plaetze'],
     boolean: ['aktiv', 'archiviert'],
   },
   magnet_leads: {
@@ -187,10 +187,11 @@ export const SCHEMA = {
       'id', 'magnet', 'eingegangen_am', 'vorname', 'email', 'shop', 'shopsystem', 'utm_source', 'utm_medium',
       'utm_campaign', 'utm_content', 'token', 'mail_gesendet_am', 'download_am', 'downloads',
       'newsletter_einwilligung', 'newsletter_text', 'newsletter_bestaetigt_am', 'newsletter_abgemeldet_am',
-      'status', 'firma_id', 'kontakt_id', 'erledigt_am', 'erledigt_von', ...META,
+      'status', 'firma_id', 'kontakt_id', 'erledigt_am', 'erledigt_von', 'warteliste', 'audit_id', 'report',
+      'report_von', 'report_freigegeben_am', 'report_gesendet_am', 'report_geoeffnet_am', 'report_aufrufe', ...META,
     ],
-    numeric: ['downloads'],
-    boolean: ['newsletter_einwilligung'],
+    numeric: ['downloads', 'report_aufrufe'],
+    boolean: ['newsletter_einwilligung', 'warteliste'],
   },
   listen: {
     name: 'listen',

@@ -1,8 +1,19 @@
-import type { AuditAnfrage, AuditErgebnis, Befund } from './audit';
+import type { AuditAnfrage, AuditErgebnis, Befund, NichtGeprueft } from './audit';
 import { AuthExpiredError } from './errors';
+import type { RoastTexte } from './roast';
+
+/** Findings of a stored audit, sent for the Shop-Roast texts (functions/shop-audit, route /roast). */
+export interface RoastAnfrage {
+  domain: string;
+  vorname: string;
+  befunde: Befund[];
+  nicht_geprueft: NichtGeprueft[];
+}
 
 export interface ShopAuditApi {
   pruefe(anfrage: AuditAnfrage): Promise<AuditErgebnis>;
+  /** Claude explains the findings to the shop owner. Points with doubtful numbers are left out. */
+  roastTexte(anfrage: RoastAnfrage): Promise<RoastTexte & { verworfen: number }>;
 }
 
 /** Calls the Cloud Function with the Google token the app already holds. One audit takes 20–60 seconds. */
@@ -13,22 +24,32 @@ export class CloudShopAudit implements ShopAuditApi {
   ) {}
 
   async pruefe(anfrage: AuditAnfrage): Promise<AuditErgebnis> {
+    const body = await this.post<AuditErgebnis>(this.url, anfrage);
+    if (!body.befunde) throw new Error('Das Shop-Audit hat keine Befunde geliefert.');
+    return body;
+  }
+
+  async roastTexte(anfrage: RoastAnfrage): Promise<RoastTexte & { verworfen: number }> {
+    const body = await this.post<RoastTexte & { verworfen: number }>(`${this.url.replace(/\/$/, '')}/roast`, anfrage);
+    if (!Array.isArray(body.punkte)) throw new Error('Claude hat keine Texte geliefert.');
+    return body;
+  }
+
+  private async post<T>(url: string, daten: unknown): Promise<T> {
     const token = await this.getToken();
     let antwort: Response;
     try {
-      antwort = await fetch(this.url, {
+      antwort = await fetch(url, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(anfrage),
+        body: JSON.stringify(daten),
       });
     } catch {
       throw new Error('Das Shop-Audit ist gerade nicht erreichbar. Bitte Internetverbindung prüfen und erneut versuchen.');
     }
-    const body = (await antwort.json().catch(() => null)) as (AuditErgebnis & { fehler?: string }) | null;
+    const body = (await antwort.json().catch(() => null)) as (T & { fehler?: string }) | null;
     if (antwort.status === 401 && /abgelaufen|nicht angemeldet/i.test(body?.fehler ?? '')) throw new AuthExpiredError();
-    if (!antwort.ok || !body?.befunde) {
-      throw new Error(body?.fehler ?? `Das Shop-Audit hat mit Fehler ${antwort.status} geantwortet.`);
-    }
+    if (!antwort.ok || !body) throw new Error(body?.fehler ?? `Das Shop-Audit hat mit Fehler ${antwort.status} geantwortet.`);
     return body;
   }
 }
@@ -36,6 +57,21 @@ export class CloudShopAudit implements ShopAuditApi {
 /** Demo mode: a made-up but plausible audit, the same for the same domain. No shop is contacted. */
 export class DemoShopAudit implements ShopAuditApi {
   constructor(private readonly dauerMs = 1500) {}
+
+  async roastTexte(anfrage: RoastAnfrage): Promise<RoastTexte & { verworfen: number }> {
+    await new Promise((resolve) => setTimeout(resolve, this.dauerMs));
+    const du = anfrage.vorname ? `, ${anfrage.vorname}` : '';
+    return {
+      einleitung: `Danke${du}, dass du uns ${anfrage.domain} gezeigt hast. Wir haben Plattform, Geschwindigkeit, Tracking und die Shop-Basics angesehen – am meisten Wirkung hat der erste Punkt. (Beispieltext aus dem Demo-Modus)`,
+      punkte: anfrage.befunde.map((b) => ({
+        befund_id: b.id,
+        titel: { plattform: 'Die Plattform bremst', geschwindigkeit: 'Mobil zu langsam', tracking: 'Tracking ohne Einwilligung', email: 'E-Mail verschenkt Umsatz', seo: 'Google sieht weniger als möglich', shop: 'Kleinigkeit im Shop' }[b.bereich] ?? 'Befund',
+        text: `${b.text} Das kostet auf Dauer Vertrauen oder Umsatz. Erster Schritt: mit dem Team klären, wer sich darum kümmert.`,
+      })),
+      fazit: 'Fang mit dem Punkt mit der roten Ampel an – der Rest lässt sich danach in Ruhe angehen. (Beispieltext aus dem Demo-Modus)',
+      verworfen: 0,
+    };
+  }
 
   async pruefe(anfrage: AuditAnfrage): Promise<AuditErgebnis> {
     await new Promise((resolve) => setTimeout(resolve, this.dauerMs));

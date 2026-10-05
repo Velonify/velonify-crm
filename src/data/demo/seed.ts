@@ -1,4 +1,5 @@
 import { CrmService } from '../crm';
+import { DemoShopAudit } from '../shopAudit';
 import { EINSTELLUNG } from '../constants';
 import { addDays, isoDate } from '../ids';
 import { SheetStore } from '../sheets/sheetStore';
@@ -161,11 +162,18 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
     datei_url: 'https://drive.google.com/drive/folders/demo-skills', mail_betreff: '', mail_text: '', aktiv: true,
     untertitel: '8 Claude-Skills, die wir selbst jeden Tag im Shopify-Alltag nutzen – jeweils mit Anleitung.',
     inhalt: '## Was drin ist\n- Lieferantendaten rein, fertige Produkttexte raus\n- Matrixify-Import vorher auf Fehler prüfen\n- Retourengründe clustern\n\n## Für wen\nE-Com-Manager in Shopify-Shops.',
-    knopf: 'Skillset anfordern',
+    knopf: 'Skillset anfordern', typ: 'datei', plaetze: null,
   });
   await service.saveMagnet({
     slug: 'umzug-checkliste', titel: 'Checkliste Shopify-Umzug', beschreibung: 'Livegang-Checkliste für Magento → Shopify', stichwort: 'UMZUG',
-    datei_url: '', mail_betreff: '', mail_text: '', aktiv: false, untertitel: '', inhalt: '', knopf: '',
+    datei_url: '', mail_betreff: '', mail_text: '', aktiv: false, untertitel: '', inhalt: '', knopf: '', typ: 'datei', plaetze: null,
+  });
+  const roast = await service.saveMagnet({
+    slug: 'shop-roast', titel: 'Shop-Roast', beschreibung: 'Kommentiert ROAST → wir prüfen euren Shop', stichwort: 'ROAST',
+    datei_url: '', mail_betreff: '', mail_text: '', aktiv: true, typ: 'audit', plaetze: 30,
+    untertitel: 'Wir prüfen euren Shop in vier Bereichen – dazu drei Beobachtungen von unserem Team.',
+    inhalt: '## Was wir prüfen\n- Plattform und Version\n- Geschwindigkeit\n- Tracking und E-Mail-Marketing\n- Shop-Basics und SEO',
+    knopf: 'Shop prüfen lassen',
   });
   const magnetLead = (id: string, stunden: number, felder: Partial<Record<string, string | number | boolean>>) => {
     const eingegangen = new Date(Date.now() - stunden * 3600_000).toISOString();
@@ -175,6 +183,7 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
         utm_source: 'linkedin', utm_medium: 'social', utm_campaign: skills.slug, utm_content: 'dm', token: `demo-${id}`,
         mail_gesendet_am: eingegangen, download_am: '', downloads: 0, newsletter_einwilligung: false, newsletter_text: '',
         newsletter_bestaetigt_am: '', newsletter_abgemeldet_am: '', status: 'neu', firma_id: '', kontakt_id: '', erledigt_am: '', erledigt_von: '',
+        warteliste: false, audit_id: '', report: '', report_von: '', report_freigegeben_am: '', report_gesendet_am: '', report_geoeffnet_am: '', report_aufrufe: null,
         erstellt_am: eingegangen, erstellt_von: 'Website', geaendert_am: eingegangen, geaendert_von: 'Website',
         ...felder,
       },
@@ -188,6 +197,12 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   });
   await magnetLead('ML-DEMO3', 20, { vorname: 'Jana', email: 'jana.lorenz@gmail.com', shopsystem: 'keins', newsletter_einwilligung: true, newsletter_text: 'Ja, schickt mir auch den Velonify-Newsletter.' });
   await magnetLead('ML-DEMO4', 30, { vorname: 'Ole', email: 'ole@nordwind-moebel.example', shop: 'nordwind-moebel.example', shopsystem: 'shopware', utm_source: '', utm_medium: '', utm_campaign: '', utm_content: '' });
+  // Shop-Roast: one sign-up waiting for the check, one already checked with a first draft of the report.
+  const roastLead = { magnet: roast.slug, utm_campaign: roast.slug, mail_gesendet_am: spaeter(3) };
+  await magnetLead('ML-DEMO5', 3, { ...roastLead, vorname: 'Mira', email: 'mira@seifenwerk.example', shop: 'seifenwerk.example', shopsystem: 'shopware' });
+  await magnetLead('ML-DEMO6', 26, { ...roastLead, vorname: 'Jonas', email: 'jonas@bergzeit-tee.example', shop: 'https://www.bergzeit-tee.example/', shopsystem: 'magento' });
+  const roastAudit = await service.speichereAudit(await new DemoShopAudit(0).pruefe({ domain: 'bergzeit-tee.example', leistungen: [] }));
+  await service.verknuepfeRoastAudit('ML-DEMO6', roastAudit);
 
   // Team plant: Johannes has already watered today.
   await service.giesseMonstera('Johannes');

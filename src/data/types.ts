@@ -519,13 +519,18 @@ export interface Magnet extends Meta {
   inhalt: string;
   /** Landing page: label of the submit button; empty means "Kostenlos anfordern". */
   knopf: string;
+  /** 'datei' sends a download; 'audit' (Shop-Roast) confirms by mail and the team sends a report later. */
+  typ: MagnetTyp;
+  /** Audit magnets only: how many shops get a report; later sign-ups land on the waiting list. Empty = no limit. */
+  plaetze: number | null;
   sortierung: number | null;
   archiviert: boolean;
 }
 export type MagnetInput = Pick<
   Magnet,
-  'slug' | 'titel' | 'beschreibung' | 'stichwort' | 'datei_url' | 'mail_betreff' | 'mail_text' | 'aktiv' | 'untertitel' | 'inhalt' | 'knopf'
+  'slug' | 'titel' | 'beschreibung' | 'stichwort' | 'datei_url' | 'mail_betreff' | 'mail_text' | 'aktiv' | 'untertitel' | 'inhalt' | 'knopf' | 'typ' | 'plaetze'
 >;
+export type MagnetTyp = 'datei' | 'audit' | '';
 
 /** A sign-up for a lead magnet, written by the Apps Script behind the form on velonify.de. */
 export interface MagnetLead extends Meta {
@@ -559,6 +564,20 @@ export interface MagnetLead extends Meta {
   kontakt_id: string;
   erledigt_am: string;
   erledigt_von: string;
+  /** Audit magnets: signed up after all places were taken. Set by the Apps Script. */
+  warteliste: boolean;
+  /** Audit magnets: the shop audit the report is built on (tab `audits`). */
+  audit_id: string;
+  /** Audit magnets: the report as JSON (see src/data/roast.ts). Everything in it is shown to the shop. */
+  report: string;
+  /** Who checked the shop; named in the report. */
+  report_von: string;
+  /** Only a released report is shown on velonify.de/roast/<token>. */
+  report_freigegeben_am: string;
+  report_gesendet_am: string;
+  /** First and count of views of the report page, written by the Apps Script. */
+  report_geoeffnet_am: string;
+  report_aufrufe: number | null;
 }
 
 /** Everything the lead magnet tool works with, loaded in one request. */
