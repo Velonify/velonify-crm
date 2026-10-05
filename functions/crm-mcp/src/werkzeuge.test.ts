@@ -188,3 +188,73 @@ describe('archivieren', () => {
     expect(fehler).toBe(true);
   });
 });
+
+describe('Lead-Magnete', () => {
+  beforeEach(() => verbinde('lugge@velonify.de', 'Lugge Muster'));
+
+  it('listet Magnete mit Landingpage, DM-Link und Zahlen', async () => {
+    const { daten } = await rufe('magnete');
+    const skills = daten.magnete.find((m: { adresse: string }) => m.adresse === 'shopify-skills');
+    expect(skills).toMatchObject({ aktiv: true, landingpage: 'https://velonify.de/ressourcen/shopify-skills/', eintraege: 4, offen: 4 });
+    expect(skills.dm_link).toContain('utm_source=linkedin');
+    const einzeln = await rufe('magnete', { adresse: 'shopify-skills' });
+    expect(einzeln.daten.untertitel).toContain('Claude-Skills');
+    expect(einzeln.daten.dm_text).toContain(skills.dm_link);
+    expect((await rufe('magnete', { adresse: 'gibts-nicht' })).fehler).toBe(true);
+  });
+
+  it('legt einen Magneten an, ändert nur die angegebenen Felder und prüft die Regeln', async () => {
+    const ohneTitel = await rufe('magnet_speichern', { adresse: 'neu-test' });
+    expect(ohneTitel.fehler).toBe(true);
+
+    const angelegt = await rufe('magnet_speichern', { adresse: 'neu-test', titel: 'Testmagnet', stichwort: 'test' });
+    expect(angelegt.daten).toMatchObject({ erledigt: 'angelegt', adresse: 'neu-test', stichwort: 'TEST' });
+    expect(angelegt.daten.aktiv).toBe(false);
+
+    const ohneDatei = await rufe('magnet_speichern', { adresse: 'neu-test', aktiv: true, untertitel: 'Ein Satz.' });
+    expect(ohneDatei.fehler).toBe(true);
+    expect(ohneDatei.text).toContain('Datei-Link');
+
+    const aktiv = await rufe('magnet_speichern', { adresse: 'neu-test', aktiv: true, untertitel: 'Ein Satz.', datei_url: 'https://drive.google.com/file/d/x/view' });
+    expect(aktiv.daten).toMatchObject({ erledigt: 'geändert', aktiv: true, titel: 'Testmagnet', stichwort: 'TEST', untertitel: 'Ein Satz.' });
+    expect(aktiv.daten.dm_text).toContain('velonify.de/ressourcen/neu-test/');
+
+    expect((await rufe('magnet_speichern', { adresse: 'danke', titel: 'x' })).fehler).toBe(true);
+  });
+
+  it('zeigt offene Einträge und übernimmt einen ins CRM', async () => {
+    const { daten } = await rufe('magnet_leads', { magnet: 'shopify-skills' });
+    expect(daten.zahlen.eintraege).toBe(4);
+    const svenja = daten.eintraege.find((e: { vorname: string }) => e.vorname === 'Svenja');
+    expect(svenja).toMatchObject({ shopsystem: 'Magento', herkunft: 'LinkedIn' });
+
+    const ergebnis = await rufe('magnet_lead_uebernehmen', { lead_id: svenja.lead_id, firmenname: 'Hafenkontor GmbH' });
+    expect(ergebnis.daten).toMatchObject({ erledigt: 'übernommen', firma: 'Hafenkontor GmbH' });
+    const db = await service.load();
+    expect(db.firmen.find((f) => f.id === ergebnis.daten.firma_id)).toMatchObject({ quelle: 'LinkedIn · Magnet shopify-skills', plattform: 'magento', zustaendig: 'Lugge' });
+    expect(db.deals.some((d) => d.firma_id === ergebnis.daten.firma_id)).toBe(true);
+
+    expect((await rufe('magnet_lead_uebernehmen', { lead_id: svenja.lead_id })).fehler).toBe(true);
+    const offen = await rufe('magnet_leads', { magnet: 'shopify-skills' });
+    expect(offen.daten.eintraege.some((e: { lead_id: string }) => e.lead_id === svenja.lead_id)).toBe(false);
+  });
+
+  it('warnt vor einer Firma, die es schon gibt, und verwirft Einträge', async () => {
+    const { daten } = await rufe('magnet_leads');
+    const tarek = daten.eintraege.find((e: { vorname: string }) => e.vorname === 'Tarek');
+    await service.createFirma({ ...(await import('../../../src/data/types')).EMPTY_FIRMA_INPUT, name: 'Kräuterwerk', domain: 'kraeuterwerk.example' });
+    const doppelt = await rufe('magnet_lead_uebernehmen', { lead_id: tarek.lead_id });
+    expect(doppelt.fehler).toBe(true);
+    expect(doppelt.text).toContain('Kräuterwerk');
+
+    const verworfen = await rufe('magnet_lead_verwerfen', { lead_id: tarek.lead_id });
+    expect(verworfen.daten).toMatchObject({ erledigt: 'verworfen', magnet: 'shopify-skills' });
+  });
+
+  it('archiviert einen Magneten und schaltet ihn damit ab', async () => {
+    const { daten } = await rufe('archivieren', { magnet: 'shopify-skills' });
+    expect(daten).toMatchObject({ adresse: 'shopify-skills', archiviert: true, aktiv: false });
+    const liste = await rufe('magnete');
+    expect(liste.daten.magnete.some((m: { adresse: string }) => m.adresse === 'shopify-skills')).toBe(false);
+  });
+});

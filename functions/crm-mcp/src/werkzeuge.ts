@@ -16,10 +16,34 @@ import {
 import type { CrmService } from '../../../src/data/crm';
 import { findeDubletten, dublettenText } from '../../../src/data/dubletten';
 import { DuplicateError } from '../../../src/data/errors';
+import {
+  dmLink,
+  dmText,
+  herkunftLabel,
+  istNewsletterAbonnent,
+  istOffenerLead,
+  leadFirmenname,
+  magnetZahlen,
+  RESSOURCEN_BASIS,
+  shopsystemLabel,
+  sortiereLeads,
+} from '../../../src/data/magnete';
 import { kontaktName, suggestKuerzel } from '../../../src/data/rules';
 import { driveKonfiguration, findeTeamMitglied, indexById, kennzahlen, meinTag, offeneDeals, type Aufgabe } from '../../../src/data/selectors';
 import { suche } from '../../../src/data/suche';
-import { EMPTY_DEAL_INPUT, EMPTY_FIRMA_INPUT, EMPTY_KONTAKT_INPUT, type Database, type Deal, type Firma, type Kontakt, type KontaktInput } from '../../../src/data/types';
+import {
+  EMPTY_DEAL_INPUT,
+  EMPTY_FIRMA_INPUT,
+  EMPTY_KONTAKT_INPUT,
+  type Database,
+  type Deal,
+  type Firma,
+  type Kontakt,
+  type KontaktInput,
+  type Magnet,
+  type MagnetInput,
+  type MagnetLead,
+} from '../../../src/data/types';
 import type { Person } from './google';
 
 const HUB = 'https://crm.velonify.de';
@@ -32,7 +56,8 @@ export const ANLEITUNG = `Velonify-CRM (Google Sheet hinter crm.velonify.de). Sc
 - Phasen: ${PHASEN.join(' → ')}. Phasenwechsel nur mit \`phase_aendern\`, LinkedIn-Anfragen mit Phase "vernetzung" und danach \`vernetzung_ergebnis\`.
 - "zustaendig" ist ein Vorname aus dem Team (siehe \`ueberblick\`), keine E-Mail.
 - Daten im Format JJJJ-MM-TT. Die Zeitzone ist Europe/Berlin.
-- Nichts wird gelöscht. \`archivieren\` blendet Firmen, Deals oder Kontakte aus und lässt sich rückgängig machen; vorher nachfragen.`;
+- Nichts wird gelöscht. \`archivieren\` blendet Firmen, Deals, Kontakte oder Lead-Magnete aus und lässt sich rückgängig machen; vorher nachfragen.
+- Lead-Magnete (Downloads gegen E-Mail auf velonify.de/ressourcen/<adresse>/): \`magnete\`, \`magnet_speichern\`, \`magnet_leads\`, \`magnet_lead_uebernehmen\`, \`magnet_lead_verwerfen\`. Ein aktiver Magnet hat sofort seine Landingpage; aktiv geht nur mit Datei-Link (Google Drive, per Link freigegeben) und Untertitel. Wer nur den Download wollte, bekommt keine Werbe-Mails – Kontakt danach über LinkedIn.`;
 
 // ─── Ausgabe ────────────────────────────────────────────────────────────────
 
@@ -95,6 +120,53 @@ function finde<T extends { id: string }>(liste: readonly T[], id: string, was: s
   if (!treffer) throw new Error(`${was} „${id}“ nicht gefunden. IDs über \`suchen\` holen.`);
   return treffer;
 }
+
+const magnetLink = () => `${HUB}/#/magnete/liste`;
+
+function magnetZeile(m: Magnet, leads: readonly MagnetLead[], mitTexten = false) {
+  const zahlen = magnetZahlen(leads.filter((l) => l.magnet === m.slug));
+  return kompakt({
+    adresse: m.slug,
+    titel: m.titel,
+    aktiv: m.aktiv,
+    archiviert: m.archiviert || '',
+    stichwort: m.stichwort,
+    landingpage: `${RESSOURCEN_BASIS}${m.slug}/`,
+    dm_link: m.aktiv ? dmLink(m.slug) : '',
+    datei_url: m.datei_url,
+    eintraege: zahlen.eintraege,
+    download_geoeffnet: zahlen.geladen,
+    newsletter: zahlen.newsletter,
+    im_crm: zahlen.uebernommen,
+    offen: zahlen.offen,
+    ...(mitTexten
+      ? { untertitel: m.untertitel, inhalt: m.inhalt, knopf: m.knopf, mail_betreff: m.mail_betreff, mail_text: m.mail_text, beschreibung: m.beschreibung }
+      : {}),
+  });
+}
+
+function leadZeile(l: MagnetLead) {
+  return kompakt({
+    lead_id: l.id,
+    magnet: l.magnet,
+    eingegangen_am: l.eingegangen_am.slice(0, 16).replace('T', ' '),
+    vorname: l.vorname,
+    email: l.email,
+    shop: l.shop,
+    shopsystem: l.shopsystem ? shopsystemLabel(l.shopsystem) : '',
+    herkunft: herkunftLabel(l),
+    download_geoeffnet: l.download_am ? l.download_am.slice(0, 10) : 'nein',
+    newsletter: istNewsletterAbonnent(l) ? 'bestätigt' : l.newsletter_abgemeldet_am ? 'abgemeldet' : l.newsletter_einwilligung ? 'angehakt, nicht bestätigt' : '',
+    status: l.status,
+    firma_id: l.firma_id,
+  });
+}
+
+/** The editable fields of a magnet, so a partial change keeps the rest. */
+const magnetInput = (m: Magnet): MagnetInput => ({
+  slug: m.slug, titel: m.titel, beschreibung: m.beschreibung, stichwort: m.stichwort, datei_url: m.datei_url, mail_betreff: m.mail_betreff,
+  mail_text: m.mail_text, aktiv: m.aktiv, untertitel: m.untertitel, inhalt: m.inhalt, knopf: m.knopf,
+});
 
 // ─── Eingaben ───────────────────────────────────────────────────────────────
 
@@ -639,19 +711,27 @@ export function registriereWerkzeuge(server: McpServer, { service, person, teamN
     {
       title: 'Archivieren',
       description:
-        'Archiviert eine Firma, einen Deal oder einen Kontakt (genau eine ID angeben), z. B. Testeinträge oder Dubletten. Archivierte Einträge verschwinden aus Pipeline und Mein Tag, bleiben aber im Sheet; mit archiviert: false wieder herstellen. Eine archivierte Firma blendet auch ihre Deals aus.',
+        'Archiviert eine Firma, einen Deal, einen Kontakt oder einen Lead-Magneten (genau eines angeben), z. B. Testeinträge oder Dubletten. Archivierte Einträge verschwinden aus Pipeline und Mein Tag, bleiben aber im Sheet; mit archiviert: false wieder herstellen. Eine archivierte Firma blendet auch ihre Deals aus; ein archivierter Magnet wird inaktiv, seine Landingpage geht offline.',
       inputSchema: {
         firma_id: z.string().optional(),
         deal_id: z.string().optional(),
         kontakt_id: z.string().optional(),
+        magnet: z.string().optional().describe('Adresse eines Lead-Magneten'),
         archiviert: z.boolean().optional().describe('Standard true; false stellt wieder her'),
       },
       annotations: { ...schreiben, idempotentHint: true },
     },
-    sicher(async ({ firma_id, deal_id, kontakt_id, archiviert }) => {
-      const ids = [firma_id, deal_id, kontakt_id].filter(Boolean);
-      if (ids.length !== 1) return fehler('Genau eine von firma_id, deal_id oder kontakt_id angeben.');
+    sicher(async ({ firma_id, deal_id, kontakt_id, magnet, archiviert }) => {
+      const ids = [firma_id, deal_id, kontakt_id, magnet].filter(Boolean);
+      if (ids.length !== 1) return fehler('Genau eine von firma_id, deal_id, kontakt_id oder magnet angeben.');
       const ziel = archiviert ?? true;
+      if (magnet) {
+        const { magnete } = await service.loadMagnetDaten();
+        const m = magnete.find((x) => x.slug === magnet);
+        if (!m) return fehler(`Kein Magnet mit der Adresse „${magnet}“. Adressen über \`magnete\` holen.`);
+        const neu = await service.setMagnetArchiviert(m.id, ziel, m.geaendert_am);
+        return antwort({ magnet: neu.titel, adresse: neu.slug, archiviert: neu.archiviert, aktiv: neu.aktiv });
+      }
       const db = await service.load();
       if (firma_id) {
         const firma = finde(db.firmen, firma_id, 'Firma');
@@ -666,6 +746,156 @@ export function registriereWerkzeuge(server: McpServer, { service, person, teamN
       const kontakt = finde(db.kontakte, kontakt_id!, 'Kontakt');
       const neu = await service.setKontaktArchiviert(kontakt.id, ziel, kontakt.geaendert_am);
       return antwort({ kontakt: kontaktName(neu), kontakt_id: neu.id, archiviert: neu.archiviert });
+    }),
+  );
+
+  // ─── Lead-Magnete ───────────────────────────────────────────────────────────
+
+  server.registerTool(
+    'magnete',
+    {
+      title: 'Lead-Magnete anzeigen',
+      description:
+        'Alle Lead-Magnete (kostenlose Downloads gegen E-Mail) mit Landingpage, DM-Link und Zahlen: Einträge, Download geöffnet, Newsletter bestätigt, im CRM, offen. Mit adresse nur dieser Magnet samt allen Texten und fertigem DM-Text.',
+      inputSchema: {
+        adresse: z.string().optional().describe('Adresse des Magneten, z. B. shopify-skills'),
+        archivierte_zeigen: z.boolean().optional(),
+      },
+      annotations: lesen,
+    },
+    sicher(async ({ adresse, archivierte_zeigen }) => {
+      const { magnete, leads } = await service.loadMagnetDaten();
+      if (adresse) {
+        const m = magnete.find((x) => x.slug === adresse);
+        if (!m) return fehler(`Kein Magnet mit der Adresse „${adresse}“. Vorhanden: ${magnete.map((x) => x.slug).join(', ') || 'keine'}.`);
+        return antwort({ ...magnetZeile(m, leads, true), dm_text: m.aktiv ? dmText(m) : '', hub: magnetLink() });
+      }
+      const liste = magnete.filter((m) => archivierte_zeigen || !m.archiviert).sort((a, b) => (a.sortierung ?? 0) - (b.sortierung ?? 0));
+      return antwort({ magnete: liste.map((m) => magnetZeile(m, leads)), hub: magnetLink() });
+    }),
+  );
+
+  server.registerTool(
+    'magnet_speichern',
+    {
+      title: 'Lead-Magnet anlegen oder ändern',
+      description:
+        'Legt einen Lead-Magneten an oder ändert ihn, erkannt an der Adresse (der Teil hinter velonify.de/ressourcen/). Nur angegebene Felder werden geändert. Ein aktiver Magnet hat sofort seine Landingpage (spätestens nach 2 Minuten online) und verschickt die Mail mit dem Download. Aktiv geht nur mit datei_url und untertitel. Die Adresse eines bestehenden Magneten lässt sich hier nicht ändern, weil verschickte Links sonst ins Leere führen.',
+      inputSchema: {
+        adresse: z.string().min(1).describe('Kleinbuchstaben, Ziffern, Bindestriche, z. B. shopify-skills'),
+        titel: z.string().optional().describe('Überschrift der Landingpage und Name in der Mail; Pflicht beim Anlegen'),
+        untertitel: z.string().optional().describe('Ein Satz unter der Überschrift, auch Vorschautext in LinkedIn-DMs'),
+        inhalt: z.string().optional().describe('Text neben dem Formular: "- " Liste, "## " Zwischenüberschrift, **fett**, Leerzeile = Absatz'),
+        knopf: z.string().max(40).optional().describe('Text auf dem Knopf, leer = „Kostenlos anfordern“'),
+        stichwort: z.string().optional().describe('Kommentar-Stichwort unter dem Post, z. B. SKILLS'),
+        datei_url: z.string().optional().describe('Google-Drive-Link, freigegeben für „Jeder mit dem Link“'),
+        mail_betreff: z.string().optional().describe('Leer = „Dein Download: <Titel>“'),
+        mail_text: z.string().optional().describe('Steht nach „Hi <Vorname>,“ vor dem Download-Knopf; leer = Standardtext'),
+        beschreibung: z.string().optional().describe('Interne Notiz'),
+        aktiv: z.boolean().optional(),
+      },
+      annotations: { ...schreiben, idempotentHint: true },
+    },
+    sicher(async ({ adresse, ...felder }) => {
+      const { magnete } = await service.loadMagnetDaten();
+      const vorhanden = magnete.find((m) => m.slug === adresse.trim().toLowerCase());
+      const basis: MagnetInput = vorhanden
+        ? magnetInput(vorhanden)
+        : { slug: adresse, titel: '', beschreibung: '', stichwort: '', datei_url: '', mail_betreff: '', mail_text: '', aktiv: false, untertitel: '', inhalt: '', knopf: '' };
+      if (!vorhanden && !felder.titel) return fehler('Beim Anlegen braucht der Magnet einen titel.');
+      const gespeichert = await service.saveMagnet(
+        { ...basis, ...ohneUndefined(felder) },
+        vorhanden && { id: vorhanden.id, expectedGeaendertAm: vorhanden.geaendert_am },
+      );
+      const { leads } = await service.loadMagnetDaten();
+      return antwort({
+        erledigt: vorhanden ? 'geändert' : 'angelegt',
+        ...magnetZeile(gespeichert, leads, true),
+        dm_text: gespeichert.aktiv ? dmText(gespeichert) : '',
+        hinweis: gespeichert.aktiv ? 'Landingpage ist spätestens nach 2 Minuten mit diesen Texten online.' : 'Inaktiv: keine Landingpage, keine Mails. Mit aktiv: true einschalten.',
+        hub: magnetLink(),
+      });
+    }),
+  );
+
+  server.registerTool(
+    'magnet_leads',
+    {
+      title: 'Einträge der Lead-Magnete',
+      description:
+        'Wer sich für einen Magneten eingetragen hat: Shop, Shopsystem, Herkunft (LinkedIn/Instagram/direkt), ob der Download geöffnet und der Newsletter bestätigt ist. Standard: nur offene Einträge (noch nicht übernommen oder verworfen), neueste zuerst.',
+      inputSchema: {
+        magnet: z.string().optional().describe('Nur Einträge dieses Magneten (Adresse)'),
+        alle: z.boolean().optional().describe('Auch übernommene und verworfene zeigen'),
+        limit: z.number().int().min(1).max(200).optional().describe('Standard 50'),
+      },
+      annotations: lesen,
+    },
+    sicher(async ({ magnet, alle, limit }) => {
+      const { leads } = await service.loadMagnetDaten();
+      const auswahl = sortiereLeads(leads.filter((l) => (!magnet || l.magnet === magnet) && (alle || istOffenerLead(l))));
+      const zahlen = magnetZahlen(leads.filter((l) => !magnet || l.magnet === magnet));
+      return antwort({ zahlen, eintraege: auswahl.slice(0, limit ?? 50).map(leadZeile), mehr: Math.max(0, auswahl.length - (limit ?? 50)), hub: `${HUB}/#/magnete` });
+    }),
+  );
+
+  server.registerTool(
+    'magnet_lead_uebernehmen',
+    {
+      title: 'Magnet-Eintrag ins CRM übernehmen',
+      description:
+        'Macht aus einem Magnet-Eintrag eine Firma (Quelle „LinkedIn · Magnet <adresse>“, Plattform aus dem Shopsystem), einen Kontakt, auf Wunsch einen Deal in Phase „neu“ und einen Verlaufseintrag. Gibt es die Firma schon (firma_id über `suchen`), hängt der Eintrag dort an. Ohne firma_id wird eine neue Firma angelegt; vorher mit `suchen` prüfen.',
+      inputSchema: {
+        lead_id: z.string().describe('ML-… aus `magnet_leads`'),
+        firma_id: z.string().optional().describe('Bestehende Firma statt einer neuen'),
+        firmenname: z.string().optional().describe('Name der neuen Firma; Standard ist die Shop-Domain'),
+        zustaendig: z.string().optional().describe('Vorname aus dem Team; Standard: wer angemeldet ist'),
+        deal_anlegen: z.boolean().optional().describe('Standard true'),
+      },
+      annotations: schreiben,
+    },
+    sicher(async ({ lead_id, firma_id, firmenname, zustaendig, deal_anlegen }) => {
+      const db = await service.load();
+      pruefeTeam(db, zustaendig);
+      const { leads } = await service.loadMagnetDaten();
+      const lead = finde(leads, lead_id, 'Eintrag');
+      if (!firma_id) {
+        const name = firmenname?.trim() || leadFirmenname(lead);
+        const treffer = findeDubletten({ name, domain: lead.shop, ust_id: '', register: '', email_allgemein: lead.email }, db.firmen.filter((f) => !f.archiviert));
+        if (treffer.length > 0) {
+          return fehler(`Sieht aus wie eine Firma, die schon im CRM steht: ${treffer.map(dublettenText).join("; ")}. Mit firma_id übernehmen oder firmenname eindeutig angeben.`);
+        }
+      }
+      const { firma, kontakt, deal } = await service.uebernimmMagnetLead(lead.id, {
+        firmaId: firma_id,
+        firma: firma_id || !firmenname ? undefined : { name: firmenname.trim() },
+        zustaendig: zustaendig ?? meinName(db) ?? '',
+        dealAnlegen: deal_anlegen ?? true,
+      });
+      return antwort({
+        erledigt: 'übernommen',
+        firma: firma.name,
+        firma_id: firma.id,
+        kontakt: kontaktName(kontakt),
+        kontakt_id: kontakt.id,
+        deal_id: deal?.id,
+        hinweis: 'Kontakt am besten über LinkedIn aufnehmen. Werbe-Mails nur bei bestätigtem Newsletter.',
+        hub: firmaLink(firma.id),
+      });
+    }),
+  );
+
+  server.registerTool(
+    'magnet_lead_verwerfen',
+    {
+      title: 'Magnet-Eintrag verwerfen',
+      description: 'Blendet einen Magnet-Eintrag aus der Liste der offenen aus (Studierende, Mitbewerber, Tests). Er bleibt im Sheet und zählt in den Zahlen weiter mit.',
+      inputSchema: { lead_id: z.string().describe('ML-… aus `magnet_leads`') },
+      annotations: { ...schreiben, idempotentHint: true },
+    },
+    sicher(async ({ lead_id }) => {
+      const lead = await service.verwirfMagnetLead(lead_id);
+      return antwort({ erledigt: 'verworfen', lead_id: lead.id, email: lead.email, magnet: lead.magnet });
     }),
   );
 }
