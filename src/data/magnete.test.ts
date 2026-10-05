@@ -7,7 +7,7 @@ import { dmLink, dmText, firmaAusLead, leadText, magnetZahlen, newsletterCsv, pr
 import { runSetup } from './sheets/setup';
 import { SheetStore } from './sheets/sheetStore';
 import { auditZeile } from './audit';
-import { ampelVon, bereinigeReport, mitTexten, pruefeFreigabe, reportEntwurf, reportMail, reportVon, roastPlaetze, roastSchritt, type Report } from './roast';
+import { ampelVon, bereinigeReport, systemMitVersion, mitTexten, pruefeFreigabe, reportEntwurf, reportMail, reportVon, roastPlaetze, roastSchritt, type Report } from './roast';
 import { DemoShopAudit } from './shopAudit';
 import type { Audit, Magnet, MagnetInput, MagnetLead } from './types';
 
@@ -227,6 +227,14 @@ describe('Shop-Roast', () => {
     const ohne = bereinigeReport({ ...mitClaude, punkte: mitClaude.punkte.map((p) => (p.bereich === 'plattform' ? { ...p, text: ' ' } : p)) }, audit);
     expect(ohne.bereiche.find((b) => b.bereich === 'plattform')?.ampel).toBe('gruen');
     expect(ampelVon([], true)).toBe('offen');
+  });
+
+  it('names the shop system without repeating the major version', () => {
+    expect(systemMitVersion('Magento 2', '2.4.6')).toBe('Magento 2.4.6');
+    expect(systemMitVersion('Shopware 6', '6.5.8')).toBe('Shopware 6.5.8');
+    expect(systemMitVersion('Magento 1', '1')).toBe('Magento 1');
+    expect(systemMitVersion('WooCommerce', '8.2')).toBe('WooCommerce 8.2');
+    expect(systemMitVersion('Shopify', '')).toBe('Shopify');
   });
 
   it('only releases complete reports', () => {

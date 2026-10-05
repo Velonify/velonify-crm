@@ -80,11 +80,18 @@ export function ampelVon(punkte: readonly Pick<ReportPunkt, 'schwere'>[], offen:
 
 export const AMPEL_LABEL: Record<Ampel, string> = { rot: 'Dringend', gelb: 'Luft nach oben', gruen: 'Passt', offen: 'Nicht geprüft' };
 
+/** "Magento 2" + "2.4.6" → "Magento 2.4.6"; "Shopware 6" + "6.5.8" → "Shopware 6.5.8"; without a real version just the name. */
+export function systemMitVersion(name: string, version: string): string {
+  if (!version || version === '1') return name;
+  const hauptversion = /^(.*) (\d+)$/.exec(name);
+  if (hauptversion && version.split('.')[0] === hauptversion[2]) return `${hauptversion[1]} ${version}`;
+  return `${name} ${version}`;
+}
+
 function kennzahlenVon(audit: Audit): Kennzahl[] {
   const zahlen: Kennzahl[] = [];
   if (audit.plattform && audit.plattform !== 'unbekannt') {
-    const version = audit.version && audit.version !== '1' ? ` ${audit.version}` : '';
-    zahlen.push({ label: 'Shopsystem', wert: `${plattformLabel(audit.plattform)}${version}` });
+    zahlen.push({ label: 'Shopsystem', wert: systemMitVersion(plattformLabel(audit.plattform), audit.version) });
     if (audit.eol && audit.eol !== 'unknown') zahlen.push({ label: 'Support', wert: EOL_LABEL[audit.eol] ?? audit.eol });
   }
   if (audit.score_mobil !== null) zahlen.push({ label: 'PageSpeed mobil', wert: `${audit.score_mobil} / 100` });

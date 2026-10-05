@@ -199,7 +199,8 @@ export function RoastPage() {
       if (befunde.length === 0) throw new Error('Im Report steht kein Befund mehr, den Claude erklären könnte.');
       const schonGeschrieben = entwurf.einleitung || entwurf.fazit || entwurf.punkte.some((p) => p.titel);
       if (schonGeschrieben && !window.confirm('Claude schreibt Einleitung, Überschriften, Erklärungen und Fazit neu. Eure Änderungen daran werden ersetzt (die Beobachtungen bleiben). Weiter?')) return;
-      const texte = await api.roastTexte({ domain: audit.domain, vorname: lead.vorname, befunde, nicht_geprueft: nichtGeprueftVon(audit) });
+      // No name or address goes to Claude: only the shop and its findings (see the privacy notice on velonify.de).
+      const texte = await api.roastTexte({ domain: audit.domain, vorname: '', befunde, nicht_geprueft: nichtGeprueftVon(audit) });
       aendere((r) => mitTexten(r, texte));
       toast.show(texte.verworfen > 0 ? `Texte eingesetzt. ${texte.verworfen} Erklärung(en) hatten unsichere Zahlen und wurden verworfen – dort steht noch der Befund.` : 'Texte von Claude eingesetzt – bitte gegenlesen und speichern.');
     });
@@ -402,7 +403,8 @@ export function RoastPage() {
               <Schritt nummer={3} titel="Freigeben" erledigt={freigegeben}>
                 {freigegeben ? (
                   <>
-                    <a href={link} target="_blank" rel="noreferrer noopener" className="small">
+                    {/* ?vorschau: the team's own clicks do not count as views of the shop owner. */}
+                    <a href={`${link}?vorschau`} target="_blank" rel="noreferrer noopener" className="small">
                       {link.replace('https://', '')}
                     </a>
                     <span className="roast-knoepfe">
