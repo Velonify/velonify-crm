@@ -511,12 +511,21 @@ export interface Magnet extends Meta {
   mail_betreff: string;
   /** Opening of the mail; empty uses the standard text. Paragraphs separated by an empty line. */
   mail_text: string;
-  /** Only active magnets send mails; sign-ups for inactive ones are still recorded. */
+  /** Only active magnets have a landing page and send mails; sign-ups for inactive ones are still recorded. */
   aktiv: boolean;
+  /** Landing page: the sentence under the title, also the preview text in a LinkedIn DM. */
+  untertitel: string;
+  /** Landing page: what is inside. Lines with "- " become a list, "## " a heading, **bold** stays bold. */
+  inhalt: string;
+  /** Landing page: label of the submit button; empty means "Kostenlos anfordern". */
+  knopf: string;
   sortierung: number | null;
   archiviert: boolean;
 }
-export type MagnetInput = Pick<Magnet, 'slug' | 'titel' | 'beschreibung' | 'stichwort' | 'datei_url' | 'mail_betreff' | 'mail_text' | 'aktiv'>;
+export type MagnetInput = Pick<
+  Magnet,
+  'slug' | 'titel' | 'beschreibung' | 'stichwort' | 'datei_url' | 'mail_betreff' | 'mail_text' | 'aktiv' | 'untertitel' | 'inhalt' | 'knopf'
+>;
 
 /** A sign-up for a lead magnet, written by the Apps Script behind the form on velonify.de. */
 export interface MagnetLead extends Meta {

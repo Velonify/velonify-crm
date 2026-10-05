@@ -1,10 +1,15 @@
 # Lead-Magnete: Einträge von velonify.de/ressourcen ins CRM, Mail mit Download
 
-Wer auf einer Landingpage `velonify.de/ressourcen/<slug>/` das Formular ausfüllt, bekommt eine Mail mit dem
+Jeder aktive Magnet hat automatisch eine Landingpage `velonify.de/ressourcen/<adresse>/`: Die Website baut sie
+aus einer Vorlage und den Texten, die im Hub beim Magneten stehen (Titel, Untertitel, „Was drin ist“, Knopf).
+Ein Website-Deploy ist dafür nicht nötig. Wer auf einer Landingpage das Formular ausfüllt, bekommt eine Mail mit dem
 Download (und, falls angehakt, dem Bestätigungslink für den Newsletter). Im Hub stehen die Einträge unter
 **Lead-Magnete → Leads**, die Magnete selbst (Datei-Link, Mailtext, Aktiv-Schalter) unter **Lead-Magnete → Magnete**.
 
 ```
+Aufruf von velonify.de/ressourcen/<adresse>/
+  → netlify/functions/ressourcen-seite.mjs      (Website-Repo)
+  → dieses Skript, Aktion „inhalt“                → Titel, Untertitel, Text, Knopf des aktiven Magneten
 Formular „magnet“ (Netlify Forms, Spamfilter)
   → netlify/functions/submission-created.mjs   (Website-Repo)
   → dieses Skript, Aktion „eintrag“               → Zeile in magnet_leads + Mail über Gmail

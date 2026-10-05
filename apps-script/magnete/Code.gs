@@ -3,8 +3,9 @@
  * den Tab „magnet_leads“ der CRM-Datenbank und verschickt die Mail mit dem Download (und, falls angehakt, dem
  * Bestätigungslink für den Newsletter). Außerdem vermerkt es die Klicks auf diese Links.
  *
- * Aufgerufen wird es nur von den Netlify-Funktionen der Website (netlify/functions/submission-created.mjs und
- * magnet-link.mjs), nie direkt vom Browser. Einrichtung siehe README.md. Das Skript läuft als die Person, die
+ * Aufgerufen wird es nur von den Netlify-Funktionen der Website (submission-created.mjs, magnet-link.mjs und
+ * ressourcen-seite.mjs), nie direkt vom Browser. Die Landingpages füllt die Website mit den Texten aus dem Tab
+ * „magnete“ (Aktion „inhalt“). Einrichtung siehe README.md. Das Skript läuft als die Person, die
  * es bereitstellt – von deren Google-Konto gehen die Mails raus (vorgesehen: lukas@velonify.de).
  *
  * Die Spalten sind der Vertrag mit dem Hub (src/data/schema.ts, Tabs `magnete` und `magnet_leads`): ändert
@@ -51,6 +52,8 @@ function doPost(e) {
         return newsletter(koerper.token);
       case 'abmelden':
         return abmelden(koerper.token);
+      case 'inhalt':
+        return inhalt(koerper.magnet);
       default:
         return antwort(400, 'Unbekannte Aktion.');
     }
@@ -181,6 +184,25 @@ function abmelden(token) {
       }
     });
     return antwort(200, 'Abgemeldet.');
+  });
+}
+
+/**
+ * Texte der Landingpage für die Website (netlify/functions/ressourcen-seite.mjs). Nur für aktive Magnete und nur
+ * das, was ohnehin öffentlich auf der Seite steht – Datei-Link, Mailtext und Notiz bleiben im CRM.
+ */
+function inhalt(slug) {
+  slug = String(slug || '').toLowerCase();
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return antwort(400, 'Ungültige Adresse.');
+  var magnet = finde(lies(TAB_MAGNETE), function (m) {
+    return m.slug === slug && wahr(m.aktiv) && !wahr(m.archiviert) && m.datei_url;
+  });
+  if (!magnet) return antwort(404, 'Kein aktiver Magnet unter dieser Adresse.');
+  return antwort(200, 'Inhalt.', {
+    titel: String(magnet.titel || ''),
+    untertitel: String(magnet.untertitel || ''),
+    inhalt: String(magnet.inhalt || ''),
+    knopf: String(magnet.knopf || ''),
   });
 }
 

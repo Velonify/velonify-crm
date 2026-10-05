@@ -159,10 +159,13 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   const skills = await service.saveMagnet({
     slug: 'shopify-skills', titel: 'Shopify-Ops-Skillset', beschreibung: '8 Claude-Skills für E-Com-Manager in Shopify-Shops', stichwort: 'SKILLS',
     datei_url: 'https://drive.google.com/drive/folders/demo-skills', mail_betreff: '', mail_text: '', aktiv: true,
+    untertitel: '8 Claude-Skills, die wir selbst jeden Tag im Shopify-Alltag nutzen – jeweils mit Anleitung.',
+    inhalt: '## Was drin ist\n- Lieferantendaten rein, fertige Produkttexte raus\n- Matrixify-Import vorher auf Fehler prüfen\n- Retourengründe clustern\n\n## Für wen\nE-Com-Manager in Shopify-Shops.',
+    knopf: 'Skillset anfordern',
   });
   await service.saveMagnet({
     slug: 'umzug-checkliste', titel: 'Checkliste Shopify-Umzug', beschreibung: 'Livegang-Checkliste für Magento → Shopify', stichwort: 'UMZUG',
-    datei_url: '', mail_betreff: '', mail_text: '', aktiv: false,
+    datei_url: '', mail_betreff: '', mail_text: '', aktiv: false, untertitel: '', inhalt: '', knopf: '',
   });
   const magnetLead = (id: string, stunden: number, felder: Partial<Record<string, string | number | boolean>>) => {
     const eingegangen = new Date(Date.now() - stunden * 3600_000).toISOString();
