@@ -10,13 +10,20 @@ import { useMagnetDaten } from './useMagnetDaten';
 
 type Aendern = <T>(action: (s: CrmService) => Promise<T>) => Promise<T>;
 
-const LEER: MagnetInput = { slug: '', titel: '', beschreibung: '', stichwort: '', datei_url: '', mail_betreff: '', mail_text: '', aktiv: false };
+const LEER: MagnetInput = {
+  slug: '', titel: '', beschreibung: '', stichwort: '', datei_url: '', mail_betreff: '', mail_text: '', aktiv: false, untertitel: '', inhalt: '', knopf: '',
+};
+
+const INHALT_BEISPIEL = '## Was drin ist\n- Lieferantendaten rein, fertige Produkttexte raus\n- Matrixify-Import vorher auf Fehler prüfen\n\n## Für wen\nE-Com-Manager in Shopify-Shops.';
 
 function MagnetDialog({ magnet, hatLeads, aendern, onClose }: { magnet?: Magnet; hatLeads: boolean; aendern: Aendern; onClose(): void }) {
   const toast = useToast();
   const [werte, setWerte] = useState<MagnetInput>(() =>
     magnet
-      ? { slug: magnet.slug, titel: magnet.titel, beschreibung: magnet.beschreibung, stichwort: magnet.stichwort, datei_url: magnet.datei_url, mail_betreff: magnet.mail_betreff, mail_text: magnet.mail_text, aktiv: magnet.aktiv }
+      ? {
+          slug: magnet.slug, titel: magnet.titel, beschreibung: magnet.beschreibung, stichwort: magnet.stichwort, datei_url: magnet.datei_url,
+          mail_betreff: magnet.mail_betreff, mail_text: magnet.mail_text, aktiv: magnet.aktiv, untertitel: magnet.untertitel, inhalt: magnet.inhalt, knopf: magnet.knopf,
+        }
       : LEER,
   );
   const [busy, setBusy] = useState(false);
@@ -65,10 +72,11 @@ function MagnetDialog({ magnet, hatLeads, aendern, onClose }: { magnet?: Magnet;
       }
     >
       <div className="grid">
-        <Field label="Titel" hint="So heißt der Magnet in der Mail, z. B. „Shopify-Ops-Skillset“" invalid={fieldOf(error) === 'titel'} wide>
+        <p className="form-abschnitt">Magnet</p>
+        <Field label="Titel" hint="Überschrift der Landingpage und Name in der Mail, z. B. „Shopify-Ops-Skillset“" invalid={fieldOf(error) === 'titel'} wide>
           <input {...feld('titel')} autoComplete="off" />
         </Field>
-        <Field label="Adresse" hint={`${RESSOURCEN_BASIS}${werte.slug.trim() || '…'}/ – muss zur Datei _ressourcen/<adresse>.md im Website-Repo passen`} invalid={fieldOf(error) === 'slug'}>
+        <Field label="Adresse" hint={`${RESSOURCEN_BASIS}${werte.slug.trim() || '…'}/ – die Seite entsteht automatisch, sobald der Magnet aktiv ist`} invalid={fieldOf(error) === 'slug'}>
           <input {...feld('slug')} placeholder="shopify-skills" autoComplete="off" spellCheck={false} />
         </Field>
         <Field label="Stichwort" hint="Was unter den Post kommentiert wird">
@@ -77,19 +85,31 @@ function MagnetDialog({ magnet, hatLeads, aendern, onClose }: { magnet?: Magnet;
         <Field label="Datei-Link" hint="Google-Drive-Datei oder -Ordner, freigegeben für „Jeder mit dem Link“ (nur Betrachter)" invalid={fieldOf(error) === 'datei_url'} wide>
           <input {...feld('datei_url')} type="url" placeholder="https://drive.google.com/…" autoComplete="off" />
         </Field>
+        <p className="form-abschnitt">Landingpage</p>
+        <Field label="Untertitel" hint="Ein Satz unter der Überschrift. Erscheint auch als Vorschautext, wenn der Link in einer DM geteilt wird." invalid={fieldOf(error) === 'untertitel'} wide>
+          <textarea rows={2} {...feld('untertitel')} placeholder="8 Claude-Skills, die wir selbst jeden Tag im Shopify-Alltag nutzen – jeweils mit Anleitung." />
+        </Field>
+        <Field label="Was drin ist" hint="Text neben dem Formular. „- “ am Zeilenanfang ergibt eine Liste, „## “ eine Zwischenüberschrift, **so** wird fett. Leerzeile = neuer Absatz." wide>
+          <textarea rows={8} {...feld('inhalt')} placeholder={INHALT_BEISPIEL} />
+        </Field>
+        <Field label="Text auf dem Knopf" hint="Leer: „Kostenlos anfordern“" invalid={fieldOf(error) === 'knopf'}>
+          <input {...feld('knopf')} maxLength={40} autoComplete="off" />
+        </Field>
+        <p className="form-abschnitt">Mail</p>
         <Field label="Betreff der Mail" hint="Leer: „Dein Download: <Titel>“" wide>
           <input {...feld('mail_betreff')} autoComplete="off" />
         </Field>
         <Field label="Text der Mail" hint="Steht nach „Hi <Vorname>,“ und vor dem Download-Knopf. Leerzeile = neuer Absatz. Leer: Standardtext." wide>
           <textarea rows={5} {...feld('mail_text')} />
         </Field>
-        <Field label="Notiz (intern)" hint="Was drin ist, für wen" wide>
+        <p className="form-abschnitt">Intern</p>
+        <Field label="Notiz (intern)" hint="Nur hier im Hub sichtbar" wide>
           <textarea rows={2} {...feld('beschreibung')} />
         </Field>
-        <Field label="Status" invalid={fieldOf(error) === 'datei_url' && werte.aktiv}>
+        <Field label="Status" invalid={(fieldOf(error) === 'datei_url' || fieldOf(error) === 'untertitel') && werte.aktiv}>
           <label className="checkbox">
             <input type="checkbox" checked={werte.aktiv} onChange={(e) => setWerte((w) => ({ ...w, aktiv: e.target.checked }))} />
-            Aktiv – Einträge bekommen die Mail mit dem Download
+            Aktiv – Landingpage ist online, Einträge bekommen die Mail mit dem Download
           </label>
         </Field>
       </div>
@@ -175,7 +195,7 @@ export function MagnetePage() {
       <PageHeader
         eyebrow="Lead-Magnete"
         title="Magnete"
-        subtitle="Was es zum Herunterladen gibt. Der Hub liefert Datei-Link und Mailtext, die Landingpage kommt aus dem Website-Repo. Nach einem Kommentar den DM-Link kopieren und von Hand schicken."
+        subtitle="Was es zum Herunterladen gibt. Landingpage, Mail und Datei-Link kommen alle von hier: aktiv schalten genügt, die Seite auf velonify.de entsteht automatisch. Nach einem Kommentar den DM-Link kopieren und von Hand schicken."
         actions={
           <button type="button" className="button primary" onClick={() => setOffen({})}>
             Magnet anlegen
@@ -187,8 +207,7 @@ export function MagnetePage() {
         <section className="card empty">
           <p>Noch kein Magnet angelegt.</p>
           <p className="muted">
-            Ein Magnet braucht drei Dinge: die Datei in Google Drive (freigegeben per Link), eine Zeile hier und die Landingpage _ressourcen/&lt;adresse&gt;.md im
-            Website-Repo.
+            Ein Magnet braucht zwei Dinge: die Datei in Google Drive (freigegeben per Link) und einen Eintrag hier mit den Texten für Landingpage und Mail.
           </p>
           <div className="empty-actions">
             <button type="button" className="button primary" onClick={() => setOffen({})}>

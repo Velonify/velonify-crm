@@ -24,7 +24,10 @@ export const SHOPSYSTEME: Record<string, string> = {
 export const shopsystemLabel = (wert: string) => SHOPSYSTEME[wert] ?? wert;
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-/** Addresses the website already uses for the pages after the form (_ressourcen/build.py, SEITEN). */
+/**
+ * Addresses the website already uses for the pages after the form (_ressourcen/build.py, SEITEN). Every other
+ * address of an active magnet gets its landing page from the template on the website, filled from this hub.
+ */
 export const RESERVIERTE_SLUGS = ['danke', 'newsletter', 'abmelden', 'abgemeldet', 'hoppla'];
 
 export function prepareMagnet(input: MagnetInput, alle: readonly Magnet[], selfId?: string): MagnetInput {
@@ -37,6 +40,9 @@ export function prepareMagnet(input: MagnetInput, alle: readonly Magnet[], selfI
     mail_betreff: input.mail_betreff.trim(),
     mail_text: input.mail_text.trim(),
     aktiv: input.aktiv,
+    untertitel: input.untertitel.trim(),
+    inhalt: input.inhalt.trim(),
+    knopf: input.knopf.trim(),
   };
   if (!clean.titel) throw new ValidationError('titel', 'Bitte einen Titel eintragen.');
   if (!SLUG.test(clean.slug)) throw new ValidationError('slug', 'Nur Kleinbuchstaben, Ziffern und Bindestriche, z. B. shopify-skills.');
@@ -44,6 +50,8 @@ export function prepareMagnet(input: MagnetInput, alle: readonly Magnet[], selfI
   if (alle.some((m) => m.slug === clean.slug && m.id !== selfId)) throw new ValidationError('slug', 'Diese Adresse hat schon ein anderer Magnet.');
   if (clean.datei_url && !/^https:\/\//.test(clean.datei_url)) throw new ValidationError('datei_url', 'Der Link muss mit https:// anfangen.');
   if (clean.aktiv && !clean.datei_url) throw new ValidationError('datei_url', 'Ohne Datei-Link kann der Magnet nicht aktiv sein – die Mail hätte keinen Download.');
+  if (clean.aktiv && !clean.untertitel) throw new ValidationError('untertitel', 'Ohne Untertitel kann der Magnet nicht aktiv sein – er steht oben auf der Landingpage und in der Vorschau der DM.');
+  if (clean.knopf.length > 40) throw new ValidationError('knopf', 'Der Text auf dem Knopf darf höchstens 40 Zeichen lang sein.');
   return clean;
 }
 

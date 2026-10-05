@@ -17,6 +17,9 @@ const eingabe = (overrides: Partial<MagnetInput> = {}): MagnetInput => ({
   mail_betreff: '',
   mail_text: '',
   aktiv: true,
+  untertitel: 'Acht Skills für den Shopify-Alltag.',
+  inhalt: '',
+  knopf: '',
   ...overrides,
 });
 
@@ -60,6 +63,9 @@ describe('Lead-Magnete', () => {
     expect(() => prepareMagnet(eingabe({ datei_url: '' }), [])).toThrow(ValidationError);
     expect(prepareMagnet(eingabe({ datei_url: '', aktiv: false }), []).aktiv).toBe(false);
     expect(() => prepareMagnet(eingabe({ slug: 'danke' }), [])).toThrow(ValidationError);
+    expect(() => prepareMagnet(eingabe({ untertitel: ' ' }), [])).toThrow(ValidationError);
+    expect(prepareMagnet(eingabe({ untertitel: '', aktiv: false }), []).untertitel).toBe('');
+    expect(() => prepareMagnet(eingabe({ knopf: 'x'.repeat(41) }), [])).toThrow(ValidationError);
   });
 
   it('keeps the address unique, except for the magnet itself', () => {

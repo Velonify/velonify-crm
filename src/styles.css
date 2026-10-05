@@ -598,6 +598,8 @@ input[type='checkbox']:indeterminate::before { transform: scale(1); height: 3px;
 .outreach-liste > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: start; padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
 .outreach-liste > li.is-archived { opacity: 0.55; }
 .outreach-liste h3 { margin: 0 0 4px; }
+.form-abschnitt { grid-column: 1 / -1; margin: var(--space-2) 0 0; padding-top: var(--space-2); border-top: 1px solid var(--line); font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-muted); }
+.form-abschnitt:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
 .magnet-aktionen { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-2); }
 .outreach-liste dl { margin: var(--space-1) 0 0; display: grid; gap: 4px; }
 .outreach-liste dl div { display: grid; grid-template-columns: 72px 1fr; gap: var(--space-2); font-size: 13.5px; }

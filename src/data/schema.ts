@@ -176,7 +176,7 @@ export const SCHEMA = {
     name: 'magnete',
     columns: [
       'id', 'slug', 'titel', 'beschreibung', 'stichwort', 'datei_url', 'mail_betreff', 'mail_text', 'aktiv',
-      'sortierung', 'archiviert', ...META,
+      'sortierung', 'archiviert', 'untertitel', 'inhalt', 'knopf', ...META,
     ],
     numeric: ['sortierung'],
     boolean: ['aktiv', 'archiviert'],
