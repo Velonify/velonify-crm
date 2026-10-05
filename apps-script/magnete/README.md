@@ -68,6 +68,23 @@ nach außen nicht zu, ist sie in der Admin-Konsole von Google Workspace abgescha
   Adresse in allen Einträgen. Die bestätigten Adressen exportiert der Hub als CSV (*Leads → Newsletter-Liste*).
 - **Kontingent:** Google Workspace erlaubt Skripten rund 1.500 Empfänger am Tag. Das Skript bremst selbst schon bei 300 Download-Mails am Tag, falls doch Spam durchkommt.
 
+## Shop-Roast (Magnete vom Typ „audit“)
+
+Im Hub beim Magneten *Art: Shop-Roast (Audit)* wählen und die Zahl der Plätze eintragen. Ein Datei-Link ist dann
+nicht nötig.
+
+- **Mail nach dem Formular:** Statt des Downloads eine Bestätigung („Wir prüfen den Shop in vier Bereichen …
+  innerhalb von zwei Werktagen“). Sind alle Plätze vergeben (alle Einträge außer Warteliste und Verworfenen),
+  bekommt der Eintrag `warteliste = TRUE` und die Wartelisten-Mail. Das Formular bleibt offen.
+- **Aktion „inhalt“** liefert zusätzlich `typ`, `plaetze` und `frei` für die Anzeige „noch X Plätze“.
+- **Aktion „report“** (`token`, optional `zaehlen: false`): liefert für die Seite `velonify.de/roast/<token>/`
+  Vorname, Shop, den Report (JSON aus `magnet_leads.report`) und wer geprüft hat, aber nur, wenn der Report im
+  Hub freigegeben ist. Jeder Aufruf zählt `report_aufrufe` hoch, der erste setzt `report_geoeffnet_am`.
+- Prüfen, Report schreiben, Freigeben und Senden laufen im Hub (*Leads → Shop prüfen*), nicht hier.
+
+Reihenfolge beim Einführen: erst im Hub *Einrichten* (neue Spalten in `magnete` und `magnet_leads`), dann die
+neue Version des Skripts bereitstellen. Andersherum bricht das Skript mit „Im Tab magnet_leads fehlen Spalten“ ab.
+
 ## Änderungen am Code
 
 Nach jeder Änderung an `Code.gs`: *Bereitstellen → Bereitstellungen verwalten → Bearbeiten → Version: Neue
@@ -75,4 +92,5 @@ Version*. So bleibt die `/exec`-Adresse gleich und Netlify muss nichts ändern.
 
 Die Spalten von `magnet_leads` sind der Vertrag mit dem Hub (`src/data/schema.ts`), die Formularfelder
 (`magnet`, `vorname`, `email`, `shop`, `shopsystem`, `newsletter`, `newsletter_text`, `utm_*`, `bot-field`) der
-Vertrag mit `_ressourcen/build.py` im Website-Repo. Ändert sich eine Seite, die andere mitändern.
+Vertrag mit `_ressourcen/build.py` im Website-Repo. Der Aufbau des Reports (`src/data/roast.ts`, Typ `Report`)
+ist der Vertrag mit der Report-Seite der Website. Ändert sich eine Seite, die andere mitändern.

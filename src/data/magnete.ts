@@ -43,13 +43,16 @@ export function prepareMagnet(input: MagnetInput, alle: readonly Magnet[], selfI
     untertitel: input.untertitel.trim(),
     inhalt: input.inhalt.trim(),
     knopf: input.knopf.trim(),
+    typ: input.typ === 'audit' ? 'audit' : 'datei',
+    plaetze: input.typ === 'audit' && input.plaetze !== null && Number.isFinite(input.plaetze) ? Math.round(input.plaetze) : null,
   };
   if (!clean.titel) throw new ValidationError('titel', 'Bitte einen Titel eintragen.');
   if (!SLUG.test(clean.slug)) throw new ValidationError('slug', 'Nur Kleinbuchstaben, Ziffern und Bindestriche, z. B. shopify-skills.');
   if (RESERVIERTE_SLUGS.includes(clean.slug)) throw new ValidationError('slug', `„${clean.slug}“ ist schon eine feste Seite unter /ressourcen/. Bitte eine andere Adresse wählen.`);
   if (alle.some((m) => m.slug === clean.slug && m.id !== selfId)) throw new ValidationError('slug', 'Diese Adresse hat schon ein anderer Magnet.');
   if (clean.datei_url && !/^https:\/\//.test(clean.datei_url)) throw new ValidationError('datei_url', 'Der Link muss mit https:// anfangen.');
-  if (clean.aktiv && !clean.datei_url) throw new ValidationError('datei_url', 'Ohne Datei-Link kann der Magnet nicht aktiv sein – die Mail hätte keinen Download.');
+  if (clean.aktiv && clean.typ === 'datei' && !clean.datei_url) throw new ValidationError('datei_url', 'Ohne Datei-Link kann der Magnet nicht aktiv sein – die Mail hätte keinen Download.');
+  if (clean.plaetze !== null && (clean.plaetze < 1 || clean.plaetze > 1000)) throw new ValidationError('plaetze', 'Plätze: eine Zahl zwischen 1 und 1000, oder leer für unbegrenzt.');
   if (clean.aktiv && !clean.untertitel) throw new ValidationError('untertitel', 'Ohne Untertitel kann der Magnet nicht aktiv sein – er steht oben auf der Landingpage und in der Vorschau der DM.');
   if (clean.knopf.length > 40) throw new ValidationError('knopf', 'Der Text auf dem Knopf darf höchstens 40 Zeichen lang sein.');
   return clean;
@@ -62,7 +65,14 @@ export function dmLink(slug: string, quelle: 'linkedin' | 'instagram' = 'linkedi
 }
 
 /** Ready-to-send DM; the name is filled in by hand, LinkedIn shows it anyway. */
-export function dmText(magnet: Pick<Magnet, 'slug' | 'titel'>, quelle: 'linkedin' | 'instagram' = 'linkedin'): string {
+export function dmText(magnet: Pick<Magnet, 'slug' | 'titel'> & Partial<Pick<Magnet, 'typ'>>, quelle: 'linkedin' | 'instagram' = 'linkedin'): string {
+  if (magnet.typ === 'audit') {
+    return [
+      'Hey [Vorname], danke für deinen Kommentar!',
+      `Hier kannst du deinen Shop für den „${magnet.titel}“ eintragen: ${dmLink(magnet.slug, quelle)}`,
+      'Shop-Adresse und E-Mail rein, dann schauen wir ihn uns an und schicken dir den Report in den nächsten zwei Werktagen.',
+    ].join('\n\n');
+  }
   return [
     'Hey [Vorname], danke für deinen Kommentar!',
     `Hier ist der Link zu „${magnet.titel}“: ${dmLink(magnet.slug, quelle)}`,
@@ -147,11 +157,16 @@ export function kontaktAusLead(lead: MagnetLead): KontaktInput {
 }
 
 /** Timeline entry of the firm: which magnet, from where, what was done with it. */
-export function leadText(lead: MagnetLead, magnet?: Pick<Magnet, 'titel'>): string {
+export function leadText(lead: MagnetLead, magnet?: Pick<Magnet, 'titel'> & Partial<Pick<Magnet, 'typ'>>): string {
   const teile = [`Lead-Magnet „${magnet?.titel || lead.magnet}“ angefordert (${herkunftLabel(lead)})`];
   if (lead.shop) teile.push(`Shop: ${lead.shop}`);
   if (lead.shopsystem) teile.push(`Shopsystem: ${shopsystemLabel(lead.shopsystem)}`);
-  teile.push(lead.download_am ? 'Download geöffnet' : 'Download noch nicht geöffnet');
+  if (magnet?.typ === 'audit') {
+    if (lead.report_gesendet_am) teile.push(`Report gesendet am ${lead.report_gesendet_am.slice(0, 10)}${lead.report_von ? ` von ${lead.report_von}` : ''}`);
+    if (lead.report_geoeffnet_am) teile.push(`Report ${lead.report_aufrufe ?? 1}× geöffnet`);
+  } else {
+    teile.push(lead.download_am ? 'Download geöffnet' : 'Download noch nicht geöffnet');
+  }
   if (istNewsletterAbonnent(lead)) teile.push('Newsletter bestätigt');
   return teile.join('\n');
 }

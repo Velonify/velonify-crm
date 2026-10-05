@@ -12,6 +12,7 @@ import { AnfrageFehler, leadRoute, ROUTEN, type Route } from './leads/api.js';
 import { echteBq } from './leads/bq.js';
 import { AUSGABE_SCHEMA_BRANCHE, BrancheSchema, MODELL_BRANCHE, SYSTEM_PROMPT_BRANCHE } from './leads/branche.js';
 import * as linkedin from './linkedin.js';
+import { AUSGABE_SCHEMA_ROAST, pruefeRoast, RoastAnfrageSchema, roastNachricht, RoastAusgabeSchema, SYSTEM_PROMPT_ROAST } from './roast.js';
 
 const MODELL = 'claude-opus-5';
 
@@ -171,6 +172,33 @@ functions.http('shopAudit', async (req, res) => {
       console.error('LinkedIn-Einschätzung fehlgeschlagen', error instanceof Anthropic.APIError ? `${error.status} ${error.message}` : error instanceof Error ? error.message : error);
     }
     return res.json(linkedin.baueLead(roh, ausgabe, dealTitel, { hinweis, modell }));
+  }
+
+  if (/^\/roast\/?$/.test(req.path)) {
+    if (!limit.erlaubt(email)) return fehler(429, 'Zu viele Anfragen in kurzer Zeit. Bitte in ein paar Minuten erneut versuchen.');
+    const anfrage = RoastAnfrageSchema.safeParse(req.body);
+    if (!anfrage.success) return fehler(400, fehlerText(anfrage.error));
+    const start = Date.now();
+    try {
+      const antwort = await client.beta.messages.create({
+        model: MODELL,
+        max_tokens: 12000,
+        betas: ['server-side-fallback-2026-07-01'],
+        fallbacks: 'default',
+        thinking: { type: 'adaptive' },
+        output_config: { effort: 'medium', format: { type: 'json_schema', schema: AUSGABE_SCHEMA_ROAST } },
+        system: SYSTEM_PROMPT_ROAST,
+        messages: [{ role: 'user', content: roastNachricht(anfrage.data) }],
+      });
+      console.log(JSON.stringify({ email, route: 'roast', domain: anfrage.data.domain, dauer_ms: Date.now() - start, modell: antwort.model, usage: antwort.usage }));
+      if (antwort.stop_reason !== 'end_turn') return fehler(502, 'Claude hat keine Texte geliefert. Bitte noch einmal versuchen.');
+      const text = antwort.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');
+      const texte = pruefeRoast(RoastAusgabeSchema.parse(JSON.parse(text)), anfrage.data);
+      return res.json({ ...texte, verworfen: anfrage.data.befunde.length - texte.punkte.length, modell: antwort.model });
+    } catch (error) {
+      console.error('Roast-Texte fehlgeschlagen', error instanceof Anthropic.APIError ? `${error.status} ${error.message}` : error instanceof Error ? error.message : error);
+      return fehler(502, 'Claude war nicht erreichbar. Bitte in einer Minute noch einmal versuchen.');
+    }
   }
 
   if (!limit.erlaubt(email)) return fehler(429, 'Zu viele Prüfungen in kurzer Zeit. Bitte in ein paar Minuten erneut versuchen.');

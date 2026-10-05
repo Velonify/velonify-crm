@@ -6,7 +6,10 @@ import { ValidationError } from './errors';
 import { dmLink, dmText, firmaAusLead, leadText, magnetZahlen, newsletterCsv, prepareMagnet, sortiereLeads } from './magnete';
 import { runSetup } from './sheets/setup';
 import { SheetStore } from './sheets/sheetStore';
-import type { Magnet, MagnetInput, MagnetLead } from './types';
+import { auditZeile } from './audit';
+import { ampelVon, bereinigeReport, mitTexten, pruefeFreigabe, reportEntwurf, reportMail, reportVon, roastPlaetze, roastSchritt, type Report } from './roast';
+import { DemoShopAudit } from './shopAudit';
+import type { Audit, Magnet, MagnetInput, MagnetLead } from './types';
 
 const eingabe = (overrides: Partial<MagnetInput> = {}): MagnetInput => ({
   slug: 'shopify-skills',
@@ -20,6 +23,8 @@ const eingabe = (overrides: Partial<MagnetInput> = {}): MagnetInput => ({
   untertitel: 'Acht Skills für den Shopify-Alltag.',
   inhalt: '',
   knopf: '',
+  typ: 'datei',
+  plaetze: null,
   ...overrides,
 });
 
@@ -48,6 +53,14 @@ const lead = (overrides: Partial<MagnetLead> = {}): MagnetLead => ({
   kontakt_id: '',
   erledigt_am: '',
   erledigt_von: '',
+  warteliste: false,
+  audit_id: '',
+  report: '',
+  report_von: '',
+  report_freigegeben_am: '',
+  report_gesendet_am: '',
+  report_geoeffnet_am: '',
+  report_aufrufe: null,
   erstellt_am: '2026-10-02T09:00:00.000Z',
   erstellt_von: 'Website',
   geaendert_am: '2026-10-02T09:00:00.000Z',
@@ -174,5 +187,101 @@ describe('CrmService: Lead-Magnete', () => {
     expect(await crm.verwirfMagnetLead(eintrag.id)).toMatchObject({ status: 'verworfen' });
     await expect(crm.verwirfMagnetLead(eintrag.id)).rejects.toThrow(ValidationError);
     expect((await crm.loadMagnetDaten()).leads).toHaveLength(1);
+  });
+});
+
+describe('Shop-Roast', () => {
+  const roastEingabe = (overrides: Partial<MagnetInput> = {}) =>
+    eingabe({ slug: 'shop-roast', titel: 'Shop-Roast', stichwort: 'roast', datei_url: '', typ: 'audit', plaetze: 30, ...overrides });
+
+  it('lets an audit magnet go live without a file and keeps places only for audits', () => {
+    expect(prepareMagnet(roastEingabe(), [])).toMatchObject({ typ: 'audit', plaetze: 30, aktiv: true });
+    expect(prepareMagnet(eingabe({ plaetze: 30 }), []).plaetze).toBeNull();
+    expect(() => prepareMagnet(roastEingabe({ typ: 'datei' }), [])).toThrow(/Datei-Link/);
+    expect(() => prepareMagnet(roastEingabe({ plaetze: 0 }), [])).toThrow(ValidationError);
+  });
+
+  it('counts places without the waiting list and discarded entries', () => {
+    const leads = [lead(), lead({ id: 'b', status: 'verworfen' }), lead({ id: 'c', warteliste: true }), lead({ id: 'd', status: 'uebernommen' })];
+    expect(roastPlaetze({ plaetze: 30 }, leads)).toEqual({ vergeben: 2, frei: 28 });
+    expect(roastPlaetze({ plaetze: 1 }, leads).frei).toBe(0);
+    expect(roastPlaetze({ plaetze: null }, leads).frei).toBeNull();
+  });
+
+  it('drafts a report from the findings, worst first, with a traffic light per area', async () => {
+    const audit = { ...auditZeile(await new DemoShopAudit(0).pruefe({ domain: 'bergzeit-tee.example', leistungen: [] }), ''), id: 'SA-1' } as Audit;
+    const report = reportEntwurf(audit);
+    expect(report.punkte[0].schwere).toBe('hoch');
+    expect(report.punkte.every((p) => p.titel === '' && p.text)).toBe(true);
+    expect(report.bereiche.map((b) => b.bereich)).toEqual(['plattform', 'geschwindigkeit', 'marketing', 'basics']);
+    expect(report.bereiche.find((b) => b.bereich === 'plattform')?.ampel).toBe('rot');
+    expect(report.kennzahlen.map((k) => k.label)).toContain('PageSpeed mobil');
+
+    // Claude's texts replace the plain findings; points it left out stay as they were.
+    const [erster, zweiter] = report.punkte;
+    const mitClaude = mitTexten(report, { einleitung: 'Hallo!', fazit: 'Zuerst das Update.', punkte: [{ befund_id: erster.befund_id, titel: 'Kein Support', text: 'Erklärt.' }] });
+    expect(mitClaude.punkte[0]).toMatchObject({ titel: 'Kein Support', text: 'Erklärt.' });
+    expect(mitClaude.punkte[1]).toEqual(zweiter);
+
+    // Removing every severe point turns the light yellow or green.
+    const ohne = bereinigeReport({ ...mitClaude, punkte: mitClaude.punkte.map((p) => (p.bereich === 'plattform' ? { ...p, text: ' ' } : p)) }, audit);
+    expect(ohne.bereiche.find((b) => b.bereich === 'plattform')?.ampel).toBe('gruen');
+    expect(ampelVon([], true)).toBe('offen');
+  });
+
+  it('only releases complete reports', () => {
+    const fertig: Report = {
+      version: 1, domain: 'x.example', geprueft_am: '', kennzahlen: [], einleitung: 'Hallo', fazit: 'Tschüss', bereiche: [],
+      punkte: [{ befund_id: 'a', bereich: 'plattform', schwere: 'hoch', titel: 'T', text: 'X' }],
+      beobachtungen: [1, 2, 3].map((n) => ({ titel: `B${n}`, text: 'Text' })),
+    };
+    expect(() => pruefeFreigabe(fertig, 'Lukas')).not.toThrow();
+    expect(() => pruefeFreigabe(fertig, ' ')).toThrow(/geprüft/);
+    expect(() => pruefeFreigabe({ ...fertig, beobachtungen: fertig.beobachtungen.slice(0, 2) }, 'Lukas')).toThrow(/Beobachtungen/);
+    expect(() => pruefeFreigabe({ ...fertig, punkte: [{ ...fertig.punkte[0], titel: '' }] }, 'Lukas')).toThrow(/Überschrift/);
+    expect(() => pruefeFreigabe(null, 'Lukas')).toThrow(/prüfen/);
+  });
+
+  it('writes the mail with the report link and the personal signature', () => {
+    const mail = reportMail(lead({ token: 'abc', report_von: 'Lukas', report: JSON.stringify({ version: 1, domain: 'muster-shop.example', beobachtungen: [] }) }), '');
+    expect(mail).toMatchObject({ an: 'uwe@muster-shop.example', betreff: 'Euer Shop-Roast: muster-shop.example' });
+    expect(mail.text).toContain('https://velonify.de/roast/abc/');
+    expect(mail.text.startsWith('Hi Uwe,')).toBe(true);
+    expect(mail.text.endsWith('Viele Grüße\nLukas')).toBe(true);
+    expect(reportMail(lead({ token: 'abc' }), 'Beste Grüße\nLukas Hanke').text.endsWith('Beste Grüße\nLukas Hanke')).toBe(true);
+  });
+
+  it('runs from check to release to takeover, and the audit moves to the firm', async () => {
+    const sheets = new MemorySheets();
+    await runSetup(sheets);
+    const crm = new CrmService({ store: new SheetStore(sheets), drive: new MemoryDrive(), calendar: new MemoryCalendar(), currentUser: () => 'lukas@velonify.de' });
+    await crm.saveMagnet(roastEingabe());
+    await new SheetStore(sheets).insert('magnet_leads', [lead({ magnet: 'shop-roast' })]);
+
+    const audit = await crm.speichereAudit(await new DemoShopAudit(0).pruefe({ domain: 'muster-shop.example', leistungen: [] }));
+    let eintrag = await crm.verknuepfeRoastAudit('ML-1', audit);
+    expect(eintrag.audit_id).toBe(audit.id);
+    expect(roastSchritt(eintrag)).toBe('schreiben');
+    await expect(crm.gibReportFrei('ML-1', true)).rejects.toThrow(ValidationError);
+
+    const entwurf = reportVon(eintrag)!;
+    const fertig = {
+      ...entwurf,
+      einleitung: 'Hallo Uwe',
+      fazit: 'Fang beim Update an.',
+      punkte: entwurf.punkte.map((p) => ({ ...p, titel: 'Überschrift' })),
+      beobachtungen: [1, 2, 3].map((n) => ({ titel: `Beobachtung ${n}`, text: 'Text' })),
+    };
+    eintrag = await crm.speichereReport('ML-1', fertig, 'Lukas Hanke');
+    expect(roastSchritt(eintrag)).toBe('freigeben');
+    await expect(crm.markiereReportGesendet('ML-1')).rejects.toThrow(ValidationError);
+    eintrag = await crm.gibReportFrei('ML-1', true);
+    expect(eintrag.report_freigegeben_am).not.toBe('');
+    await expect(crm.speichereReport('ML-1', fertig, 'Lukas Hanke')).rejects.toThrow(/freigegeben/);
+    expect(roastSchritt(await crm.markiereReportGesendet('ML-1'))).toBe('gesendet');
+
+    const { firma } = await crm.uebernimmMagnetLead('ML-1', { zustaendig: 'Lugge', dealAnlegen: false });
+    expect((await crm.loadAudits()).find((a) => a.id === audit.id)?.firma_id).toBe(firma.id);
+    expect((await crm.load()).aktivitaeten.some((a) => a.firma_id === firma.id && a.text.includes('Report gesendet am'))).toBe(true);
   });
 });
