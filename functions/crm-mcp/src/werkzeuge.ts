@@ -204,7 +204,9 @@ export function registriereWerkzeuge(server: McpServer, { service, person, teamN
     },
     sicher(async () => {
       const db = await service.load();
-      const offen = offeneDeals(db.deals.filter((d) => !d.archiviert));
+      const firmen = indexById(db.firmen);
+      const deals = db.deals.filter((d) => !firmen.get(d.firma_id)?.archiviert);
+      const offen = offeneDeals(deals);
       return antwort({
         angemeldet: { email: person.email, team_name: meinName(db) },
         heute: heute(),
@@ -213,7 +215,7 @@ export function registriereWerkzeuge(server: McpServer, { service, person, teamN
         kontaktwege: KONTAKT_WEGE,
         aktivitaetstypen: AKTIVITAET_TYPEN,
         phasen: PHASEN.map((p) => ({ phase: p, label: phaseLabel(p), offene_deals: offen.filter((d) => d.phase === p).length })),
-        kennzahlen: kennzahlen(db.deals, heute()),
+        kennzahlen: kennzahlen(deals, heute()),
         firmen: db.firmen.filter((f) => !f.archiviert).length,
         drive_eingerichtet: Boolean(driveKonfiguration(db.einstellungen)),
       });

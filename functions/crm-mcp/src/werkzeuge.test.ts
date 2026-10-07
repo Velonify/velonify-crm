@@ -183,6 +183,16 @@ describe('archivieren', () => {
     expect((await rufe('suchen', { suchbegriff: 'bergwerk' })).daten.treffer.length).toBeGreaterThan(0);
   });
 
+  it('zählt im Überblick keine Deals archivierter Firmen mit', async () => {
+    const vorher = (await rufe('ueberblick')).daten;
+    expect((await rufe('archivieren', { firma_id: await firmaId('Bergwerk') })).daten.archiviert).toBe(true);
+    const nachher = (await rufe('ueberblick')).daten;
+    expect(nachher.kennzahlen.offen).toBe(vorher.kennzahlen.offen - 1);
+    const qualifiziert = (d: { phasen: { phase: string; offene_deals: number }[] }) => d.phasen.find((p) => p.phase === 'qualifiziert')!.offene_deals;
+    expect(qualifiziert(nachher)).toBe(qualifiziert(vorher) - 1);
+    expect(nachher.kennzahlen.offen).toBe((await rufe('pipeline')).daten.anzahl);
+  });
+
   it('verlangt genau eine ID', async () => {
     const { fehler } = await rufe('archivieren', {});
     expect(fehler).toBe(true);
