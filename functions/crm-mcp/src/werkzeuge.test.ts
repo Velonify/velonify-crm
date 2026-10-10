@@ -232,6 +232,15 @@ describe('Lead-Magnete', () => {
     expect((await rufe('magnet_speichern', { adresse: 'danke', titel: 'x' })).fehler).toBe(true);
   });
 
+  it('legt einen Audit-Magneten ohne Datei an und behält Typ und Plätze bei späteren Änderungen', async () => {
+    const roast = await rufe('magnet_speichern', { adresse: 'roast-test', titel: 'Roast', typ: 'audit', plaetze: 10, aktiv: true, untertitel: 'Ein Satz.' });
+    expect(roast.daten).toMatchObject({ erledigt: 'angelegt', aktiv: true, typ: 'audit (Shop-Roast)', plaetze: '10 von 10 frei' });
+    expect(roast.daten.dm_text).toContain('Shop');
+
+    const geaendert = await rufe('magnet_speichern', { adresse: 'roast-test', knopf: 'Shop prüfen lassen' });
+    expect(geaendert.daten).toMatchObject({ typ: 'audit (Shop-Roast)', plaetze: '10 von 10 frei', knopf: 'Shop prüfen lassen' });
+  });
+
   it('zeigt offene Einträge und übernimmt einen ins CRM', async () => {
     const { daten } = await rufe('magnet_leads', { magnet: 'shopify-skills' });
     expect(daten.zahlen.eintraege).toBe(4);
