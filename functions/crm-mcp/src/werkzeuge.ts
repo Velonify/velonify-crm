@@ -28,6 +28,7 @@ import {
   shopsystemLabel,
   sortiereLeads,
 } from '../../../src/data/magnete';
+import { roastPlaetze } from '../../../src/data/roast';
 import { kontaktName, suggestKuerzel } from '../../../src/data/rules';
 import { driveKonfiguration, findeTeamMitglied, indexById, kennzahlen, meinTag, offeneDeals, type Aufgabe } from '../../../src/data/selectors';
 import { suche } from '../../../src/data/suche';
@@ -57,7 +58,7 @@ export const ANLEITUNG = `Velonify-CRM (Google Sheet hinter crm.velonify.de). Sc
 - "zustaendig" ist ein Vorname aus dem Team (siehe \`ueberblick\`), keine E-Mail.
 - Daten im Format JJJJ-MM-TT. Die Zeitzone ist Europe/Berlin.
 - Nichts wird gelöscht. \`archivieren\` blendet Firmen, Deals, Kontakte oder Lead-Magnete aus und lässt sich rückgängig machen; vorher nachfragen.
-- Lead-Magnete (Downloads gegen E-Mail auf velonify.de/ressourcen/<adresse>/): \`magnete\`, \`magnet_speichern\`, \`magnet_leads\`, \`magnet_lead_uebernehmen\`, \`magnet_lead_verwerfen\`. Ein aktiver Magnet hat sofort seine Landingpage; aktiv geht nur mit Datei-Link (Google Drive, per Link freigegeben) und Untertitel. Wer nur den Download wollte, bekommt keine Werbe-Mails – Kontakt danach über LinkedIn.`;
+- Lead-Magnete (Downloads gegen E-Mail auf velonify.de/ressourcen/<adresse>/): \`magnete\`, \`magnet_speichern\`, \`magnet_leads\`, \`magnet_lead_uebernehmen\`, \`magnet_lead_verwerfen\`. Ein aktiver Magnet hat sofort seine Landingpage; aktiv geht nur mit Untertitel und beim Typ „datei“ mit Datei-Link (Google Drive, per Link freigegeben). Typ „audit“ ist der Shop-Roast: kein Download, das Team prüft den Shop und schickt einen Report; \`plaetze\` begrenzt die Zahl, danach Warteliste. Wer nur den Download wollte, bekommt keine Werbe-Mails – Kontakt danach über LinkedIn.`;
 
 // ─── Ausgabe ────────────────────────────────────────────────────────────────
 
@@ -130,6 +131,8 @@ function magnetZeile(m: Magnet, leads: readonly MagnetLead[], mitTexten = false)
     titel: m.titel,
     aktiv: m.aktiv,
     archiviert: m.archiviert || '',
+    typ: m.typ === 'audit' ? 'audit (Shop-Roast)' : 'datei',
+    plaetze: m.plaetze !== null ? `${roastPlaetze(m, leads.filter((l) => l.magnet === m.slug)).frei} von ${m.plaetze} frei` : '',
     stichwort: m.stichwort,
     landingpage: `${RESSOURCEN_BASIS}${m.slug}/`,
     dm_link: m.aktiv ? dmLink(m.slug) : '',
@@ -157,6 +160,8 @@ function leadZeile(l: MagnetLead) {
     herkunft: herkunftLabel(l),
     download_geoeffnet: l.download_am ? l.download_am.slice(0, 10) : 'nein',
     newsletter: istNewsletterAbonnent(l) ? 'bestätigt' : l.newsletter_abgemeldet_am ? 'abgemeldet' : l.newsletter_einwilligung ? 'angehakt, nicht bestätigt' : '',
+    warteliste: l.warteliste ? 'ja' : '',
+    report: l.report_gesendet_am ? `gesendet ${l.report_gesendet_am.slice(0, 10)}` : l.report_freigegeben_am ? 'freigegeben' : l.audit_id ? 'geprüft, nicht freigegeben' : '',
     status: l.status,
     firma_id: l.firma_id,
   });
@@ -165,7 +170,7 @@ function leadZeile(l: MagnetLead) {
 /** The editable fields of a magnet, so a partial change keeps the rest. */
 const magnetInput = (m: Magnet): MagnetInput => ({
   slug: m.slug, titel: m.titel, beschreibung: m.beschreibung, stichwort: m.stichwort, datei_url: m.datei_url, mail_betreff: m.mail_betreff,
-  mail_text: m.mail_text, aktiv: m.aktiv, untertitel: m.untertitel, inhalt: m.inhalt, knopf: m.knopf,
+  mail_text: m.mail_text, aktiv: m.aktiv, untertitel: m.untertitel, inhalt: m.inhalt, knopf: m.knopf, typ: m.typ, plaetze: m.plaetze,
 });
 
 // ─── Eingaben ───────────────────────────────────────────────────────────────
@@ -782,7 +787,7 @@ export function registriereWerkzeuge(server: McpServer, { service, person, teamN
     {
       title: 'Lead-Magnet anlegen oder ändern',
       description:
-        'Legt einen Lead-Magneten an oder ändert ihn, erkannt an der Adresse (der Teil hinter velonify.de/ressourcen/). Nur angegebene Felder werden geändert. Ein aktiver Magnet hat sofort seine Landingpage (spätestens nach 2 Minuten online) und verschickt die Mail mit dem Download. Aktiv geht nur mit datei_url und untertitel. Die Adresse eines bestehenden Magneten lässt sich hier nicht ändern, weil verschickte Links sonst ins Leere führen.',
+        'Legt einen Lead-Magneten an oder ändert ihn, erkannt an der Adresse (der Teil hinter velonify.de/ressourcen/). Nur angegebene Felder werden geändert. Ein aktiver Magnet hat sofort seine Landingpage (spätestens nach 2 Minuten online) und verschickt die Mail mit dem Download. Aktiv geht nur mit untertitel, beim Typ „datei“ auch mit datei_url. Die Adresse eines bestehenden Magneten lässt sich hier nicht ändern, weil verschickte Links sonst ins Leere führen.',
       inputSchema: {
         adresse: z.string().min(1).describe('Kleinbuchstaben, Ziffern, Bindestriche, z. B. shopify-skills'),
         titel: z.string().optional().describe('Überschrift der Landingpage und Name in der Mail; Pflicht beim Anlegen'),
@@ -790,7 +795,9 @@ export function registriereWerkzeuge(server: McpServer, { service, person, teamN
         inhalt: z.string().optional().describe('Text neben dem Formular: "- " Liste, "## " Zwischenüberschrift, **fett**, Leerzeile = Absatz'),
         knopf: z.string().max(40).optional().describe('Text auf dem Knopf, leer = „Kostenlos anfordern“'),
         stichwort: z.string().optional().describe('Kommentar-Stichwort unter dem Post, z. B. SKILLS'),
-        datei_url: z.string().optional().describe('Google-Drive-Link, freigegeben für „Jeder mit dem Link“'),
+        typ: z.enum(['datei', 'audit']).optional().describe('datei = Download gegen E-Mail (Standard); audit = Shop-Roast, das Team prüft den Shop und schickt einen Report'),
+        plaetze: z.number().int().min(1).max(1000).nullable().optional().describe('Nur bei audit: so viele Plätze, danach Warteliste; null = unbegrenzt'),
+        datei_url: z.string().optional().describe('Google-Drive-Link, freigegeben für „Jeder mit dem Link“; bei audit nicht nötig'),
         mail_betreff: z.string().optional().describe('Leer = „Dein Download: <Titel>“'),
         mail_text: z.string().optional().describe('Steht nach „Hi <Vorname>,“ vor dem Download-Knopf; leer = Standardtext'),
         beschreibung: z.string().optional().describe('Interne Notiz'),
@@ -803,7 +810,7 @@ export function registriereWerkzeuge(server: McpServer, { service, person, teamN
       const vorhanden = magnete.find((m) => m.slug === adresse.trim().toLowerCase());
       const basis: MagnetInput = vorhanden
         ? magnetInput(vorhanden)
-        : { slug: adresse, titel: '', beschreibung: '', stichwort: '', datei_url: '', mail_betreff: '', mail_text: '', aktiv: false, untertitel: '', inhalt: '', knopf: '' };
+        : { slug: adresse, titel: '', beschreibung: '', stichwort: '', datei_url: '', mail_betreff: '', mail_text: '', aktiv: false, untertitel: '', inhalt: '', knopf: '', typ: 'datei', plaetze: null };
       if (!vorhanden && !felder.titel) return fehler('Beim Anlegen braucht der Magnet einen titel.');
       const gespeichert = await service.saveMagnet(
         { ...basis, ...ohneUndefined(felder) },
