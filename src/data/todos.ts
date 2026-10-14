@@ -1,3 +1,4 @@
+import { istZustaendig, normalisiereZustaendig } from './zustaendig';
 import { ValidationError } from './errors';
 import { addDays, isIsoDate } from './ids';
 import type { Aufgabe, AufgabeInput, Board, ChecklistenPunkt, Firma, Spalte } from './types';
@@ -83,7 +84,7 @@ export function prepareKarte(input: AufgabeInput): AufgabeInput {
     ...input,
     titel,
     beschreibung: input.beschreibung.trim(),
-    zustaendig: input.zustaendig.trim(),
+    zustaendig: normalisiereZustaendig(input.zustaendig),
     faellig_am,
     labels,
     checkliste: punkte.length > 0 ? JSON.stringify(punkte) : '',
@@ -136,7 +137,7 @@ export function faelligkeit(aufgabe: Pick<Aufgabe, 'faellig_am' | 'erledigt_am'>
 export type KartenFilter = 'alle' | 'meine' | 'faellig';
 
 export function passtFilter(aufgabe: Aufgabe, filter: KartenFilter, ich: string | null, heute: string): boolean {
-  if (filter === 'meine') return Boolean(ich) && aufgabe.zustaendig === ich;
+  if (filter === 'meine') return istZustaendig(aufgabe.zustaendig, ich);
   if (filter === 'faellig') return ['ueberfaellig', 'heute', 'bald'].includes(faelligkeit(aufgabe, heute));
   return true;
 }
@@ -145,7 +146,7 @@ export function passtFilter(aufgabe: Aufgabe, filter: KartenFilter, ich: string 
 export function meineAufgaben(aufgaben: readonly Aufgabe[], boards: readonly Board[], ich: string): Aufgabe[] {
   const aktiv = new Set(boards.filter((b) => !b.archiviert).map((b) => b.id));
   return aufgaben
-    .filter((a) => aktiv.has(a.board_id) && !a.archiviert && !istErledigt(a) && a.zustaendig === ich)
+    .filter((a) => aktiv.has(a.board_id) && !a.archiviert && !istErledigt(a) && istZustaendig(a.zustaendig, ich))
     .sort((a, b) => (a.faellig_am || '9999').localeCompare(b.faellig_am || '9999') || a.titel.localeCompare(b.titel, 'de'));
 }
 

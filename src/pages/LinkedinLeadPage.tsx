@@ -11,6 +11,7 @@ import { isValidEmail } from '../data/rules';
 import type { FirmaInput, KontaktInput } from '../data/types';
 import { fieldOf } from '../lib/errors';
 import { useIch } from '../lib/useIch';
+import { PersonenAuswahl } from '../components/PersonenAuswahl';
 
 const PASSUNG_KLASSE = { gut: 'ok', mittel: 'warn', schwach: 'subtle', '': 'subtle' } as const;
 
@@ -281,14 +282,7 @@ function LeadFormular({ lead, v, dealTitel, team, ich }: FormularProps) {
               </select>
             </Field>
             <Field label="Zuständig">
-              <select value={zustaendig} onChange={(e) => setZustaendig(e.target.value)}>
-                <option value="">–</option>
-                {team.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+              <PersonenAuswahl team={team} wert={zustaendig} onChange={setZustaendig} />
             </Field>
           </div>
         )}

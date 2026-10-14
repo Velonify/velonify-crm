@@ -7,6 +7,7 @@ import { useCrm } from '../data/CrmContext';
 import type { ImportErgebnis } from '../data/crm';
 import { IMPORT_SPALTEN, parseCsv, planeImport, type ImportAktion, type ImportOptionen } from '../data/importCsv';
 import { useIch } from '../lib/useIch';
+import { PersonenAuswahl } from '../components/PersonenAuswahl';
 
 const AKTION_LABEL: Record<ImportAktion, string> = {
   neu: 'Neu',
@@ -139,14 +140,7 @@ export function ImportPage() {
               </fieldset>
               <label className="field">
                 <span className="field-label">Zuständig für neue Leads</span>
-                <select value={optionen.zustaendig} onChange={(e) => setOptionen((o) => ({ ...o, zustaendig: e.target.value }))}>
-                  <option value="">–</option>
-                  {db.listen.team.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
+                <PersonenAuswahl team={db.listen.team} wert={optionen.zustaendig} onChange={(zustaendig) => setOptionen((o) => ({ ...o, zustaendig }))} />
               </label>
               <div className="field">
                 <label className="checkbox">

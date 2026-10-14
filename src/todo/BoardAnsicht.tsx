@@ -8,6 +8,7 @@ import { faelligText } from '../lib/format';
 import { useIch } from '../lib/useIch';
 import { KarteDialog, SpaltenDialog, type Aendern } from './Dialoge';
 import { useKanbanDrag, type DragZiel } from './useKanbanDrag';
+import { kuerzelVon } from '../data/zustaendig';
 
 const FILTER: { wert: KartenFilter; label: string }[] = [
   { wert: 'alle', label: 'Alle' },
@@ -49,8 +50,12 @@ function KarteInhalt({ aufgabe, heute, kommentare }: { aufgabe: Aufgabe; heute: 
         {aufgabe.quelle === 'agent' && <span className="badge subtle">Slack</span>}
         {aufgabe.sichtbar_kunde && <span className="badge ok" title="Für den Kunden sichtbar">Kunde</span>}
         {aufgabe.zustaendig && (
-          <span className="karte-person" title={aufgabe.zustaendig}>
-            {aufgabe.zustaendig.slice(0, 2)}
+          <span className="karte-personen" title={aufgabe.zustaendig}>
+            {kuerzelVon(aufgabe.zustaendig).map((k, i) => (
+              <span key={i} className="karte-person">
+                {k}
+              </span>
+            ))}
           </span>
         )}
       </span>

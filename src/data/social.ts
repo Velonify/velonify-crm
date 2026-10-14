@@ -1,3 +1,4 @@
+import { normalisiereZustaendig } from './zustaendig';
 import { isIsoDate } from './ids';
 import { ValidationError } from './errors';
 import type {
@@ -430,7 +431,7 @@ export function preparePlan(input: SocialPlanInput): SocialPlanInput {
     inhalt_id: input.inhalt_id.trim(),
     status: input.status.trim() || 'geplant',
     hinweis: input.hinweis.trim(),
-    zustaendig: input.zustaendig.trim(),
+    zustaendig: normalisiereZustaendig(input.zustaendig),
   };
 }
 
@@ -473,7 +474,7 @@ export function prepareAufgabe(input: SocialAufgabeInput): SocialAufgabeInput {
     beschreibung: input.beschreibung.trim(),
     dringlichkeit: input.dringlichkeit.trim(),
     faellig_am: faellig,
-    zustaendig: input.zustaendig.trim(),
+    zustaendig: normalisiereZustaendig(input.zustaendig),
   };
 }
 

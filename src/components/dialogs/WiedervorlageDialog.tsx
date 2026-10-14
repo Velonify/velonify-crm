@@ -6,6 +6,7 @@ import { fieldOf } from '../../lib/errors';
 import { Dialog } from '../Dialog';
 import { useToast } from '../Toasts';
 import { Field, FormError } from '../ui';
+import { PersonenAuswahl } from '../PersonenAuswahl';
 
 interface Props {
   firmaId?: string;
@@ -74,14 +75,7 @@ export function WiedervorlageDialog({ firmaId, dealId, wiedervorlage, ich, onClo
           <input type="date" value={values.faellig_am} onChange={set('faellig_am')} />
         </Field>
         <Field label="Zuständig">
-          <select value={values.zustaendig} onChange={set('zustaendig')}>
-            <option value="">–</option>
-            {(db?.listen.team ?? []).map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+          <PersonenAuswahl team={db?.listen.team ?? []} wert={values.zustaendig} onChange={(zustaendig) => setValues((v) => ({ ...v, zustaendig }))} />
         </Field>
         <div className="quick-dates wide">
           {schnell.map(([label, datum]) => (

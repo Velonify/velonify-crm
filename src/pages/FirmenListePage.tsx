@@ -11,6 +11,7 @@ import { kontaktName } from '../data/rules';
 import { fortschritt } from '../data/selectors';
 import type { Firma } from '../data/types';
 import { relativeDays } from '../lib/format';
+import { istZustaendig } from '../data/zustaendig';
 
 type SortKey = 'name' | 'status' | 'phase' | 'tier' | 'score' | 'branche' | 'ort' | 'zustaendig' | 'geaendert_am';
 
@@ -95,7 +96,7 @@ export function FirmenListePage() {
           (!filter.status || f.status === filter.status) &&
           (!filter.tier || f.tier === filter.tier) &&
           (!filter.plattform || f.plattform === filter.plattform) &&
-          (!filter.zustaendig || f.zustaendig === filter.zustaendig) &&
+          (!filter.zustaendig || istZustaendig(f.zustaendig, filter.zustaendig)) &&
           (!filter.dubletten || dubletten.has(f.id)) &&
           passtBranche(branchen.wert, f.branche) &&
           (!q || suchtext.includes(q)),

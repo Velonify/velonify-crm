@@ -1,3 +1,4 @@
+import { istZustaendig } from './zustaendig';
 import { EINSTELLUNG, isAbgeschlossen, istVernetzungVermerk, phaseIndex, STANDARD_WAHRSCHEINLICHKEIT, type Phase } from './constants';
 import { addDays, isoDate, tageZwischen } from './ids';
 import type { Aktivitaet, Database, Deal, Einstellungen, Firma, Wiedervorlage } from './types';
@@ -68,7 +69,7 @@ export interface MeinTag {
 export function meinTag(db: Database, ich: string | null, heute: string, tage = 7): MeinTag {
   const firmen = indexById(db.firmen);
   const deals = indexById(db.deals);
-  const meins = (zustaendig: string) => !ich || !zustaendig || zustaendig === ich;
+  const meins = (zustaendig: string) => !ich || !zustaendig || istZustaendig(zustaendig, ich);
   const aktiveFirma = (id: string) => {
     const firma = firmen.get(id);
     return firma && !firma.archiviert ? firma : undefined;

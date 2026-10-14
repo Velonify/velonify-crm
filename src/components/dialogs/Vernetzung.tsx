@@ -12,6 +12,7 @@ import { useIch } from '../../lib/useIch';
 import { Dialog } from '../Dialog';
 import { useToast } from '../Toasts';
 import { Field, FormError } from '../ui';
+import { istZustaendig } from '../../data/zustaendig';
 
 const NEU = '__neu__';
 
@@ -98,7 +99,7 @@ export function VernetzungDialog({ deal, firma, onClose }: { deal: Deal; firma: 
     setBusy(true);
     try {
       await mutate(async (s) => s.sendeVernetzung(deal.id, deal.geaendert_am, { kontaktId: await person.ermittle(s), notiz, ich: ich ?? '' }));
-      const zugeteilt = deal.phase === 'qualifiziert' && ich && deal.zustaendig !== ich ? ' · dir zugeteilt' : '';
+      const zugeteilt = deal.phase === 'qualifiziert' && ich && !istZustaendig(deal.zustaendig, ich) ? ' · dir zugeteilt' : '';
       toast.show(`${firma.name}: Vernetzung angefragt · Erinnerung in ${VERNETZUNG_TAGE} Tagen${zugeteilt}`);
       onClose();
     } catch (err) {

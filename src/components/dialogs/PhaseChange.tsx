@@ -12,6 +12,7 @@ import { Dialog } from '../Dialog';
 import { useToast } from '../Toasts';
 import { Field, FormError } from '../ui';
 import { VernetzungDialog } from './Vernetzung';
+import { istZustaendig } from '../../data/zustaendig';
 
 interface Pending {
   deal: Deal;
@@ -94,7 +95,7 @@ function PhaseDialog({ pending, onClose }: { pending: Pending; onClose(): void }
         if (pending.erstkontakt) {
           await s.addAktivitaet({ firma_id: firma.id, kontakt_id: kontaktId, deal_id: deal.id, typ: 'notiz', datum: '', text: kontaktVermerk(weg, vermerk) });
           erledigt.push('im Verlauf vermerkt');
-          if (istZuteilung(deal.phase, phase) && ich && deal.zustaendig !== ich) erledigt.push('dir zugeteilt');
+          if (istZuteilung(deal.phase, phase) && ich && !istZustaendig(deal.zustaendig, ich)) erledigt.push('dir zugeteilt');
         }
         if (pending.leadOrdner && ordnerAnlegen) {
           await s.legeLeadOrdnerAn(firma.id, ordner.kuerzel, ordner.name, 'clients');
@@ -219,7 +220,7 @@ export function usePhaseChange(): { request(deal: Deal, phase: string): Promise<
         return;
       }
       const kunde = phase === 'gewonnen' && firma.status !== 'kunde' ? ` · ${firma.name} ist jetzt Kunde` : '';
-      const zugeteilt = istZuteilung(deal.phase, phase) && ich && deal.zustaendig !== ich ? ` · dir zugeteilt` : '';
+      const zugeteilt = istZuteilung(deal.phase, phase) && ich && !istZustaendig(deal.zustaendig, ich) ? ` · dir zugeteilt` : '';
       await perform((s) => s.changePhase(deal.id, phase, deal.geaendert_am, '', ich ?? ''), `${firma.name}: ${phaseLabel(phase)}${kunde}${zugeteilt}`);
     },
     [db, service, perform, toast, ich],

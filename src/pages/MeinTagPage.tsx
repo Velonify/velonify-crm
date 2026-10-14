@@ -11,6 +11,7 @@ import { kennzahlen, meinTag, type Aufgabe } from '../data/selectors';
 import type { Deal } from '../data/types';
 import { faelligText, formatDayShort, formatEuro } from '../lib/format';
 import { useIch } from '../lib/useIch';
+import { istZustaendig } from '../data/zustaendig';
 
 function AufgabenListe({ titel, aufgaben, heute, leer, onDeal, klasse = '' }: {
   titel: string;
@@ -87,7 +88,7 @@ export function MeinTagPage() {
   const zahlen = useMemo(() => {
     if (!db) return null;
     const firmen = new Map(db.firmen.map((f) => [f.id, f]));
-    const deals = db.deals.filter((d) => !firmen.get(d.firma_id)?.archiviert && (!filter || d.zustaendig === filter));
+    const deals = db.deals.filter((d) => !firmen.get(d.firma_id)?.archiviert && (!filter || istZustaendig(d.zustaendig, filter)));
     return kennzahlen(deals, heute);
   }, [db, filter, heute]);
 

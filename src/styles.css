@@ -893,6 +893,7 @@ fieldset.plain.invalid legend { color: var(--danger); }
 
 /* ─── To-Dos ─────────────────────────────────────────────────────────────── */
 .page.full { max-width: none; }
+.personen-auswahl { gap: 6px; }
 .kunden-karte.is-intern { background: var(--sunken); }
 .board-zahlen { color: var(--ink-muted); margin-top: auto; }
 .board-zahlen strong { color: var(--ink); }
@@ -924,7 +925,8 @@ fieldset.plain.invalid legend { color: var(--danger); }
 .karte-zahl.is-komplett { color: var(--ok); }
 .karte-faellig.is-ueberfaellig { color: var(--danger); font-weight: 700; }
 .karte-faellig.is-heute { color: var(--ink); font-weight: 700; }
-.karte-person { margin-left: auto; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: var(--selected-bg); color: var(--selected-ink); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.karte-personen { margin-left: auto; display: inline-flex; gap: 2px; }
+.karte-person { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: var(--selected-bg); color: var(--selected-ink); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 .karte-platzhalter { height: 56px; border: 1px dashed var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); flex: none; }
 .karte.is-fliegend { position: fixed; z-index: 200; pointer-events: none; cursor: grabbing; transform: rotate(1.5deg); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22); border-color: var(--accent); }
 body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
