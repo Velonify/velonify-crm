@@ -3,6 +3,7 @@ import { Dialog } from '../components/Dialog';
 import { useToast } from '../components/Toasts';
 import { Field, FormError } from '../components/ui';
 import type { CrmService } from '../data/crm';
+import { FREIGABE_LABEL, freigabeVon } from '../data/portal';
 import { checklisteVon, neueSpaltenId, spaltenVon } from '../data/todos';
 import type { Aufgabe, AufgabeInput, AufgabenKommentar, Board, ChecklistenPunkt, Spalte } from '../data/types';
 import { fieldOf } from '../lib/errors';
@@ -75,6 +76,20 @@ export function KarteDialog({
   const speichern = () => {
     const eingabe = { ...werte, checkliste: JSON.stringify(neuerPunkt.trim() ? [...punkte, { text: neuerPunkt.trim(), erledigt: false }] : punkte) };
     void run((s) => s.saveKarte(board.id, eingabe, aufgabe && { id: aufgabe.id, expectedGeaendertAm: aufgabe.geaendert_am }), aufgabe ? 'Karte gespeichert' : 'Karte angelegt');
+  };
+
+  const freigabe = aufgabe ? freigabeVon(aufgabe) : null;
+  /** Saves the open edits first, so nothing typed gets lost, then asks for (or clears) the client's approval. */
+  const freigabeAendern = () => {
+    if (!aufgabe) return;
+    const eingabe = { ...werte, checkliste: JSON.stringify(punkte), sichtbar_kunde: freigabe ? werte.sichtbar_kunde : true };
+    void run(
+      async (s) => {
+        const karte = await s.saveKarte(board.id, eingabe, { id: aufgabe.id, expectedGeaendertAm: aufgabe.geaendert_am });
+        return freigabe ? s.freigabeZuruecksetzen(karte.id, karte.geaendert_am) : s.freigabeAnfragen(karte.id, karte.geaendert_am);
+      },
+      freigabe === 'offen' ? 'Anfrage zurückgezogen' : freigabe ? 'Antwort als erledigt markiert' : 'Freigabe angefragt – der Kunde sieht die Karte unter „Für dich zu tun“',
+    );
   };
 
   const archivieren = () => {
@@ -163,8 +178,18 @@ export function KarteDialog({
           <Field label="Kunde" wide>
             <label className="checkbox">
               <input type="checkbox" checked={werte.sichtbar_kunde} onChange={(e) => setWerte((w) => ({ ...w, sichtbar_kunde: e.target.checked }))} />
-              Für den Kunden sichtbar (später im Kundenportal)
+              Für den Kunden sichtbar im Kundenportal
             </label>
+            {aufgabe && !aufgabe.archiviert && (
+              <div className="freigabe-zeile">
+                {freigabe && <span className={`badge freigabe-${freigabe}`}>{FREIGABE_LABEL[freigabe]}</span>}
+                {freigabe === 'offen' && <span className="muted small">angefragt {formatDateTime(aufgabe.freigabe_am)} von {shortUser(aufgabe.freigabe_von)}</span>}
+                {(freigabe === 'freigegeben' || freigabe === 'aenderung') && <span className="muted small">{formatDateTime(aufgabe.freigabe_am)}</span>}
+                <button type="button" className="button small" onClick={freigabeAendern} disabled={busy}>
+                  {freigabe === 'offen' ? 'Anfrage zurückziehen' : freigabe ? 'Antwort erledigt' : 'Freigabe anfragen'}
+                </button>
+              </div>
+            )}
           </Field>
         )}
         {aufgabe?.quelle_link && (

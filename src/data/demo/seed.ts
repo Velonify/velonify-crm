@@ -87,6 +87,9 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   const alpenglanz = await firma({ name: 'Alpenglanz Kosmetik AG', domain: 'alpenglanz.example', kuerzel: 'AGK', status: 'kunde', plattform: 'shopify_plus', ort: 'Innsbruck', quelle: 'Empfehlung', zustaendig: 'Johannes', slack_channel: 'client-agk-general', branche: 'beauty' });
   const ad = await deal(alpenglanz.id, { titel: 'Shopify-Plus-Relaunch', wert_eur: 65000, zustaendig: 'Johannes' });
   await phase(ad.id, 'gewonnen');
+  const ak = await kontakt(alpenglanz.id, { vorname: 'Sophie', nachname: 'Lindner', rolle: 'Geschäftsführerin', email: 'sophie@alpenglanz.example', hauptkontakt: true });
+  await kontakt(alpenglanz.id, { vorname: 'Tobias', nachname: 'Brandl', rolle: 'Marketing', email: 'tobias@alpenglanz.example' });
+  await kontakt(alpenglanz.id, { vorname: 'Petra', nachname: 'Huber', rolle: 'Buchhaltung' });
   await service.saveWiedervorlage({ firma_id: alpenglanz.id, deal_id: '', titel: 'Quartalsreport schicken', faellig_am: addDays(heute, -3), zustaendig: 'Johannes' });
 
   const feldmann = await firma({ name: 'Feldmann Werkzeuge', domain: 'feldmann-werkzeuge.example', tier: 'C', score: 38, plattform: 'magento2', version: '2.4.4', eol: 'eol', ort: 'Stuttgart' });
@@ -286,6 +289,19 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   await karte(kundenBoard.id, 'erledigt', 'Neue Produktseiten live', { zustaendig: 'Johannes', sichtbar_kunde: true });
   await karte(intern.id, 'woche', 'Angebot Nordlicht nachfassen', { zustaendig: 'Lugge', faellig_am: heute, labels: 'Sales' });
   await karte(intern.id, 'backlog', 'Slack-App für den To-Do-Agenten anlegen', { zustaendig: 'Lugge', labels: 'Intern' });
+  const hero = await karte(kundenBoard.id, 'wartet', 'Startseiten-Hero Winterkollektion', { zustaendig: 'Julian', labels: 'Design', beschreibung: 'Entwurf liegt in 07_Client-Share.', faellig_am: addDays(heute, 2) });
+  await service.freigabeAnfragen(hero.id, hero.geaendert_am);
+
+  // Client portal: one login, the UTM generator and a roadmap.
+  await service.setPortalZugang(alpenglanz.id, ak.id, true);
+  await service.setPortalWerkzeug(alpenglanz.id, 'utm', true);
+  const etappe = (titel: string, status: 'offen' | 'aktiv' | 'erledigt', tage: number | null) =>
+    service.saveMeilenstein(alpenglanz.id, { titel, status, datum: tage === null ? '' : addDays(heute, tage) });
+  await etappe('Migration', 'erledigt', -60);
+  await etappe('Tracking', 'erledigt', -1);
+  await etappe('Design & Inhalte', 'aktiv', 17);
+  await etappe('Black Week', 'offen', 37);
+  await etappe('Go-live Phase 2', 'offen', 45);
 
   return { service, sheets };
 }
