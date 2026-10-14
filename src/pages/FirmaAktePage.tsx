@@ -12,7 +12,9 @@ import { EOL_LABEL } from '../data/constants';
 import { findeDubletten } from '../data/dubletten';
 import { useCrm } from '../data/CrmContext';
 import type { Firma, FirmaInput } from '../data/types';
-import { formatDateTime, shortUser, websiteUrl } from '../lib/format';
+import { faelligText, formatDateTime, formatEuro, relativeDays, shortUser, websiteUrl } from '../lib/format';
+import { isoDate } from '../data/ids';
+import { offeneDeals } from '../data/selectors';
 import { useIch } from '../lib/useIch';
 
 function toInput({ id: _id, archiviert: _a, erstellt_am: _ea, erstellt_von: _ev, geaendert_am: _ga, geaendert_von: _gv, ...input }: Firma): FirmaInput {
@@ -106,9 +108,23 @@ export function FirmaAktePage() {
     }
   };
 
+  const offeneDealsFirma = offeneDeals(db.deals.filter((d) => d.firma_id === f.id));
+  const naechste = db.wiedervorlagen
+    .filter((w) => w.firma_id === f.id && !w.erledigt_am)
+    .sort((x, y) => x.faellig_am.localeCompare(y.faellig_am))[0];
+  const letzte = db.aktivitaeten.filter((x) => x.firma_id === f.id).sort((x, y) => y.datum.localeCompare(x.datum))[0];
+  const heute = isoDate(new Date());
+
   return (
     <div className="page wide">
       <PageHeader
+        zahlen={[
+          { wert: offeneDealsFirma.length, label: offeneDealsFirma.length === 1 ? 'offener Deal' : 'offene Deals' },
+          { wert: formatEuro(offeneDealsFirma.reduce((sum, d) => sum + (d.wert_eur ?? 0), 0)), label: 'offener Wert' },
+          { wert: naechste ? faelligText(naechste.faellig_am, heute) : '–', label: naechste ? `Wiedervorlage: ${naechste.titel}` : 'keine Wiedervorlage', warn: Boolean(naechste && naechste.faellig_am < heute) },
+          { wert: letzte ? relativeDays(letzte.datum) : '–', label: 'letzter Eintrag im Verlauf' },
+        ]}
+        ueberlappen
         eyebrow={
           <nav aria-label="Pfad">
             <Link to="/crm/firmen">Firmen</Link>

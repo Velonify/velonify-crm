@@ -1,157 +1,200 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { TerminEintrag, useTermine } from '../components/Termine';
 import { useToast } from '../components/Toasts';
-import { Card, ErrorBox, Loading, PageHeader, PhaseBadge, StatusBadge } from '../components/ui';
-import { isDemo } from '../config';
+import { Card, ErrorBox, Loading, PageHeader, type BandZahl } from '../components/ui';
 import { useCrm } from '../data/CrmContext';
-import { driveFolderUrl } from '../data/google/drive';
 import { addDays, isoDate } from '../data/ids';
 import { istVorbei, tagesBeginn, termineJeTag } from '../data/kalender';
 import { kennzahlen, meinTag } from '../data/selectors';
-import { firmenLinks, schnellzugriff, slackChannelUrl } from '../data/start';
-import type { Database } from '../data/types';
+import { firmenLinks, pipelineStufen, schnellzugriff } from '../data/start';
+import type { Database, KundenNews, TodoDaten } from '../data/types';
 import { dateiname } from '../lib/dateiname';
 import { faelligText, formatEuro } from '../lib/format';
 import { useIch } from '../lib/useIch';
 import { useLoad } from '../lib/useLoad';
-import { istGeplant, WERKZEUGE } from '../werkzeuge';
 import { AnfragenKarte } from '../eingang/AnfragenKarte';
 import { MonsteraKarte } from '../monstera/MonsteraKarte';
 import { WordleKarte } from '../wordle/WordleKarte';
-import { SchemaError } from '../data/errors';
-import { faelligkeit, meineAufgaben } from '../data/todos';
+import { boardVon, faelligkeit, istErledigt, meineAufgaben } from '../data/todos';
+import { phaseLabel } from '../data/constants';
+import { istOffen } from '../data/eingang';
+import { ticker } from '../data/kunden';
+import { AKTIONEN } from '../data/suche';
+import { istMac } from '../components/Suche';
+import { useEingang } from '../eingang/useEingang';
+import { useKundenDaten } from '../kunden/useKundenDaten';
 import { useTodoDaten } from '../todo/useTodoDaten';
 import { istZustaendig } from '../data/zustaendig';
 
 const MAX_AUFGABEN = 5;
 
-function Werkzeuge({ heute, ueberfaellig, pipelineWert }: { heute: number; ueberfaellig: number; pipelineWert: number }) {
-  return (
-    <section className="tools" aria-label="Werkzeuge">
-      <Link to="/crm" className="tool panel">
-        <span className="tool-label">CRM</span>
-        <span className="tool-text">Leads, Pipeline und Kundenakte</span>
-        <span className="tool-figures">
-          <span>
-            <strong>{heute}</strong> heute
-          </span>
-          {ueberfaellig > 0 && (
-            <span>
-              <strong>{ueberfaellig}</strong> überfällig
-            </span>
-          )}
-          <span>
-            <strong>{formatEuro(pipelineWert)}</strong> Pipeline
-          </span>
-        </span>
-        <span className="tool-cta">CRM öffnen →</span>
-      </Link>
-      {WERKZEUGE.filter((w) => w.id !== 'home' && w.id !== 'crm' && !istGeplant(w)).map((w) => (
-        <Link key={w.id} to={w.pfad!} className="tool">
-          <span className="tool-label">{w.name}</span>
-          <span className="tool-text">{w.beschreibung}</span>
-          <span className="tool-cta">Öffnen →</span>
-        </Link>
-      ))}
-      {WERKZEUGE.filter(istGeplant).map((w) => (
-        <div key={w.id} className="tool is-planned" aria-disabled="true">
-          <span className="tool-label">
-            {w.name} <span className="badge subtle">In Planung</span>
-          </span>
-          <span className="tool-text">{w.beschreibung}</span>
-        </div>
-      ))}
-    </section>
-  );
+interface HeuteEintrag {
+  key: string;
+  typ: 'Wiedervorlage' | 'Deal' | 'Karte';
+  titel: string;
+  faellig: string;
+  wo: ReactNode;
+  pfad: string;
 }
 
-/** Open cards of the signed-in person that are overdue or due soon. Hidden until the to-do tabs are set up. */
-function MeineTodos({ ich, heute }: { ich: string | null; heute: string }) {
-  const { data, error } = useTodoDaten();
-  if (error instanceof SchemaError || !ich) return null;
-  const karten = data ? meineAufgaben(data.aufgaben, data.boards, ich).filter((a) => ['ueberfaellig', 'heute', 'bald'].includes(faelligkeit(a, heute))) : [];
-  const board = (id: string) => data?.boards.find((b) => b.id === id);
+/** Everything due today or overdue, from the CRM and the to-do boards, in one list. */
+function HeuteDran({ eintraege, heute, bald }: { eintraege: HeuteEintrag[]; heute: string; bald: number }) {
   return (
     <Card
       title={
         <>
-          Meine To-dos <span className="count">{karten.length}</span>
+          Heute dran <span className="count">{eintraege.length}</span>
         </>
       }
       actions={
-        <Link to="/todo/meine" className="button small">
-          Alle
-        </Link>
+        <>
+          <Link to="/todo/meine" className="button small subtle">
+            Meine Karten
+          </Link>
+          <Link to="/crm" className="button small">
+            Mein Tag
+          </Link>
+        </>
       }
-      className="task-card"
     >
-      {error && <ErrorBox error={error} />}
-      {!data && !error && <Loading />}
-      {data && karten.length === 0 && <p className="muted">In den nächsten Tagen ist keine Karte fällig.</p>}
-      {karten.length > 0 && (
-        <ul className="task-list">
-          {karten.slice(0, MAX_AUFGABEN).map((a) => (
-            <li key={a.id} className={a.faellig_am < heute ? 'overdue' : a.faellig_am === heute ? 'today' : ''}>
-              <span className="task-kind open" aria-hidden="true" />
-              <div className="task-body">
-                <Link to={`/todo/${a.board_id}`}>{a.titel}</Link>
-                <div className="row-sub">
-                  {board(a.board_id)?.titel} · {faelligText(a.faellig_am, heute)}
-                </div>
+      {eintraege.length === 0 ? (
+        <p className="muted">Für heute ist nichts offen.{bald > 0 && ` In den nächsten Tagen: ${bald}.`}</p>
+      ) : (
+        <ul className="heute-liste">
+          {eintraege.slice(0, MAX_AUFGABEN).map((e) => (
+            <li key={e.key} className={e.faellig < heute ? 'is-ueberfaellig' : ''}>
+              <span className={`typ typ-${e.typ.toLowerCase()}`}>{e.typ}</span>
+              <div className="heute-text">
+                <Link to={e.pfad} className="heute-titel">
+                  {e.titel}
+                </Link>
+                <div className="row-sub">{e.wo}</div>
               </div>
+              <span className="heute-wann">{faelligText(e.faellig, heute)}</span>
             </li>
           ))}
         </ul>
+      )}
+      {eintraege.length > MAX_AUFGABEN && (
+        <p className="hint">
+          Und {eintraege.length - MAX_AUFGABEN} weitere – <Link to="/crm">Mein Tag</Link> · <Link to="/todo/meine">Meine Aufgaben</Link>
+        </p>
       )}
     </Card>
   );
 }
 
-function HeuteDran({ db, ich, heute }: { db: Database; ich: string | null; heute: string }) {
-  const tag = useMemo(() => meinTag(db, ich, heute), [db, ich, heute]);
-  const aufgaben = [...tag.ueberfaellig, ...tag.heute];
+/** Clients as tiles with open cards and the latest news; leads with an open offer below. */
+function Kunden({ db, todos, news, heute }: { db: Database; todos?: TodoDaten; news?: KundenNews[]; heute: string }) {
+  const eintraege = useMemo(() => schnellzugriff(db), [db]);
+  const kunden = eintraege.filter((e) => e.art === 'kunde').map((e) => e.firma);
+  const angebote = eintraege.filter((e) => e.art === 'angebot').map((e) => e.firma);
   return (
     <Card
       title={
         <>
-          Heute dran <span className="count">{aufgaben.length}</span>
+          Kunden <span className="count">{kunden.length}</span>
         </>
       }
       actions={
-        <Link to="/crm" className="button small">
-          Mein Tag
+        <Link to="/kunden" className="button small">
+          Alle Kunden
         </Link>
       }
-      className="task-card"
     >
-      {aufgaben.length === 0 ? (
-        <p className="muted">
-          Für heute ist nichts offen.
-          {tag.naechsteTage.length > 0 && ` In den nächsten 7 Tagen: ${tag.naechsteTage.length}.`}
-        </p>
-      ) : (
-        <ul className="task-list">
-          {aufgaben.slice(0, MAX_AUFGABEN).map((a) => (
-            <li key={a.key} className={a.faellig < heute ? 'overdue' : 'today'}>
-              <span className="task-kind" aria-hidden="true" />
-              <div className="task-body">
-                <span>{a.titel}</span>
-                <div className="row-sub">
-                  {a.firma && <Link to={`/crm/firmen/${a.firma.id}`}>{a.firma.name}</Link>}
-                  {a.zustaendig && <> · {a.zustaendig}</>}
-                  {a.faellig < heute && <> · {faelligText(a.faellig, heute)}</>}
-                </div>
-              </div>
+      {kunden.length === 0 && <p className="muted">Noch keine Kunden.</p>}
+      <ul className="kunden-kacheln">
+        {kunden.map((f) => {
+          const board = todos ? boardVon(todos.boards, f.id) : undefined;
+          const karten = board && todos ? todos.aufgaben.filter((a) => a.board_id === board.id && !a.archiviert) : [];
+          const offen = karten.filter((a) => !istErledigt(a));
+          const ueber = offen.filter((a) => faelligkeit(a, heute) === 'ueberfaellig').length;
+          const anteil = karten.length > 0 ? Math.round(((karten.length - offen.length) / karten.length) * 100) : 0;
+          const neueste = news ? ticker(news, f.id, heute).find((n) => !n.alleKunden) : undefined;
+          return (
+            <li key={f.id}>
+              <Link to={`/kunden/${f.id}`} className="kunden-kachel">
+                <span className="kunden-kachel-kopf">
+                  <span className="kuerzel">{f.kuerzel || '–'}</span>
+                  <span className="kunden-kachel-name">{f.name}</span>
+                </span>
+                <span className="kunden-kachel-news">{neueste ? neueste.titel : 'Noch keine News'}</span>
+                <span className="fortschritt" aria-hidden="true">
+                  <span style={{ width: `${anteil}%` }} />
+                </span>
+                <span className="kunden-kachel-zahlen">
+                  <span>{offen.length} offen</span>
+                  {ueber > 0 ? <span className="is-warn">{ueber} überfällig</span> : <span>{f.zustaendig || 'niemand zuständig'}</span>}
+                </span>
+              </Link>
             </li>
-          ))}
-        </ul>
+          );
+        })}
+      </ul>
+      {angebote.length > 0 && (
+        <>
+          <h3 className="subheading">Offene Angebote</h3>
+          <ul className="angebot-zeilen">
+            {angebote.map((f) => (
+              <li key={f.id}>
+                {f.kuerzel && <span className="kuerzel">{f.kuerzel}</span>}
+                <Link to={`/crm/firmen/${f.id}`}>{f.name}</Link>
+                <span className="muted small">{f.zustaendig}</span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
-      {aufgaben.length > MAX_AUFGABEN && (
-        <p className="hint">
-          Und {aufgaben.length - MAX_AUFGABEN} weitere – <Link to="/crm">alle in Mein Tag</Link>
-        </p>
-      )}
+    </Card>
+  );
+}
+
+function Pipeline({ db, ich }: { db: Database; ich: string | null }) {
+  const stufen = useMemo(() => {
+    const firmen = new Map(db.firmen.map((f) => [f.id, f]));
+    return pipelineStufen(db.deals.filter((d) => !firmen.get(d.firma_id)?.archiviert && (!ich || istZustaendig(d.zustaendig, ich))));
+  }, [db, ich]);
+  const max = Math.max(1, ...stufen.map((s) => s.anzahl));
+  return (
+    <Card
+      title={ich ? 'Meine Pipeline' : 'Pipeline'}
+      actions={
+        <Link to="/crm/pipeline" className="button small">
+          Öffnen
+        </Link>
+      }
+    >
+      <div className="stufen">
+        {stufen.map((s) => (
+          <div key={s.phase} className="stufe">
+            <span className="stufe-name">
+              {phaseLabel(s.phase)} <span className="muted">{s.anzahl}</span>
+            </span>
+            <span className="stufe-balken" aria-hidden="true">
+              <span style={{ width: `${(s.anzahl / max) * 100}%` }} />
+            </span>
+            <span className="stufe-wert">{s.wert > 0 ? formatEuro(s.wert) : '–'}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+const SCHNELL = ['Neue Firma anlegen', 'Neues Angebot', 'Anschreiben erstellen', 'Shop prüfen'];
+
+function Schnellstart() {
+  return (
+    <Card title="Schnell starten">
+      <div className="schnellstart">
+        {AKTIONEN.filter((a) => SCHNELL.includes(a.titel)).map((a) => (
+          <Link key={a.pfad} to={a.pfad} className="schnell-knopf">
+            {a.titel}
+          </Link>
+        ))}
+      </div>
+      <p className="hint">Alles andere: {istMac ? '⌘K' : 'Strg+K'} drücken und lostippen.</p>
     </Card>
   );
 }
@@ -198,67 +241,6 @@ function Kalender({ db, heute }: { db: Database; heute: string }) {
             </p>
           )}
         </>
-      )}
-    </Card>
-  );
-}
-
-function Kunden({ db }: { db: Database }) {
-  const eintraege = useMemo(() => schnellzugriff(db), [db]);
-  const phase = (firmaId: string) => db.deals.find((d) => d.firma_id === firmaId && d.phase === 'angebot' && !d.archiviert);
-  return (
-    <Card
-      title={
-        <>
-          Kunden & Angebote <span className="count">{eintraege.length}</span>
-        </>
-      }
-      actions={
-        <Link to="/crm/firmen?status=kunde" className="button small">
-          Alle Firmen
-        </Link>
-      }
-    >
-      {eintraege.length === 0 ? (
-        <p className="muted">Noch keine Kunden und keine offenen Angebote.</p>
-      ) : (
-        <ul className="client-list">
-          {eintraege.map(({ firma: f, art }) => {
-            // Drive links are simulated in demo mode, so they are shown without a target.
-            const links: { label: string; url?: string; title?: string }[] = [];
-            if (f.drive_ordner_id) links.push({ label: 'Drive', url: isDemo ? undefined : driveFolderUrl(f.drive_ordner_id) });
-            if (f.slack_channel) links.push({ label: 'Slack', url: slackChannelUrl(db.einstellungen, f.slack_channel), title: `#${f.slack_channel}` });
-            if (f.trello_url) links.push({ label: 'Trello', url: f.trello_url });
-            return (
-              <li key={f.id}>
-                <span className="client-kuerzel">{f.kuerzel ? <span className="kuerzel">{f.kuerzel}</span> : <span className="muted">–</span>}</span>
-                <div className="client-main">
-                  <Link to={art === 'kunde' ? `/kunden/${f.id}` : `/crm/firmen/${f.id}`} className="row-title">
-                    {f.name}
-                  </Link>
-                  <div className="row-sub">
-                    {art === 'kunde' ? <StatusBadge status="kunde" /> : <PhaseBadge phase={phase(f.id)?.phase ?? 'angebot'} />}
-                    {f.zustaendig && <> {f.zustaendig}</>}
-                  </div>
-                </div>
-                <div className="client-links">
-                  {links.length === 0 && <span className="muted small">Keine Links</span>}
-                  {links.map((l) =>
-                    l.url ? (
-                      <a key={l.label} href={l.url} target="_blank" rel="noreferrer noopener" title={l.title}>
-                        {l.label} ↗
-                      </a>
-                    ) : (
-                      <span key={l.label} className="muted" title="Im Demo-Modus simuliert">
-                        {l.label}
-                      </span>
-                    ),
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
       )}
     </Card>
   );
@@ -344,41 +326,72 @@ export function StartPage() {
   const { db, service, loading, error, refresh } = useCrm();
   // Word game and plant share one request, so opening the start page stays a small load for Google.
   const spiele = useLoad(() => (service ? service.loadSpiele() : new Promise<never>(() => {})), [service]);
+  const todos = useTodoDaten();
+  const kundenDaten = useKundenDaten();
+  const eingang = useEingang();
   const [ich] = useIch(db?.listen.team ?? []);
   const heute = isoDate(new Date());
 
-  const zahlen = useMemo(() => {
+  const cockpit = useMemo(() => {
     if (!db) return null;
     const tag = meinTag(db, ich, heute);
+    const crm: HeuteEintrag[] = [...tag.ueberfaellig, ...tag.heute].map((a) => ({
+      key: a.key,
+      typ: a.art === 'wiedervorlage' ? 'Wiedervorlage' : 'Deal',
+      titel: a.titel,
+      faellig: a.faellig,
+      wo: a.firma ? `${a.firma.kuerzel ? `${a.firma.kuerzel} · ` : ''}${a.firma.name}` : '',
+      pfad: a.firma ? `/crm/firmen/${a.firma.id}` : '/crm',
+    }));
+    const meine = todos.data && ich ? meineAufgaben(todos.data.aufgaben, todos.data.boards, ich) : [];
+    const kartenHeute: HeuteEintrag[] = meine
+      .filter((k) => ['ueberfaellig', 'heute'].includes(faelligkeit(k, heute)))
+      .map((k) => ({ key: k.id, typ: 'Karte', titel: k.titel, faellig: k.faellig_am, wo: todos.data!.boards.find((b) => b.id === k.board_id)?.titel ?? '', pfad: `/todo/${k.board_id}` }));
+    const eintraege = [...crm, ...kartenHeute].sort((x, y) => x.faellig.localeCompare(y.faellig));
+    const bald = tag.naechsteTage.length + meine.filter((k) => faelligkeit(k, heute) === 'bald').length;
     const firmen = new Map(db.firmen.map((f) => [f.id, f]));
     const deals = db.deals.filter((d) => !firmen.get(d.firma_id)?.archiviert && (!ich || istZustaendig(d.zustaendig, ich)));
-    return { heute: tag.heute.length, ueberfaellig: tag.ueberfaellig.length, pipelineWert: kennzahlen(deals, heute).pipelineWert };
-  }, [db, ich, heute]);
+    return {
+      eintraege,
+      bald,
+      ueberfaellig: eintraege.filter((e) => e.faellig < heute).length,
+      offeneKarten: todos.data ? meine.length : null,
+      pipelineWert: kennzahlen(deals, heute).pipelineWert,
+      anfragen: eingang.data ? eingang.data.filter(istOffen).length : null,
+    };
+  }, [db, ich, heute, todos.data, eingang.data]);
 
-  if (!db || !zahlen) return <div className="page">{error ? <ErrorBox error={error} onRetry={refresh} /> : loading && <Loading />}</div>;
+  if (!db || !cockpit) return <div className="page">{error ? <ErrorBox error={error} onRetry={refresh} /> : loading && <Loading />}</div>;
 
   const stunde = new Date().getHours();
   const begruessung = stunde < 11 ? 'Guten Morgen' : stunde < 18 ? 'Hallo' : 'Guten Abend';
+  const zahlen: BandZahl[] = [
+    { wert: cockpit.eintraege.length, label: cockpit.ueberfaellig > 0 ? `heute dran · ${cockpit.ueberfaellig} überfällig` : 'heute dran', warn: cockpit.ueberfaellig > 0 },
+    ...(cockpit.offeneKarten !== null ? [{ wert: cockpit.offeneKarten, label: ich ? (cockpit.offeneKarten === 1 ? 'meine offene Karte' : 'meine offenen Karten') : cockpit.offeneKarten === 1 ? 'offene Karte' : 'offene Karten' }] : []),
+    { wert: formatEuro(cockpit.pipelineWert), label: ich ? 'meine Pipeline' : 'Pipeline' },
+    ...(cockpit.anfragen !== null ? [{ wert: cockpit.anfragen, label: cockpit.anfragen === 1 ? 'neue Anfrage' : 'neue Anfragen', warn: cockpit.anfragen > 0 }] : []),
+  ];
 
   return (
-    <div className="page">
+    <div className="page wide">
       <PageHeader
         eyebrow={new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}
         title={`${begruessung}${ich ? `, ${ich}` : ''}`}
-        subtitle="CRM, Kunden und interne Werkzeuge an einem Ort."
+        zahlen={zahlen}
+        ueberlappen
       />
       {error && <ErrorBox error={error} onRetry={refresh} />}
-      <Werkzeuge {...zahlen} />
       <div className="start-grid">
         <div className="start-main">
+          <HeuteDran eintraege={cockpit.eintraege} heute={heute} bald={cockpit.bald} />
           <AnfragenKarte />
-          <HeuteDran db={db} ich={ich} heute={heute} />
-          <MeineTodos ich={ich} heute={heute} />
+          <Kunden db={db} todos={todos.data} news={kundenDaten.data?.news} heute={heute} />
           {spiele.data?.monstera && <MonsteraKarte eintraege={spiele.data.monstera} db={db} ich={ich} heute={heute} neuLaden={spiele.reload} />}
-          <Kunden db={db} />
         </div>
         <div className="start-side">
           <Kalender db={db} heute={heute} />
+          <Pipeline db={db} ich={ich} />
+          <Schnellstart />
           {spiele.data?.wordle && <WordleKarte ergebnisse={spiele.data.wordle} team={db.listen.team ?? []} ich={ich} heute={heute} />}
           <Links db={db} />
           <Dateiname db={db} heute={heute} />

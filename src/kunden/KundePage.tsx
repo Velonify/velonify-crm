@@ -15,7 +15,7 @@ import { LinkDialog, NewsDialog, type Aendern } from './Dialoge';
 import { TickerBand, TickerListe } from './Ticker';
 import { useKundenDaten } from './useKundenDaten';
 import { useToast } from '../components/Toasts';
-import { boardVon, kuerzlichErledigt } from '../data/todos';
+import { boardVon, faelligkeit, istErledigt, kuerzlichErledigt } from '../data/todos';
 import { errorMessage } from '../lib/errors';
 import { BoardAnsicht } from '../todo/BoardAnsicht';
 import { useTodoDaten } from '../todo/useTodoDaten';
@@ -58,6 +58,17 @@ export function KundePage() {
     return sortiereTicker([...ticker(daten.data.news, id, heute, share.data ?? []), ...erledigt]);
   }, [daten.data, id, heute, share.data, board, todos.data]);
 
+  const kopfZahlen = useMemo(() => {
+    const karten = board && todos.data ? todos.data.aufgaben.filter((x) => x.board_id === board.id && !x.archiviert) : [];
+    const offen = karten.filter((x) => !istErledigt(x));
+    const ueber = offen.filter((x) => faelligkeit(x, heute) === 'ueberfaellig').length;
+    return [
+      ...(board ? [{ wert: offen.length, label: offen.length === 1 ? 'offene Karte' : 'offene Karten' }, { wert: ueber, label: 'überfällig', warn: ueber > 0 }] : []),
+      ...(daten.data ? [{ wert: linksVon(daten.data.links, id).length, label: 'Tools & Ressourcen' }] : []),
+      { wert: eintraege.filter((e) => e.datum >= addDays(heute, -7)).length, label: 'News diese Woche' },
+    ];
+  }, [board, todos.data, daten.data, id, heute, eintraege]);
+
   if (!db) return <div className="page">{dbError ? <ErrorBox error={dbError} onRetry={refresh} /> : <Loading />}</div>;
   if (!firma) {
     return (
@@ -91,6 +102,9 @@ export function KundePage() {
             CRM-Akte
           </Link>
         }
+        zahlen={kopfZahlen}
+        // The news strip is what lies over the band; without news the tabs would land on bordeaux.
+        ueberlappen={eintraege.length > 0 && firma.status === 'kunde'}
       />
       {firma.status !== 'kunde' && <div className="hint-box warn">Diese Firma ist im CRM nicht als Kunde markiert und steht deshalb nicht in der Kundenliste.</div>}
 

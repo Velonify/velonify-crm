@@ -14,7 +14,7 @@ import { wahrscheinlichkeit } from '../data/selectors';
 import type { Deal } from '../data/types';
 import { formatDayShort, formatEuro } from '../lib/format';
 import { useIch } from '../lib/useIch';
-import { istZustaendig } from '../data/zustaendig';
+import { istZustaendig, kuerzelVon } from '../data/zustaendig';
 
 const ABGESCHLOSSEN_TAGE = 30;
 
@@ -72,13 +72,19 @@ export function PipelinePage() {
   const offen = spalten.filter((s) => !isAbgeschlossen(s.phase));
   const offenSumme = offen.reduce((sum, s) => sum + s.summe, 0);
   const offenGewichtet = offen.reduce((sum, s) => sum + s.gewichtet, 0);
+  const ueberfaelligeSchritte = offen.reduce((n, sp) => n + sp.deals.filter((x) => x.deal.naechster_schritt_am && x.deal.naechster_schritt_am < heute).length, 0);
 
   return (
     <div className="page full">
       <PageHeader
         eyebrow="Vertrieb"
         title="Pipeline"
-        subtitle={`Offen: ${formatEuro(offenSumme)} · gewichtet ${formatEuro(offenGewichtet)}`}
+        zahlen={[
+          { wert: formatEuro(offenSumme), label: 'offen' },
+          { wert: formatEuro(offenGewichtet), label: 'gewichtet' },
+          { wert: offen.reduce((n, sp) => n + sp.deals.length, 0), label: 'offene Deals' },
+          { wert: ueberfaelligeSchritte, label: 'Schritte überfällig', warn: ueberfaelligeSchritte > 0 },
+        ]}
         actions={
           <>
             <select value={zustaendig} onChange={(e) => setZustaendig(e.target.value)} aria-label="Zuständig">
@@ -159,7 +165,15 @@ export function PipelinePage() {
                     {firma.branche && <div className="row-sub">{brancheLabel(firma.branche)}</div>}
                     <div className="board-card-meta">
                       <span>{formatEuro(deal.wert_eur)}</span>
-                      {deal.zustaendig && <span className="avatar small" title={deal.zustaendig}>{deal.zustaendig.slice(0, 1)}</span>}
+                      {deal.zustaendig && (
+                        <span className="board-card-personen" title={deal.zustaendig}>
+                          {kuerzelVon(deal.zustaendig).map((k, i) => (
+                            <span key={i} className="avatar small">
+                              {k}
+                            </span>
+                          ))}
+                        </span>
+                      )}
                     </div>
                     {!isAbgeschlossen(deal.phase) && (deal.naechster_schritt || deal.naechster_schritt_am) && (
                       <div className={`next-step${ueberfaellig ? ' overdue' : ''}`}>
