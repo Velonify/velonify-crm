@@ -30,6 +30,9 @@ export const ID_PREFIX = {
   boards: 'B',
   aufgaben: 'T',
   aufgaben_kommentare: 'TK',
+  portal_zugaenge: 'PZ',
+  portal_werkzeuge: 'PW',
+  kunden_meilensteine: 'KM',
 } as const;
 
 export function newId(prefix: string, length = 8): string {

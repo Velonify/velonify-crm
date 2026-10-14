@@ -4,7 +4,8 @@ import { useToast } from '../components/Toasts';
 import { Field, FormError } from '../components/ui';
 import type { CrmService } from '../data/crm';
 import { LINK_ART_LABEL, NEWS_ART_LABEL } from '../data/kunden';
-import type { Firma, KundenLink, KundenLinkArt, KundenLinkInput, KundenNews, KundenNewsArt, KundenNewsInput } from '../data/types';
+import { MEILENSTEIN_STATUS_LABEL } from '../data/portal';
+import type { Firma, Meilenstein, MeilensteinInput, MeilensteinStatus, KundenLink, KundenLinkArt, KundenLinkInput, KundenNews, KundenNewsArt, KundenNewsInput } from '../data/types';
 import { fieldOf } from '../lib/errors';
 
 export type Aendern = <T>(action: (s: CrmService) => Promise<T>) => Promise<T>;
@@ -172,6 +173,51 @@ export function NewsDialog({
             <input type="checkbox" checked={werte.sichtbar_kunde} onChange={(e) => setWerte((w) => ({ ...w, sichtbar_kunde: e.target.checked }))} />
             Für den Kunden sichtbar (später im Kundenportal)
           </label>
+        </Field>
+      </div>
+      <FormError error={error} />
+    </Dialog>
+  );
+}
+
+export function MeilensteinDialog({ firma, meilenstein, aendern, onClose }: { firma: Firma; meilenstein?: Meilenstein; aendern: Aendern; onClose(): void }) {
+  const [werte, setWerte] = useState<MeilensteinInput>(() => (meilenstein ? { titel: meilenstein.titel, datum: meilenstein.datum, status: meilenstein.status } : { titel: '', datum: '', status: 'offen' }));
+  const { busy, error, run } = useSpeichern(aendern, onClose);
+
+  const archivieren = () => {
+    if (!meilenstein || (!meilenstein.archiviert && !window.confirm(`„${meilenstein.titel}“ aus dem Fahrplan nehmen?`))) return;
+    void run((s) => s.setMeilensteinArchiviert(meilenstein.id, !meilenstein.archiviert, meilenstein.geaendert_am), meilenstein.archiviert ? 'Wiederhergestellt' : 'Aus dem Fahrplan genommen');
+  };
+
+  return (
+    <Dialog
+      title={meilenstein ? 'Etappe bearbeiten' : `Neue Etappe für ${firma.kuerzel || firma.name}`}
+      onClose={onClose}
+      onSubmit={() => run((s) => s.saveMeilenstein(firma.id, werte, meilenstein && { id: meilenstein.id, expectedGeaendertAm: meilenstein.geaendert_am }), meilenstein ? 'Etappe gespeichert' : 'Etappe angelegt')}
+      busy={busy}
+      extraActions={
+        meilenstein && (
+          <button type="button" className="button subtle" onClick={archivieren} disabled={busy}>
+            {meilenstein.archiviert ? 'Wiederherstellen' : 'Entfernen'}
+          </button>
+        )
+      }
+    >
+      <div className="grid">
+        <Field label="Titel" hint="Kurz, so sieht es der Kunde: z. B. Design & Inhalte, Go-live" invalid={fieldOf(error) === 'titel'} wide>
+          <input value={werte.titel} onChange={(e) => setWerte((w) => ({ ...w, titel: e.target.value }))} maxLength={60} autoComplete="off" />
+        </Field>
+        <Field label="Datum" hint="Ende der Etappe, optional" invalid={fieldOf(error) === 'datum'}>
+          <input type="date" value={werte.datum} onChange={(e) => setWerte((w) => ({ ...w, datum: e.target.value }))} />
+        </Field>
+        <Field label="Stand" invalid={fieldOf(error) === 'status'}>
+          <select value={werte.status} onChange={(e) => setWerte((w) => ({ ...w, status: e.target.value as MeilensteinStatus }))}>
+            {(Object.keys(MEILENSTEIN_STATUS_LABEL) as MeilensteinStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {MEILENSTEIN_STATUS_LABEL[s]}
+              </option>
+            ))}
+          </select>
         </Field>
       </div>
       <FormError error={error} />

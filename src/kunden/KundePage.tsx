@@ -19,6 +19,7 @@ import { boardVon, faelligkeit, istErledigt, kuerzlichErledigt } from '../data/t
 import { errorMessage } from '../lib/errors';
 import { BoardAnsicht } from '../todo/BoardAnsicht';
 import { useTodoDaten } from '../todo/useTodoDaten';
+import { Portal } from './Portal';
 
 /** Finished cards of the client board stay in the ticker for a week. */
 const ERLEDIGT_TAGE = 7;
@@ -29,6 +30,7 @@ const BEREICHE = [
   { pfad: 'dateien', label: 'Dateien' },
   { pfad: 'tools', label: 'Tools & Ressourcen' },
   { pfad: 'news', label: 'News' },
+  { pfad: 'portal', label: 'Portal' },
 ] as const;
 
 const driveLink = (file: DriveFile) => (isDemo ? undefined : file.webViewLink ?? driveFolderUrl(file.id));
@@ -123,6 +125,7 @@ export function KundePage() {
       {bereich === 'todos' && <KundenTodos firma={firma} team={db.listen.team ?? []} todos={todos} />}
       {bereich === 'dateien' && <Dateien firma={firma} />}
       {bereich === 'tools' && (daten.data ? <ToolsUndRessourcen firma={firma} daten={daten.data} aendern={daten.aendern} /> : !daten.error && <Loading />)}
+      {bereich === 'portal' && <Portal firma={firma} db={db} kunden={daten.data} todos={todos.data} />}
       {bereich === 'news' && (daten.data ? <News firma={firma} db={db} daten={daten.data} heute={heute} aendern={daten.aendern} /> : !daten.error && <Loading />)}
     </div>
   );

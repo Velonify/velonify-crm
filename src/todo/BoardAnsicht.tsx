@@ -1,6 +1,7 @@
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useToast } from '../components/Toasts';
 import { isoDate } from '../data/ids';
+import { FREIGABE_LABEL, freigabeVon } from '../data/portal';
 import { checklisteVon, faelligkeit, kartenNachSpalte, labelsVon, passtFilter, sortierungFuerPosition, spaltenVon, type KartenFilter } from '../data/todos';
 import type { Aufgabe, Board, TodoDaten } from '../data/types';
 import { errorMessage } from '../lib/errors';
@@ -21,6 +22,7 @@ function KarteInhalt({ aufgabe, heute, kommentare }: { aufgabe: Aufgabe; heute: 
   const punkte = checklisteVon(aufgabe);
   const fertig = punkte.filter((p) => p.erledigt).length;
   const faellig = faelligkeit(aufgabe, heute);
+  const freigabe = freigabeVon(aufgabe);
   return (
     <>
       {labels.length > 0 && (
@@ -48,7 +50,7 @@ function KarteInhalt({ aufgabe, heute, kommentare }: { aufgabe: Aufgabe; heute: 
           </span>
         )}
         {aufgabe.quelle === 'agent' && <span className="badge subtle">Slack</span>}
-        {aufgabe.sichtbar_kunde && <span className="badge ok" title="Für den Kunden sichtbar">Kunde</span>}
+        {freigabe ? <span className={`badge freigabe-${freigabe}`}>{FREIGABE_LABEL[freigabe]}</span> : aufgabe.sichtbar_kunde && <span className="badge ok" title="Für den Kunden sichtbar">Kunde</span>}
         {aufgabe.zustaendig && (
           <span className="karte-personen" title={aufgabe.zustaendig}>
             {kuerzelVon(aufgabe.zustaendig).map((k, i) => (

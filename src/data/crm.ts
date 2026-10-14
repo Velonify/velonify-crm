@@ -25,6 +25,7 @@ import { anzahlPosten, parseAuswahl, prepareAngebot, statusLabel } from './angeb
 import { auditVerlaufText, auditZeile, firmaAbgleich, type AuditErgebnis } from './audit';
 import { ANFRAGE_STATUS, anfrageText, firmaAusAnfrage, istOffen, kontaktAusAnfrage } from './eingang';
 import { linksVon, prepareKundenLink, prepareKundenNews, tauscheLink } from './kunden';
+import { istKundenWerkzeug, KUNDEN_WERKZEUGE, kannPortalZugang, meilensteineVon, prepareMeilenstein, tauscheMeilenstein } from './portal';
 import {
   boardTitelFuer,
   boardVon,
@@ -101,6 +102,11 @@ import type {
   AufgabenKommentar,
   Board,
   KundenDaten,
+  Meilenstein,
+  MeilensteinInput,
+  PortalDaten,
+  PortalWerkzeug,
+  PortalZugang,
   Spalte,
   TodoDaten,
   KundenLink,
@@ -1128,6 +1134,8 @@ export class CrmService {
       const changes: Partial<Aufgabe> = {
         titel: clean.titel, beschreibung: clean.beschreibung, zustaendig: clean.zustaendig, faellig_am: clean.faellig_am, labels: clean.labels,
         checkliste: clean.checkliste, sichtbar_kunde: clean.sichtbar_kunde, spalte_id,
+        // A card hidden from the client cannot wait for the client's approval.
+        ...(!clean.sichtbar_kunde && alt.freigabe === 'offen' ? { freigabe: '', freigabe_am: '', freigabe_von: '' } : {}),
         ...(wechsel ? { sortierung: sortierungFuerPosition(kartenNachSpalte(aufgaben, board).get(spalte_id) ?? [], alt.id, Infinity), ...this.erledigtFelder(alt, spalte_id === erledigtSpalte(spalten)?.id) } : {}),
       };
       const [aufgabe] = await this.store.update('aufgaben', [{ id: existing.id, changes: { ...changes, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm }]);
@@ -1152,6 +1160,9 @@ export class CrmService {
       erledigt_am: '',
       erledigt_von: '',
       archiviert: false,
+      freigabe: '',
+      freigabe_am: '',
+      freigabe_von: '',
       ...this.created(),
     };
     if (spalte_id === erledigtSpalte(spalten)?.id) Object.assign(aufgabe, this.erledigtFelder(aufgabe, true));
@@ -1197,6 +1208,95 @@ export class CrmService {
     const kommentar: AufgabenKommentar = { id: newId(ID_PREFIX.aufgaben_kommentare), aufgabe_id: aufgabeId, text: clean, von: this.currentUser(), datum: this.timestamp() };
     await this.store.insert('aufgaben_kommentare', [kommentar]);
     return kommentar;
+  }
+
+  /** Puts a card of a client board under "Für dich zu tun" in the portal; the card becomes visible to the client. */
+  async freigabeAnfragen(id: string, expectedGeaendertAm: string): Promise<Aufgabe> {
+    const { boards, aufgaben } = await this.store.loadTodoDaten();
+    const alt = CrmService.find(aufgaben, id);
+    if (!CrmService.find(boards, alt.board_id).firma_id) throw new ValidationError('freigabe', 'Freigaben gibt es nur auf Kunden-Boards.');
+    if (alt.archiviert) throw new ValidationError('freigabe', 'Archivierte Karten können nicht freigegeben werden.');
+    const [aufgabe] = await this.store.update('aufgaben', [
+      { id, changes: { freigabe: 'offen', freigabe_am: this.timestamp(), freigabe_von: this.currentUser(), sichtbar_kunde: true, ...this.changed() }, expectedGeaendertAm },
+    ]);
+    return aufgabe;
+  }
+
+  /** Takes the approval request back (or clears the client's answer once it is dealt with). */
+  async freigabeZuruecksetzen(id: string, expectedGeaendertAm: string): Promise<Aufgabe> {
+    const [aufgabe] = await this.store.update('aufgaben', [{ id, changes: { freigabe: '', freigabe_am: '', freigabe_von: '', ...this.changed() }, expectedGeaendertAm }]);
+    return aufgabe;
+  }
+
+  // ─── Kundenportal ──────────────────────────────────────────────────────────
+
+  loadPortalDaten(): Promise<PortalDaten> {
+    return this.store.loadPortalDaten();
+  }
+
+  /** Switches the portal login of a contact on or off; one row per contact, created on first use. */
+  async setPortalZugang(firmaId: string, kontaktId: string, aktiv: boolean): Promise<PortalZugang> {
+    const kontakt = CrmService.find((await this.store.load()).kontakte, kontaktId);
+    if (kontakt.firma_id !== firmaId) throw new ValidationError('kontakt_id', 'Dieser Kontakt gehört zu einer anderen Firma.');
+    if (aktiv && !kannPortalZugang(kontakt)) throw new ValidationError('email', 'Für einen Zugang braucht der Kontakt eine E-Mail-Adresse.');
+    const { zugaenge } = await this.store.loadPortalDaten();
+    const vorhanden = zugaenge.find((z) => z.kontakt_id === kontaktId);
+    if (vorhanden) {
+      const [zugang] = await this.store.update('portal_zugaenge', [{ id: vorhanden.id, changes: { aktiv, ...this.changed() } }]);
+      return zugang;
+    }
+    const zugang: PortalZugang = { id: newId(ID_PREFIX.portal_zugaenge), firma_id: firmaId, kontakt_id: kontaktId, aktiv, zuletzt_am: '', ...this.created() };
+    await this.store.insert('portal_zugaenge', [zugang]);
+    return zugang;
+  }
+
+  /** Switches a client tool on or off for one client. */
+  async setPortalWerkzeug(firmaId: string, werkzeug: string, aktiv: boolean): Promise<PortalWerkzeug> {
+    if (!istKundenWerkzeug(werkzeug)) throw new ValidationError('werkzeug', 'Dieses Werkzeug gibt es nicht.');
+    if (aktiv && KUNDEN_WERKZEUGE.find((w) => w.id === werkzeug && 'bald' in w)) throw new ValidationError('werkzeug', 'Dieses Werkzeug ist noch nicht fertig.');
+    CrmService.find((await this.store.load()).firmen, firmaId);
+    const { werkzeuge } = await this.store.loadPortalDaten();
+    const vorhanden = werkzeuge.find((w) => w.firma_id === firmaId && w.werkzeug === werkzeug);
+    if (vorhanden) {
+      const [eintrag] = await this.store.update('portal_werkzeuge', [{ id: vorhanden.id, changes: { aktiv, ...this.changed() } }]);
+      return eintrag;
+    }
+    const eintrag: PortalWerkzeug = { id: newId(ID_PREFIX.portal_werkzeuge), firma_id: firmaId, werkzeug, aktiv, ...this.created() };
+    await this.store.insert('portal_werkzeuge', [eintrag]);
+    return eintrag;
+  }
+
+  async saveMeilenstein(firmaId: string, input: MeilensteinInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<Meilenstein> {
+    const clean = prepareMeilenstein(input);
+    if (existing) {
+      const [meilenstein] = await this.store.update('kunden_meilensteine', [{ id: existing.id, changes: { ...clean, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm }]);
+      return meilenstein;
+    }
+    CrmService.find((await this.store.load()).firmen, firmaId);
+    const { meilensteine } = await this.store.loadPortalDaten();
+    const meilenstein: Meilenstein = {
+      ...clean,
+      id: newId(ID_PREFIX.kunden_meilensteine),
+      firma_id: firmaId,
+      sortierung: naechsteSortierung(meilensteine.filter((m) => m.firma_id === firmaId)),
+      archiviert: false,
+      ...this.created(),
+    };
+    await this.store.insert('kunden_meilensteine', [meilenstein]);
+    return meilenstein;
+  }
+
+  async setMeilensteinArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<Meilenstein> {
+    const [meilenstein] = await this.store.update('kunden_meilensteine', [{ id, changes: { archiviert, ...this.changed() }, expectedGeaendertAm }]);
+    return meilenstein;
+  }
+
+  /** Moves a milestone one place earlier (-1) or later (+1) in the roadmap. */
+  async verschiebeMeilenstein(id: string, richtung: -1 | 1): Promise<void> {
+    const { meilensteine } = await this.store.loadPortalDaten();
+    const meilenstein = CrmService.find(meilensteine, id);
+    const aenderungen = tauscheMeilenstein(meilensteineVon(meilensteine, meilenstein.firma_id), id, richtung);
+    await this.store.update('kunden_meilensteine', aenderungen.map(({ id: mid, sortierung }) => ({ id: mid, changes: { sortierung, ...this.changed() } })));
   }
 
   // ─── Lead-Magnete ──────────────────────────────────────────────────────────

@@ -213,7 +213,7 @@ export const SCHEMA = {
     name: 'aufgaben',
     columns: [
       'id', 'board_id', 'spalte_id', 'titel', 'beschreibung', 'zustaendig', 'faellig_am', 'labels', 'checkliste', 'sortierung',
-      'quelle', 'quelle_link', 'sichtbar_kunde', 'erledigt_am', 'erledigt_von', 'archiviert', ...META,
+      'quelle', 'quelle_link', 'sichtbar_kunde', 'erledigt_am', 'erledigt_von', 'archiviert', 'freigabe', 'freigabe_am', 'freigabe_von', ...META,
     ],
     numeric: ['sortierung'],
     boolean: ['sichtbar_kunde', 'archiviert'],
@@ -221,6 +221,22 @@ export const SCHEMA = {
   aufgaben_kommentare: {
     name: 'aufgaben_kommentare',
     columns: ['id', 'aufgabe_id', 'text', 'von', 'datum'],
+  },
+  portal_zugaenge: {
+    name: 'portal_zugaenge',
+    columns: ['id', 'firma_id', 'kontakt_id', 'aktiv', 'zuletzt_am', ...META],
+    boolean: ['aktiv'],
+  },
+  portal_werkzeuge: {
+    name: 'portal_werkzeuge',
+    columns: ['id', 'firma_id', 'werkzeug', 'aktiv', ...META],
+    boolean: ['aktiv'],
+  },
+  kunden_meilensteine: {
+    name: 'kunden_meilensteine',
+    columns: ['id', 'firma_id', 'titel', 'datum', 'status', 'sortierung', 'archiviert', ...META],
+    numeric: ['sortierung'],
+    boolean: ['archiviert'],
   },
   listen: {
     name: 'listen',
@@ -262,6 +278,11 @@ export const MAGNET_TABS = ['magnete', 'magnet_leads'] as const;
 export const KUNDEN_TABS = ['kunden_links', 'kunden_news'] as const;
 /** Tabs of the to-do boards that replace Trello: one board per client plus an internal one. Loaded only when needed. */
 export const TODO_TABS = ['boards', 'aufgaben', 'aufgaben_kommentare'] as const;
+/**
+ * Tabs of the client portal settings: which contacts may log in, which client tools are switched on and the milestones
+ * shown as the client's roadmap. Loaded only on the "Portal" tab of a client page.
+ */
+export const PORTAL_TABS = ['portal_zugaenge', 'portal_werkzeuge', 'kunden_meilensteine'] as const;
 export type EntityTab =
   | (typeof ENTITY_TABS)[number]
   | (typeof ANGEBOTS_TABS)[number]
@@ -273,7 +294,8 @@ export type EntityTab =
   | (typeof SOCIAL_TABS)[number]
   | (typeof MAGNET_TABS)[number]
   | (typeof KUNDEN_TABS)[number]
-  | (typeof TODO_TABS)[number];
+  | (typeof TODO_TABS)[number]
+  | (typeof PORTAL_TABS)[number];
 
 /** Editable select values, written to the "listen" tab on setup and maintained there afterwards. */
 export const LISTEN_DEFAULTS: Record<string, string[]> = {

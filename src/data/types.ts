@@ -618,6 +618,9 @@ export interface EntityMap {
   boards: Board;
   aufgaben: Aufgabe;
   aufgaben_kommentare: AufgabenKommentar;
+  portal_zugaenge: PortalZugang;
+  portal_werkzeuge: PortalWerkzeug;
+  kunden_meilensteine: Meilenstein;
 }
 
 export type KundenLinkArt = 'tool' | 'ressource';
@@ -708,6 +711,10 @@ export interface Aufgabe extends Meta {
   erledigt_am: string;
   erledigt_von: string;
   archiviert: boolean;
+  /** Approval by the client: empty, `offen` (asked), `freigegeben` or `aenderung` (client wants changes). */
+  freigabe: string;
+  freigabe_am: string;
+  freigabe_von: string;
 }
 export type AufgabeInput = Pick<Aufgabe, 'titel' | 'beschreibung' | 'zustaendig' | 'faellig_am' | 'labels' | 'checkliste' | 'sichtbar_kunde'> & {
   spalte_id?: string;
@@ -727,6 +734,45 @@ export interface TodoDaten {
   boards: Board[];
   aufgaben: Aufgabe[];
   kommentare: AufgabenKommentar[];
+}
+
+/** A contact of a client that may log in to the client portal. */
+export interface PortalZugang extends Meta {
+  id: string;
+  firma_id: string;
+  kontakt_id: string;
+  aktiv: boolean;
+  /** Last login, written by the portal. */
+  zuletzt_am: string;
+}
+
+/** A client tool (UTM generator …) switched on or off for one client. */
+export interface PortalWerkzeug extends Meta {
+  id: string;
+  firma_id: string;
+  werkzeug: string;
+  aktiv: boolean;
+}
+
+export type MeilensteinStatus = 'offen' | 'aktiv' | 'erledigt';
+
+/** A stage of the client's roadmap, shown as progress in the portal. */
+export interface Meilenstein extends Meta {
+  id: string;
+  firma_id: string;
+  titel: string;
+  /** YYYY-MM-DD or empty */
+  datum: string;
+  status: MeilensteinStatus;
+  sortierung: number | null;
+  archiviert: boolean;
+}
+export type MeilensteinInput = Pick<Meilenstein, 'titel' | 'datum' | 'status'>;
+
+export interface PortalDaten {
+  zugaenge: PortalZugang[];
+  werkzeuge: PortalWerkzeug[];
+  meilensteine: Meilenstein[];
 }
 
 /** An inquiry from the website form, written into the sheet by the Apps Script behind the Netlify webhook. */
