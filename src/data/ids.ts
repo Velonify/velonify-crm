@@ -25,6 +25,8 @@ export const ID_PREFIX = {
   social_dms: 'SD',
   magnete: 'MG',
   magnet_leads: 'ML',
+  kunden_links: 'KL',
+  kunden_news: 'KN',
 } as const;
 
 export function newId(prefix: string, length = 8): string {

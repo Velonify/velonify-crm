@@ -613,6 +613,49 @@ export interface EntityMap {
   social_dms: SocialDm;
   magnete: Magnet;
   magnet_leads: MagnetLead;
+  kunden_links: KundenLink;
+  kunden_news: KundenNews;
+}
+
+export type KundenLinkArt = 'tool' | 'ressource';
+
+/** A link on a client page: a tool the client uses (Shopify admin, GA4 …) or a resource (briefing, brand guide …). Never a password. */
+export interface KundenLink extends Meta {
+  id: string;
+  firma_id: string;
+  art: KundenLinkArt;
+  titel: string;
+  url: string;
+  beschreibung: string;
+  /** Shown on the overview of the client page. */
+  angeheftet: boolean;
+  /** May be shown in the client portal. */
+  sichtbar_kunde: boolean;
+  sortierung: number | null;
+  archiviert: boolean;
+}
+export type KundenLinkInput = Pick<KundenLink, 'art' | 'titel' | 'url' | 'beschreibung' | 'angeheftet' | 'sichtbar_kunde'>;
+
+export type KundenNewsArt = 'update' | 'meilenstein' | 'hinweis';
+
+/** A message in the news ticker of one client, or of all clients when `firma_id` is empty. */
+export interface KundenNews extends Meta {
+  id: string;
+  firma_id: string;
+  art: KundenNewsArt;
+  titel: string;
+  text: string;
+  /** YYYY-MM-DD */
+  datum: string;
+  angeheftet: boolean;
+  sichtbar_kunde: boolean;
+  archiviert: boolean;
+}
+export type KundenNewsInput = Pick<KundenNews, 'firma_id' | 'art' | 'titel' | 'text' | 'datum' | 'angeheftet' | 'sichtbar_kunde'>;
+
+export interface KundenDaten {
+  links: KundenLink[];
+  news: KundenNews[];
 }
 
 /** An inquiry from the website form, written into the sheet by the Apps Script behind the Netlify webhook. */
