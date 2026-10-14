@@ -95,14 +95,19 @@ export function MeinTagPage() {
   if (!db || !tag || !zahlen) return <div className="page">{error ? <ErrorBox error={error} onRetry={refresh} /> : loading && <Loading />}</div>;
 
   const offen = tag.ueberfaellig.length + tag.heute.length;
-  const begruessung = new Date().getHours() < 11 ? 'Guten Morgen' : new Date().getHours() < 18 ? 'Hallo' : 'Guten Abend';
 
   return (
     <div className="page">
       <PageHeader
         eyebrow={new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}
-        title={`${begruessung}${ich ? `, ${ich}` : ''}`}
-        subtitle={offen === 0 ? 'Für heute ist nichts offen.' : `${offen} ${offen === 1 ? 'Sache ist' : 'Sachen sind'} heute dran.`}
+        title={nurMeine && ich ? `Mein Tag, ${ich}` : 'Alle Aufgaben'}
+        zahlen={[
+          { wert: offen, label: tag.ueberfaellig.length > 0 ? `heute dran · ${tag.ueberfaellig.length} überfällig` : 'heute dran', warn: tag.ueberfaellig.length > 0 },
+          { wert: zahlen.offen, label: 'offene Deals' },
+          { wert: formatEuro(zahlen.pipelineWert), label: `Pipeline · ${formatEuro(zahlen.angebotWert)} im Angebot` },
+          { wert: formatEuro(zahlen.gewonnenMonatWert), label: `gewonnen diesen Monat · ${zahlen.gewonnenMonat} ${zahlen.gewonnenMonat === 1 ? 'Deal' : 'Deals'}` },
+        ]}
+        ueberlappen
         actions={
           <>
             <div className="segmented" role="radiogroup" aria-label="Ansicht">
@@ -134,27 +139,6 @@ export function MeinTagPage() {
           </select>
         </div>
       )}
-
-      <div className="kpis">
-        <div className="kpi">
-          <span className="kpi-label">Offene Deals</span>
-          <span className="kpi-value">{zahlen.offen}</span>
-        </div>
-        <div className="kpi panel">
-          <span className="kpi-label">Pipeline-Wert</span>
-          <span className="kpi-value">{formatEuro(zahlen.pipelineWert)}</span>
-          <span className="kpi-sub">gewichtet {formatEuro(zahlen.gewichtet)}</span>
-        </div>
-        <div className="kpi">
-          <span className="kpi-label">In Phase „Angebot“</span>
-          <span className="kpi-value">{formatEuro(zahlen.angebotWert)}</span>
-        </div>
-        <div className="kpi">
-          <span className="kpi-label">Gewonnen diesen Monat</span>
-          <span className="kpi-value">{formatEuro(zahlen.gewonnenMonatWert)}</span>
-          <span className="kpi-sub">{zahlen.gewonnenMonat} Deals</span>
-        </div>
-      </div>
 
       <AnfragenKarte ziel="/crm/anfragen" />
 

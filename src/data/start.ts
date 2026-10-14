@@ -1,6 +1,6 @@
-import { FIRMEN_LINKS, SLACK_STANDARD_URL } from './constants';
+import { FIRMEN_LINKS, isAbgeschlossen, PHASEN, SLACK_STANDARD_URL } from './constants';
 import { offeneDeals } from './selectors';
-import type { Database, Einstellungen, Firma } from './types';
+import type { Database, Deal, Einstellungen, Firma } from './types';
 
 export interface FirmenLink {
   label: string;
@@ -38,4 +38,19 @@ export function schnellzugriff(db: Database): Schnellzugriff[] {
     ...aktiv.filter((f) => f.status === 'kunde').map((firma) => ({ firma, art: 'kunde' as const })),
     ...aktiv.filter((f) => f.status === 'lead' && mitAngebot.has(f.id)).map((firma) => ({ firma, art: 'angebot' as const })),
   ];
+}
+
+export interface PipelineStufe {
+  phase: string;
+  anzahl: number;
+  wert: number;
+}
+
+/** Open deals per phase in pipeline order, for the small pipeline on the start page. */
+export function pipelineStufen(deals: readonly Deal[]): PipelineStufe[] {
+  const offen = offeneDeals(deals);
+  return PHASEN.filter((p) => !isAbgeschlossen(p)).map((phase) => {
+    const inPhase = offen.filter((d) => d.phase === phase);
+    return { phase, anzahl: inPhase.length, wert: inPhase.reduce((sum, d) => sum + (d.wert_eur ?? 0), 0) };
+  });
 }

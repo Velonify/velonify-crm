@@ -4,7 +4,7 @@ import { Card, ErrorBox, Loading, PageHeader } from '../components/ui';
 import { isDemo } from '../config';
 import { useCrm } from '../data/CrmContext';
 import { driveFolderUrl } from '../data/google/drive';
-import { isoDate } from '../data/ids';
+import { addDays, isoDate } from '../data/ids';
 import { kundenListe, linksVon, ticker, type TickerEintrag } from '../data/kunden';
 import { slackChannelUrl } from '../data/start';
 import { websiteUrl } from '../lib/format';
@@ -32,7 +32,12 @@ export function KundenPage() {
     <div className="page wide">
       <PageHeader
         title="Kunden"
-        subtitle="Dateien, Tools, Ressourcen und News je Kunde"
+        zahlen={[
+          { wert: kunden.length, label: kunden.length === 1 ? 'Kunde' : 'Kunden' },
+          { wert: alleNews.filter((e) => e.datum >= addDays(heute, -7)).length, label: 'News in den letzten 7 Tagen' },
+          ...(data ? [{ wert: data.links.filter((l) => !l.archiviert).length, label: 'Tools & Ressourcen' }] : []),
+        ]}
+        ueberlappen
         actions={
           <button type="button" className="button primary" onClick={() => setDialog({})} disabled={!data}>
             + Meldung

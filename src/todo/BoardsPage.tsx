@@ -55,6 +55,9 @@ export function BoardsPage() {
     }
   };
 
+  const aktiveBoards = new Set((data?.boards ?? []).filter((b) => !b.archiviert).map((b) => b.id));
+  const offen = (data?.aufgaben ?? []).filter((x) => aktiveBoards.has(x.board_id) && !x.archiviert && !istErledigt(x));
+
   const eintraege: { firma: Firma | null; board?: Board }[] = [
     { firma: null, board: data && boardVon(data.boards, '') },
     ...kundenListe(db).map((firma) => ({ firma, board: data && boardVon(data.boards, firma.id) })),
@@ -62,7 +65,21 @@ export function BoardsPage() {
 
   return (
     <div className="page wide">
-      <PageHeader title="To-Dos" subtitle="Ein Board für Velonify und eins pro Kunde" />
+      <PageHeader
+        title="To-Dos"
+        subtitle="Ein Board für Velonify und eins pro Kunde"
+        zahlen={
+          data
+            ? [
+                { wert: offen.length, label: 'offene Karten' },
+                { wert: offen.filter((x) => faelligkeit(x, heute) === 'ueberfaellig').length, label: 'überfällig', warn: offen.some((x) => faelligkeit(x, heute) === 'ueberfaellig') },
+                { wert: offen.filter((x) => ['heute', 'bald'].includes(faelligkeit(x, heute))).length, label: 'bald fällig' },
+                { wert: data.boards.filter((b) => !b.archiviert).length, label: 'Boards' },
+              ]
+            : undefined
+        }
+        ueberlappen
+      />
       {error && <ErrorBox error={error} onRetry={reload} />}
       {!data && !error && <Loading />}
       {data && (

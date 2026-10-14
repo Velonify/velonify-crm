@@ -38,7 +38,13 @@ export function MeinePage() {
     <div className="page">
       <PageHeader
         title="Meine Aufgaben"
-        subtitle={`${karten.length} offen über alle Boards`}
+        zahlen={[
+          { wert: karten.length, label: 'offen über alle Boards' },
+          { wert: karten.filter((x) => faelligkeit(x, heute) === 'ueberfaellig').length, label: 'überfällig', warn: karten.some((x) => faelligkeit(x, heute) === 'ueberfaellig') },
+          { wert: karten.filter((x) => faelligkeit(x, heute) === 'heute').length, label: 'heute' },
+        ]}
+        // Only cards may lie over the band; a plain hint would end up on bordeaux.
+        ueberlappen={karten.length > 0}
         actions={
           <label className="ich-auswahl">
             Ich bin
