@@ -187,7 +187,7 @@ function Kunden({ db }: { db: Database }) {
               <li key={f.id}>
                 <span className="client-kuerzel">{f.kuerzel ? <span className="kuerzel">{f.kuerzel}</span> : <span className="muted">–</span>}</span>
                 <div className="client-main">
-                  <Link to={`/crm/firmen/${f.id}`} className="row-title">
+                  <Link to={art === 'kunde' ? `/kunden/${f.id}` : `/crm/firmen/${f.id}`} className="row-title">
                     {f.name}
                   </Link>
                   <div className="row-sub">

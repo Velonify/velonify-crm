@@ -36,6 +36,8 @@ import { SocialMessungPage } from './social/MessungPage';
 import { SocialPlanPage } from './social/PlanPage';
 import { SocialStrategiePage } from './social/StrategiePage';
 import { SocialUebersichtPage } from './social/UebersichtPage';
+import { KundePage } from './kunden/KundePage';
+import { KundenPage } from './kunden/KundenPage';
 import { MagnetLeadsPage } from './magnete/LeadsPage';
 import { MagnetePage } from './magnete/MagnetePage';
 import { RoastPage } from './magnete/RoastPage';
@@ -71,6 +73,11 @@ export function App() {
                 <Route path="firmen/:id" element={<FirmaAktePage />} />
                 <Route path="import" element={<ImportPage />} />
                 <Route path="linkedin" element={<LinkedinLeadPage />} />
+              </Route>
+              <Route path="kunden">
+                <Route index element={<KundenPage />} />
+                <Route path=":id" element={<KundePage />} />
+                <Route path=":id/:bereich" element={<KundePage />} />
               </Route>
               <Route path="angebote">
                 <Route index element={<AngebotePage />} />

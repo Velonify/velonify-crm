@@ -11,6 +11,7 @@ describe('werkzeugFuerPfad', () => {
     expect(werkzeugFuerPfad('/anfragen')?.id).toBe('home');
     expect(werkzeugFuerPfad('/crm/anfragen')?.id).toBe('crm');
     expect(werkzeugFuerPfad('/audit/SA-123')?.id).toBe('audit');
+    expect(werkzeugFuerPfad('/kunden/F-123/dateien')?.id).toBe('kunden');
   });
 
   it('leaves shared pages without a tool', () => {

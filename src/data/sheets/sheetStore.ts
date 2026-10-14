@@ -1,7 +1,7 @@
 import { ConflictError, NotFoundError, SchemaError } from '../errors';
-import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, EINGANG_TABS, LISTEN_DEFAULTS, MAGNET_TABS, SCHEMA, MONSTERA_TABS, SOCIAL_TABS, WORDLE_TABS, type EntityTab, type TabSchema } from '../schema';
+import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, EINGANG_TABS, KUNDEN_TABS, LISTEN_DEFAULTS, MAGNET_TABS, SCHEMA, MONSTERA_TABS, SOCIAL_TABS, WORDLE_TABS, type EntityTab, type TabSchema } from '../schema';
 import type { RecordUpdate, Store } from '../store';
-import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Listen, MagnetDaten, MonsteraEintrag, SocialDaten, SpieleDaten, WordleErgebnis } from '../types';
+import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, KundenDaten, Listen, MagnetDaten, MonsteraEintrag, SocialDaten, SpieleDaten, WordleErgebnis } from '../types';
 import { columnLetter, recordToRow, rowToRecord } from './rows';
 import { quoteTab, type SheetsApi, type SpreadsheetInfo, type ValueWrite } from './sheetsClient';
 
@@ -210,6 +210,22 @@ export class SheetStore implements Store {
       return table;
     });
     return { magnete: entityRows('magnete', tables[0]), leads: entityRows('magnet_leads', tables[1]) };
+  }
+
+  async loadKundenDaten(): Promise<KundenDaten> {
+    const info = await this.info();
+    const vorhanden = new Set(info.sheets?.map((sheet) => sheet.properties.title));
+    if (KUNDEN_TABS.some((tab) => !vorhanden.has(tab))) {
+      throw new SchemaError('Der Client-Hub ist noch nicht eingerichtet. Bitte unter \u201eEinrichtung\u201c auf \u201eEinrichten\u201c klicken.');
+    }
+    const values = await this.api.batchGetValues(KUNDEN_TABS.map((tab) => fullRange(tab)));
+    const tables = KUNDEN_TABS.map((tab, i) => {
+      const table = splitHeader(values[i]);
+      assertColumns(SCHEMA[tab], table.header);
+      this.headers.set(tab, table.header);
+      return table;
+    });
+    return { links: entityRows('kunden_links', tables[0]), news: entityRows('kunden_news', tables[1]) };
   }
 
   /** Both games of the start page in a single request; a tab that is not set up yet comes back as null. */

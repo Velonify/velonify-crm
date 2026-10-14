@@ -256,5 +256,23 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   }
 
   seeding = false;
+  // Client hub: links and news for the one client, a company-wide note and a fresh file in the client share.
+  const link = (art: 'tool' | 'ressource', titel: string, url: string, beschreibung = '', angeheftet = false, sichtbar_kunde = false) =>
+    service.saveKundenLink(alpenglanz.id, { art, titel, url, beschreibung, angeheftet, sichtbar_kunde });
+  await link('tool', 'Shopify-Admin', 'https://admin.shopify.com/store/alpenglanz-demo', 'Live-Shop', true);
+  await link('tool', 'Staging-Shop', 'https://alpenglanz-staging.example', 'Passwort im Passwortmanager', true);
+  await link('tool', 'GA4', 'https://analytics.google.com/', 'Property „Alpenglanz Webshop“');
+  await link('tool', 'Klaviyo', 'https://www.klaviyo.com/dashboard');
+  await link('ressource', 'Brand-Guidelines', 'https://drive.google.com/drive/folders/demo-brand', 'Farben, Schriften, Bildsprache', true, true);
+  await link('ressource', 'Relaunch-Briefing', 'https://docs.google.com/document/d/demo-briefing', '', false, true);
+  const news = (titel: string, art: 'update' | 'meilenstein' | 'hinweis', tage: number, text = '', firmaId = alpenglanz.id, angeheftet = false) =>
+    service.saveKundenNews({ firma_id: firmaId, art, titel, text, datum: addDays(heute, -tage), angeheftet, sichtbar_kunde: firmaId !== '' });
+  await news('Go-live der neuen Produktseiten', 'meilenstein', 1, 'Alle 240 Produkte laufen auf dem neuen Template.', alpenglanz.id, true);
+  await news('Klaviyo-Flows für Warenkorbabbruch überarbeitet', 'update', 4);
+  await news('Black-Week-Freeze ab 24.11.: keine Deployments bis 02.12.', 'hinweis', 2, 'Gilt für alle Kundenshops.', '');
+  const kundenordner = (await service.legeLeadOrdnerAn(alpenglanz.id, 'AGK', undefined, 'clients')).drive_ordner_id;
+  const share = (await drive.listChildren(kundenordner)).find((f) => f.name === '07_Client-Share');
+  if (share) drive.add('Reporting September.pdf', share.id, 'application/pdf');
+
   return { service, sheets };
 }

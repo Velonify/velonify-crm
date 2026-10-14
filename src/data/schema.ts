@@ -193,6 +193,17 @@ export const SCHEMA = {
     numeric: ['downloads', 'report_aufrufe'],
     boolean: ['newsletter_einwilligung', 'warteliste'],
   },
+  kunden_links: {
+    name: 'kunden_links',
+    columns: ['id', 'firma_id', 'art', 'titel', 'url', 'beschreibung', 'angeheftet', 'sichtbar_kunde', 'sortierung', 'archiviert', ...META],
+    numeric: ['sortierung'],
+    boolean: ['angeheftet', 'sichtbar_kunde', 'archiviert'],
+  },
+  kunden_news: {
+    name: 'kunden_news',
+    columns: ['id', 'firma_id', 'art', 'titel', 'text', 'datum', 'angeheftet', 'sichtbar_kunde', 'archiviert', ...META],
+    boolean: ['angeheftet', 'sichtbar_kunde', 'archiviert'],
+  },
   listen: {
     name: 'listen',
     columns: ['liste', 'wert'],
@@ -226,6 +237,11 @@ export const SOCIAL_TABS = ['social_plan', 'social_inhalte', 'social_hooks', 'so
  * the form on velonify.de (apps-script/magnete). Loaded only when the tool is opened.
  */
 export const MAGNET_TABS = ['magnete', 'magnet_leads'] as const;
+/**
+ * Tabs of the client hub: links to tools and resources per client, and the news ticker. `sichtbar_kunde` marks what the
+ * client portal may show later. Loaded only when the tool is opened.
+ */
+export const KUNDEN_TABS = ['kunden_links', 'kunden_news'] as const;
 export type EntityTab =
   | (typeof ENTITY_TABS)[number]
   | (typeof ANGEBOTS_TABS)[number]
@@ -235,7 +251,8 @@ export type EntityTab =
   | (typeof MONSTERA_TABS)[number]
   | (typeof EINGANG_TABS)[number]
   | (typeof SOCIAL_TABS)[number]
-  | (typeof MAGNET_TABS)[number];
+  | (typeof MAGNET_TABS)[number]
+  | (typeof KUNDEN_TABS)[number];
 
 /** Editable select values, written to the "listen" tab on setup and maintained there afterwards. */
 export const LISTEN_DEFAULTS: Record<string, string[]> = {

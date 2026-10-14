@@ -23,6 +23,7 @@ import { addDays, ID_PREFIX, isIsoDate, isoDate, newId } from './ids';
 import { anzahlPosten, parseAuswahl, prepareAngebot, statusLabel } from './angebote';
 import { auditVerlaufText, auditZeile, firmaAbgleich, type AuditErgebnis } from './audit';
 import { ANFRAGE_STATUS, anfrageText, firmaAusAnfrage, istOffen, kontaktAusAnfrage } from './eingang';
+import { linksVon, prepareKundenLink, prepareKundenNews, tauscheLink } from './kunden';
 import { firmaAusLead, istOffenerLead, kontaktAusLead, LEAD_STATUS, leadText, prepareMagnet } from './magnete';
 import { bereinigeReport, pruefeFreigabe, reportEntwurf, reportVon, type Report } from './roast';
 import { ANSCHREIBEN_STATUS, prepareAnschreiben, prepareOutreachLeistung, verlaufText, type AnschreibenInput } from './anschreiben';
@@ -81,6 +82,11 @@ import type {
   Leistungskategorie,
   LeistungskategorieInput,
   Meta,
+  KundenDaten,
+  KundenLink,
+  KundenLinkInput,
+  KundenNews,
+  KundenNewsInput,
   Magnet,
   MagnetDaten,
   MagnetInput,
@@ -979,6 +985,69 @@ export class CrmService {
       },
     ]);
     return anfrage;
+  }
+
+  // ─── Client-Hub ────────────────────────────────────────────────────────────
+
+  loadKundenDaten(): Promise<KundenDaten> {
+    return this.store.loadKundenDaten();
+  }
+
+  async saveKundenLink(firmaId: string, input: KundenLinkInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<KundenLink> {
+    const clean = prepareKundenLink(input);
+    if (existing) {
+      const [link] = await this.store.update('kunden_links', [{ id: existing.id, changes: { ...clean, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm }]);
+      return link;
+    }
+    const db = await this.store.load();
+    CrmService.find(db.firmen, firmaId);
+    const { links } = await this.store.loadKundenDaten();
+    const link: KundenLink = {
+      ...clean,
+      id: newId(ID_PREFIX.kunden_links),
+      firma_id: firmaId,
+      sortierung: naechsteSortierung(links.filter((l) => l.firma_id === firmaId)),
+      archiviert: false,
+      ...this.created(),
+    };
+    await this.store.insert('kunden_links', [link]);
+    return link;
+  }
+
+  async setKundenLinkArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<KundenLink> {
+    const [link] = await this.store.update('kunden_links', [{ id, changes: { archiviert, ...this.changed() }, expectedGeaendertAm }]);
+    return link;
+  }
+
+  /** Moves a link one place up (-1) or down (+1) among the client's links. */
+  async verschiebeKundenLink(id: string, richtung: -1 | 1): Promise<void> {
+    const { links } = await this.store.loadKundenDaten();
+    const link = CrmService.find(links, id);
+    const aenderungen = tauscheLink(linksVon(links, link.firma_id), id, richtung);
+    await this.store.update('kunden_links', aenderungen.map(({ id: lid, sortierung }) => ({ id: lid, changes: { sortierung, ...this.changed() } })));
+  }
+
+  async saveKundenNews(input: KundenNewsInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<KundenNews> {
+    const clean = prepareKundenNews(input, this.today());
+    if (clean.firma_id) CrmService.find((await this.store.load()).firmen, clean.firma_id);
+    if (existing) {
+      const [news] = await this.store.update('kunden_news', [{ id: existing.id, changes: { ...clean, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm }]);
+      return news;
+    }
+    const news: KundenNews = { ...clean, id: newId(ID_PREFIX.kunden_news), archiviert: false, ...this.created() };
+    await this.store.insert('kunden_news', [news]);
+    return news;
+  }
+
+  async setKundenNewsArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<KundenNews> {
+    const [news] = await this.store.update('kunden_news', [{ id, changes: { archiviert, ...this.changed() }, expectedGeaendertAm }]);
+    return news;
+  }
+
+  /** Content of any folder below a client folder, folders first. */
+  async ordnerDateien(ordnerId: string): Promise<DriveFile[]> {
+    const dateien = await this.drive.listChildren(ordnerId);
+    return dateien.sort((a, b) => Number(isFolder(b)) - Number(isFolder(a)) || a.name.localeCompare(b.name, 'de', { numeric: true }));
   }
 
   // ─── Lead-Magnete ──────────────────────────────────────────────────────────

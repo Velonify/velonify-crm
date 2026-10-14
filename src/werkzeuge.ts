@@ -40,6 +40,13 @@ export const WERKZEUGE: Werkzeug[] = [
     ],
   },
   {
+    id: 'kunden',
+    name: 'Kunden',
+    beschreibung: 'Client-Hub: Dateien, Tools, Ressourcen und News je Kunde',
+    pfad: '/kunden',
+    navigation: [{ label: 'Alle Kunden', pfad: '/kunden' }],
+  },
+  {
     id: 'angebote',
     name: 'Angebots-Rechner',
     beschreibung: 'Leistungen auswählen, im Sheet kalkulieren, Angebot als PDF',
