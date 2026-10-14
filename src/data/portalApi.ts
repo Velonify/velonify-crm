@@ -1,0 +1,205 @@
+/**
+ * What the client portal may see. The portal function builds its answer only through `kundensicht`, which copies
+ * whitelisted fields of the client's own, released records – nothing else of the sheet leaves the server.
+ * Shared with the portal frontend as the contract of the API.
+ */
+import { CLIENT_SHARE_ORDNER } from './kunden';
+import { freigabeVon, meilensteineVon, type FreigabeStatus } from './portal';
+import { checklisteVon, erledigtSpalte, spaltenVon } from './todos';
+import { personen } from './zustaendig';
+import type { Database, Firma, Kontakt, KundenDaten, MeilensteinStatus, PortalDaten, PortalZugang, TodoDaten } from './types';
+
+export { CLIENT_SHARE_ORDNER };
+
+/** How long a login link and a session are valid. */
+export const LINK_GUELTIG_MS = 15 * 60_000;
+export const SITZUNG_GUELTIG_MS = 30 * 24 * 60 * 60_000;
+/** Done cards older than the newest ones are left out; the portal shows them collapsed anyway. */
+export const MAX_ERLEDIGT = 30;
+export const MAX_NEWS = 50;
+
+export type PortalPhase = 'wartet' | 'arbeit' | 'geplant' | 'erledigt';
+
+export interface PortalKommentar {
+  von: string;
+  /** Written by Velonify (true) or by someone of the client (false). */
+  team: boolean;
+  text: string;
+  datum: string;
+}
+
+export interface PortalKarte {
+  id: string;
+  titel: string;
+  beschreibung: string;
+  phase: PortalPhase;
+  zustaendig: string[];
+  faellig_am: string;
+  /** YYYY-MM-DD, done cards only */
+  erledigt_am: string;
+  checkliste: { text: string; erledigt: boolean }[];
+  freigabe: FreigabeStatus | '';
+  /** Came in as a request of the client. */
+  anfrage: boolean;
+  kommentare: PortalKommentar[];
+}
+
+export interface PortalDatei {
+  id: string;
+  name: string;
+  mimeType: string;
+  geaendert: string;
+}
+
+export interface Kundensicht {
+  kunde: { name: string; kuerzel: string };
+  ich: { vorname: string; nachname: string; email: string };
+  team: string[];
+  fahrplan: { titel: string; datum: string; status: MeilensteinStatus }[];
+  karten: PortalKarte[];
+  news: { id: string; art: string; titel: string; text: string; datum: string }[];
+  links: { titel: string; url: string; beschreibung: string; art: string }[];
+  werkzeuge: string[];
+  dateien: PortalDatei[];
+}
+
+/** Columns that mean "the team is on it" on the standard board. */
+const ARBEIT_SPALTEN = new Set(['woche', 'arbeit', 'wartet']);
+
+export const normalisiereEmail = (email: string) => email.trim().toLowerCase();
+
+export interface Berechtigung {
+  zugang: PortalZugang;
+  kontakt: Kontakt;
+  firma: Firma;
+}
+
+/**
+ * The login of an e-mail address: an active portal login of a contact that is not archived, at a firm that is an
+ * active client. Anything else is no login (the caller answers the same either way, so nobody can probe addresses).
+ */
+export function findeBerechtigung(db: Pick<Database, 'firmen' | 'kontakte'>, portal: Pick<PortalDaten, 'zugaenge'>, email: string): Berechtigung | null {
+  const gesucht = normalisiereEmail(email);
+  if (!gesucht) return null;
+  for (const kontakt of db.kontakte) {
+    if (kontakt.archiviert || normalisiereEmail(kontakt.email) !== gesucht) continue;
+    const berechtigung = pruefeBerechtigung(db, portal, kontakt.id, kontakt.firma_id);
+    if (berechtigung) return berechtigung;
+  }
+  return null;
+}
+
+/** Re-checked on every request with a session: the login can be switched off in the hub at any time. */
+export function pruefeBerechtigung(db: Pick<Database, 'firmen' | 'kontakte'>, portal: Pick<PortalDaten, 'zugaenge'>, kontaktId: string, firmaId: string): Berechtigung | null {
+  const kontakt = db.kontakte.find((k) => k.id === kontaktId);
+  if (!kontakt || kontakt.archiviert || kontakt.firma_id !== firmaId) return null;
+  const firma = db.firmen.find((f) => f.id === firmaId);
+  if (!firma || firma.archiviert || firma.status !== 'kunde') return null;
+  const zugang = portal.zugaenge.find((z) => z.kontakt_id === kontaktId && z.firma_id === firmaId && z.aktiv);
+  return zugang ? { zugang, kontakt, firma } : null;
+}
+
+const datumTeil = (zeitpunkt: string) => zeitpunkt.slice(0, 10);
+
+/** Team members appear with their first name (from the address), people of the client with their name. */
+function absender(von: string, teamDomain: string, kontakte: readonly Kontakt[]): { von: string; team: boolean } {
+  const adresse = normalisiereEmail(von);
+  if (adresse.endsWith(`@${teamDomain}`)) {
+    const name = adresse.split('@')[0].split(/[._-]/)[0];
+    return { von: name.charAt(0).toUpperCase() + name.slice(1), team: true };
+  }
+  const kontakt = kontakte.find((k) => normalisiereEmail(k.email) === adresse);
+  return { von: kontakt ? `${kontakt.vorname} ${kontakt.nachname}`.trim() : 'Kunde', team: false };
+}
+
+export function kundensicht(args: {
+  berechtigung: Berechtigung;
+  db: Pick<Database, 'kontakte'>;
+  kunden: KundenDaten;
+  todos: TodoDaten;
+  portal: PortalDaten;
+  dateien: PortalDatei[];
+  teamDomain: string;
+}): Kundensicht {
+  const { berechtigung, db, kunden, todos, portal, dateien, teamDomain } = args;
+  const { firma, kontakt } = berechtigung;
+  const firmenKontakte = db.kontakte.filter((k) => k.firma_id === firma.id);
+
+  const board = todos.boards.find((b) => b.firma_id === firma.id && !b.archiviert);
+  const spalten = board ? spaltenVon(board) : [];
+  const fertig = erledigtSpalte(spalten)?.id;
+  const spaltenIds = new Set(spalten.map((s) => s.id));
+  const reihenfolge = (id: string) => spalten.findIndex((s) => s.id === id);
+
+  const sichtbar = board
+    ? todos.aufgaben
+        .filter((a) => a.board_id === board.id && a.sichtbar_kunde && !a.archiviert && spaltenIds.has(a.spalte_id))
+        .sort((a, b) => reihenfolge(a.spalte_id) - reihenfolge(b.spalte_id) || (a.sortierung ?? 0) - (b.sortierung ?? 0))
+    : [];
+  const offen = sichtbar.filter((a) => a.spalte_id !== fertig);
+  const erledigt = sichtbar
+    .filter((a) => a.spalte_id === fertig)
+    .sort((a, b) => b.erledigt_am.localeCompare(a.erledigt_am))
+    .slice(0, MAX_ERLEDIGT);
+
+  const karten: PortalKarte[] = [...offen, ...erledigt].map((a) => {
+    const freigabe = freigabeVon(a);
+    const phase: PortalPhase = a.spalte_id === fertig ? 'erledigt' : freigabe === 'offen' ? 'wartet' : ARBEIT_SPALTEN.has(a.spalte_id) ? 'arbeit' : 'geplant';
+    return {
+      id: a.id,
+      titel: a.titel,
+      beschreibung: a.beschreibung,
+      phase,
+      zustaendig: personen(a.zustaendig),
+      faellig_am: a.faellig_am,
+      erledigt_am: phase === 'erledigt' ? datumTeil(a.erledigt_am) : '',
+      checkliste: checklisteVon(a).map((p) => ({ text: p.text, erledigt: p.erledigt })),
+      freigabe: freigabe ?? '',
+      anfrage: a.quelle === 'kunde',
+      kommentare: todos.kommentare
+        .filter((k) => k.aufgabe_id === a.id)
+        .sort((x, y) => x.datum.localeCompare(y.datum))
+        .map((k) => ({ ...absender(k.von, teamDomain, firmenKontakte), text: k.text, datum: k.datum })),
+    };
+  });
+
+  return {
+    kunde: { name: firma.name, kuerzel: firma.kuerzel },
+    ich: { vorname: kontakt.vorname, nachname: kontakt.nachname, email: kontakt.email },
+    team: personen(firma.zustaendig),
+    fahrplan: meilensteineVon(portal.meilensteine, firma.id).map((m) => ({ titel: m.titel, datum: m.datum, status: m.status })),
+    karten,
+    news: kunden.news
+      .filter((n) => (n.firma_id === firma.id || n.firma_id === '') && n.sichtbar_kunde && !n.archiviert)
+      .sort((a, b) => b.datum.localeCompare(a.datum))
+      .slice(0, MAX_NEWS)
+      .map((n) => ({ id: n.id, art: n.art, titel: n.titel, text: n.text, datum: n.datum })),
+    links: kunden.links
+      .filter((l) => l.firma_id === firma.id && l.sichtbar_kunde && !l.archiviert)
+      .sort((a, b) => (a.sortierung ?? 0) - (b.sortierung ?? 0))
+      .map((l) => ({ titel: l.titel, url: l.url, beschreibung: l.beschreibung, art: l.art })),
+    werkzeuge: portal.werkzeuge.filter((w) => w.firma_id === firma.id && w.aktiv).map((w) => w.werkzeug),
+    dateien,
+  };
+}
+
+/** Text of the login mail (plain text, German, "du"). */
+export function loginMail(vorname: string, link: string): { betreff: string; text: string } {
+  return {
+    betreff: 'Dein Anmeldelink für das Velonify-Kundenportal',
+    text: [
+      `Hallo${vorname ? ` ${vorname}` : ''},`,
+      '',
+      'mit diesem Link meldest du dich im Velonify-Kundenportal an:',
+      '',
+      link,
+      '',
+      'Der Link gilt 15 Minuten und funktioniert nur einmal. Du bleibst danach 30 Tage angemeldet.',
+      '',
+      'Du hast keinen Link angefordert? Dann kannst du diese Mail ignorieren.',
+      '',
+      'Viele Grüße',
+      'dein Velonify-Team',
+    ].join('\n'),
+  };
+}
