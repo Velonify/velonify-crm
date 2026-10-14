@@ -204,6 +204,24 @@ export const SCHEMA = {
     columns: ['id', 'firma_id', 'art', 'titel', 'text', 'datum', 'angeheftet', 'sichtbar_kunde', 'archiviert', ...META],
     boolean: ['angeheftet', 'sichtbar_kunde', 'archiviert'],
   },
+  boards: {
+    name: 'boards',
+    columns: ['id', 'firma_id', 'titel', 'spalten', 'archiviert', ...META],
+    boolean: ['archiviert'],
+  },
+  aufgaben: {
+    name: 'aufgaben',
+    columns: [
+      'id', 'board_id', 'spalte_id', 'titel', 'beschreibung', 'zustaendig', 'faellig_am', 'labels', 'checkliste', 'sortierung',
+      'quelle', 'quelle_link', 'sichtbar_kunde', 'erledigt_am', 'erledigt_von', 'archiviert', ...META,
+    ],
+    numeric: ['sortierung'],
+    boolean: ['sichtbar_kunde', 'archiviert'],
+  },
+  aufgaben_kommentare: {
+    name: 'aufgaben_kommentare',
+    columns: ['id', 'aufgabe_id', 'text', 'von', 'datum'],
+  },
   listen: {
     name: 'listen',
     columns: ['liste', 'wert'],
@@ -242,6 +260,8 @@ export const MAGNET_TABS = ['magnete', 'magnet_leads'] as const;
  * client portal may show later. Loaded only when the tool is opened.
  */
 export const KUNDEN_TABS = ['kunden_links', 'kunden_news'] as const;
+/** Tabs of the to-do boards that replace Trello: one board per client plus an internal one. Loaded only when needed. */
+export const TODO_TABS = ['boards', 'aufgaben', 'aufgaben_kommentare'] as const;
 export type EntityTab =
   | (typeof ENTITY_TABS)[number]
   | (typeof ANGEBOTS_TABS)[number]
@@ -252,7 +272,8 @@ export type EntityTab =
   | (typeof EINGANG_TABS)[number]
   | (typeof SOCIAL_TABS)[number]
   | (typeof MAGNET_TABS)[number]
-  | (typeof KUNDEN_TABS)[number];
+  | (typeof KUNDEN_TABS)[number]
+  | (typeof TODO_TABS)[number];
 
 /** Editable select values, written to the "listen" tab on setup and maintained there afterwards. */
 export const LISTEN_DEFAULTS: Record<string, string[]> = {

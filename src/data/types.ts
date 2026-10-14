@@ -615,6 +615,9 @@ export interface EntityMap {
   magnet_leads: MagnetLead;
   kunden_links: KundenLink;
   kunden_news: KundenNews;
+  boards: Board;
+  aufgaben: Aufgabe;
+  aufgaben_kommentare: AufgabenKommentar;
 }
 
 export type KundenLinkArt = 'tool' | 'ressource';
@@ -656,6 +659,74 @@ export type KundenNewsInput = Pick<KundenNews, 'firma_id' | 'art' | 'titel' | 't
 export interface KundenDaten {
   links: KundenLink[];
   news: KundenNews[];
+}
+
+/** A column of a board, stored as JSON in `boards.spalten`. Cards in the column marked `erledigt` count as done. */
+export interface Spalte {
+  id: string;
+  titel: string;
+  erledigt?: boolean;
+}
+
+/** A to-do board: one per client (`firma_id`) and an internal one without firm. */
+export interface Board extends Meta {
+  id: string;
+  firma_id: string;
+  titel: string;
+  /** JSON array of Spalte, in display order. */
+  spalten: string;
+  archiviert: boolean;
+}
+
+export interface ChecklistenPunkt {
+  text: string;
+  erledigt: boolean;
+}
+
+export type AufgabenQuelle = 'manuell' | 'agent';
+
+/** A card on a board. */
+export interface Aufgabe extends Meta {
+  id: string;
+  board_id: string;
+  spalte_id: string;
+  titel: string;
+  beschreibung: string;
+  zustaendig: string;
+  /** YYYY-MM-DD or empty */
+  faellig_am: string;
+  /** Comma-separated */
+  labels: string;
+  /** JSON array of ChecklistenPunkt */
+  checkliste: string;
+  /** Position within the column; fractional so a move writes one row only. */
+  sortierung: number | null;
+  quelle: string;
+  /** e.g. the Slack message a suggestion came from */
+  quelle_link: string;
+  sichtbar_kunde: boolean;
+  erledigt_am: string;
+  erledigt_von: string;
+  archiviert: boolean;
+}
+export type AufgabeInput = Pick<Aufgabe, 'titel' | 'beschreibung' | 'zustaendig' | 'faellig_am' | 'labels' | 'checkliste' | 'sichtbar_kunde'> & {
+  spalte_id?: string;
+  quelle?: string;
+  quelle_link?: string;
+};
+
+export interface AufgabenKommentar {
+  id: string;
+  aufgabe_id: string;
+  text: string;
+  von: string;
+  datum: string;
+}
+
+export interface TodoDaten {
+  boards: Board[];
+  aufgaben: Aufgabe[];
+  kommentare: AufgabenKommentar[];
 }
 
 /** An inquiry from the website form, written into the sheet by the Apps Script behind the Netlify webhook. */

@@ -891,6 +891,62 @@ fieldset.plain.invalid legend { color: var(--danger); }
 .ordner-pfad { font-size: inherit; overflow-wrap: anywhere; }
 .datei-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* ─── To-Dos ─────────────────────────────────────────────────────────────── */
+.page.full { max-width: none; }
+.kunden-karte.is-intern { background: var(--sunken); }
+.board-zahlen { color: var(--ink-muted); margin-top: auto; }
+.board-zahlen strong { color: var(--ink); }
+.board-zahlen .is-ueberfaellig, .board-zahlen .is-ueberfaellig strong { color: var(--danger); }
+.board-anlegen { align-self: flex-start; margin-top: auto; }
+
+.kanban-rahmen { min-width: 0; }
+.kanban-werkzeuge { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; margin-bottom: var(--space-3); }
+.kanban-einstellungen { margin-left: auto; }
+.kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(260px, 300px); gap: var(--space-2); overflow-x: auto; padding-bottom: var(--space-2); align-items: start; scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
+.kanban-spalte { background: var(--sunken); border: 1px solid var(--line); display: flex; flex-direction: column; max-height: calc(100vh - 220px); min-height: 160px; scroll-snap-align: start; transition: border-color 0.15s ease; }
+.kanban-spalte.is-ziel { border-color: var(--accent); }
+.kanban-kopf { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); padding: 12px 12px 8px; border-bottom: var(--border-rule) solid var(--rule); }
+.kanban-kopf h2 { font-family: var(--font-sans); font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; margin: 0; }
+.kanban-karten { list-style: none; margin: 0; padding: 8px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; min-height: 48px; }
+.kanban-leer { color: var(--ink-muted); font-size: 13px; padding: 10px 4px; text-align: center; }
+.karte { background: var(--raised); border: 1px solid var(--line); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: border-color 0.12s ease, box-shadow 0.12s ease; }
+.karte:hover { border-color: var(--line-strong); }
+.karte:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.karte.is-ueberfaellig { border-left: var(--border-accent) solid var(--danger); }
+.kanban-spalte.is-erledigt .karte-titel { color: var(--ink-muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.karte-titel { font-weight: 600; font-size: 14.5px; line-height: 1.35; overflow-wrap: anywhere; }
+.karte-labels { display: flex; flex-wrap: wrap; gap: 4px; }
+.karte-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 6px 2px; background: var(--hover); color: var(--ink-muted); }
+.karte-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12.5px; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.karte-meta:empty { display: none; }
+.karte-zahl { display: inline-flex; align-items: center; gap: 4px; }
+.karte-zahl svg { width: 13px; height: 13px; }
+.karte-zahl.is-komplett { color: var(--ok); }
+.karte-faellig.is-ueberfaellig { color: var(--danger); font-weight: 700; }
+.karte-faellig.is-heute { color: var(--ink); font-weight: 700; }
+.karte-person { margin-left: auto; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: var(--selected-bg); color: var(--selected-ink); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.karte-platzhalter { height: 56px; border: 1px dashed var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); flex: none; }
+.karte.is-fliegend { position: fixed; z-index: 200; pointer-events: none; cursor: grabbing; transform: rotate(1.5deg); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22); border-color: var(--accent); }
+body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
+.kanban-neu { font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-muted); background: none; border: 0; border-top: 1px solid var(--line); padding: 10px 12px; text-align: left; cursor: pointer; }
+.kanban-neu:hover { color: var(--accent); background: var(--hover); }
+.kanban-schnell { padding: 8px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.kanban-schnell textarea { resize: none; }
+
+.checkliste { list-style: none; margin: 0 0 var(--space-1); padding: 0; }
+.checkliste li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); padding: 4px 0; }
+.checkliste .checkbox { white-space: normal; color: var(--ink); font-weight: 500; }
+.checkliste .is-erledigt { color: var(--ink-muted); text-decoration: line-through; }
+.inline-form { display: flex; gap: var(--space-1); align-items: flex-start; }
+.inline-form > :first-child { flex: 1; min-width: 0; }
+.kommentare { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.kommentar-liste { list-style: none; margin: 0 0 var(--space-2); padding: 0; display: grid; gap: var(--space-2); }
+.spalten-editor { list-style: none; margin: 0 0 var(--space-2); padding: 0; display: grid; gap: 6px; }
+.spalten-editor li { display: flex; align-items: center; gap: 6px; }
+.spalten-editor input:not([type='radio']) { flex: 1; min-width: 0; }
+@media (prefers-reduced-motion: reduce) { .karte.is-fliegend { transform: none; } }
+@media (max-width: 760px) { .kanban { grid-auto-columns: minmax(240px, 82vw); } .kanban-spalte { max-height: none; } .kanban-einstellungen { margin-left: 0; } }
+
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .page { padding: var(--space-5) var(--space-5) var(--space-6); }

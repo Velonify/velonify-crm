@@ -274,5 +274,18 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   const share = (await drive.listChildren(kundenordner)).find((f) => f.name === '07_Client-Share');
   if (share) drive.add('Reporting September.pdf', share.id, 'application/pdf');
 
+  // To-dos: the internal board and the client board with a few cards in different columns.
+  const intern = await service.boardFuer('');
+  const kundenBoard = await service.boardFuer(alpenglanz.id);
+  const karte = (boardId: string, spalte_id: string, titel: string, felder: Partial<{ zustaendig: string; faellig_am: string; labels: string; beschreibung: string; checkliste: string; sichtbar_kunde: boolean }> = {}) =>
+    service.saveKarte(boardId, { titel, beschreibung: '', zustaendig: '', faellig_am: '', labels: '', checkliste: '', sichtbar_kunde: false, spalte_id, ...felder });
+  await karte(kundenBoard.id, 'woche', 'Black-Week-Banner einbauen', { zustaendig: 'Johannes', faellig_am: addDays(heute, 1), labels: 'Theme, Black Week', sichtbar_kunde: true });
+  await karte(kundenBoard.id, 'arbeit', 'Klaviyo: Browse-Abandonment-Flow', { zustaendig: 'Julian', labels: 'E-Mail', checkliste: JSON.stringify([{ text: 'Segment anlegen', erledigt: true }, { text: 'Mails texten', erledigt: false }, { text: 'Testversand', erledigt: false }]) });
+  await karte(kundenBoard.id, 'wartet', 'Produktfotos Winterkollektion', { beschreibung: 'Kunde liefert bis Ende der Woche in 07_Client-Share.', faellig_am: addDays(heute, -1) });
+  await karte(kundenBoard.id, 'backlog', 'Core Web Vitals der Kategorieseiten prüfen', { labels: 'Performance' });
+  await karte(kundenBoard.id, 'erledigt', 'Neue Produktseiten live', { zustaendig: 'Johannes', sichtbar_kunde: true });
+  await karte(intern.id, 'woche', 'Angebot Nordlicht nachfassen', { zustaendig: 'Lugge', faellig_am: heute, labels: 'Sales' });
+  await karte(intern.id, 'backlog', 'Slack-App für den To-Do-Agenten anlegen', { zustaendig: 'Lugge', labels: 'Intern' });
+
   return { service, sheets };
 }

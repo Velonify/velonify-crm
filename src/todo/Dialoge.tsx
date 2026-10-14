@@ -1,0 +1,270 @@
+import { useState } from 'react';
+import { Dialog } from '../components/Dialog';
+import { useToast } from '../components/Toasts';
+import { Field, FormError } from '../components/ui';
+import type { CrmService } from '../data/crm';
+import { checklisteVon, neueSpaltenId, spaltenVon } from '../data/todos';
+import type { Aufgabe, AufgabeInput, AufgabenKommentar, Board, ChecklistenPunkt, Spalte } from '../data/types';
+import { fieldOf } from '../lib/errors';
+import { formatDateTime, shortUser } from '../lib/format';
+
+export type Aendern = <T>(action: (s: CrmService) => Promise<T>) => Promise<T>;
+
+function useSpeichern(aendern: Aendern, onClose: () => void) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>();
+  const run = async (action: (s: CrmService) => Promise<unknown>, meldung: string, schliessen = true) => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await aendern(action);
+      toast.show(meldung);
+      if (schliessen) onClose();
+      else setBusy(false);
+    } catch (err) {
+      setError(err);
+      setBusy(false);
+    }
+  };
+  return { busy, error, run };
+}
+
+export function KarteDialog({
+  board,
+  aufgabe,
+  spalteId,
+  kommentare,
+  team,
+  istKundenBoard,
+  aendern,
+  onClose,
+}: {
+  board: Board;
+  aufgabe?: Aufgabe;
+  /** Column of a new card. */
+  spalteId?: string;
+  kommentare: AufgabenKommentar[];
+  team: readonly string[];
+  istKundenBoard: boolean;
+  aendern: Aendern;
+  onClose(): void;
+}) {
+  const spalten = spaltenVon(board);
+  const [werte, setWerte] = useState<AufgabeInput>(() =>
+    aufgabe
+      ? {
+          titel: aufgabe.titel, beschreibung: aufgabe.beschreibung, zustaendig: aufgabe.zustaendig, faellig_am: aufgabe.faellig_am, labels: aufgabe.labels,
+          checkliste: aufgabe.checkliste, sichtbar_kunde: aufgabe.sichtbar_kunde, spalte_id: aufgabe.spalte_id,
+        }
+      : { titel: '', beschreibung: '', zustaendig: '', faellig_am: '', labels: '', checkliste: '', sichtbar_kunde: false, spalte_id: spalteId ?? spalten[0].id },
+  );
+  const [punkte, setPunkte] = useState<ChecklistenPunkt[]>(() => checklisteVon(werte));
+  const [neuerPunkt, setNeuerPunkt] = useState('');
+  const [kommentar, setKommentar] = useState('');
+  const { busy, error, run } = useSpeichern(aendern, onClose);
+  const eigene = aufgabe ? kommentare.filter((k) => k.aufgabe_id === aufgabe.id).sort((a, b) => a.datum.localeCompare(b.datum)) : [];
+
+  const punktHinzu = () => {
+    if (!neuerPunkt.trim()) return;
+    setPunkte((p) => [...p, { text: neuerPunkt.trim(), erledigt: false }]);
+    setNeuerPunkt('');
+  };
+
+  const speichern = () => {
+    const eingabe = { ...werte, checkliste: JSON.stringify(neuerPunkt.trim() ? [...punkte, { text: neuerPunkt.trim(), erledigt: false }] : punkte) };
+    void run((s) => s.saveKarte(board.id, eingabe, aufgabe && { id: aufgabe.id, expectedGeaendertAm: aufgabe.geaendert_am }), aufgabe ? 'Karte gespeichert' : 'Karte angelegt');
+  };
+
+  const archivieren = () => {
+    if (!aufgabe || (!aufgabe.archiviert && !window.confirm(`„${aufgabe.titel}“ archivieren? Die Karte verschwindet vom Board, bleibt aber im Sheet.`))) return;
+    void run((s) => s.setKarteArchiviert(aufgabe.id, !aufgabe.archiviert, aufgabe.geaendert_am), aufgabe.archiviert ? 'Wiederhergestellt' : 'Archiviert');
+  };
+
+  const kommentieren = () => {
+    if (!aufgabe || !kommentar.trim()) return;
+    void run((s) => s.kommentiereKarte(aufgabe.id, kommentar), 'Kommentar gespeichert', false).then(() => setKommentar(''));
+  };
+
+  return (
+    <Dialog
+      title={aufgabe ? 'Karte' : 'Neue Karte'}
+      onClose={onClose}
+      onSubmit={speichern}
+      busy={busy}
+      wide
+      extraActions={
+        aufgabe && (
+          <button type="button" className="button subtle" onClick={archivieren} disabled={busy}>
+            {aufgabe.archiviert ? 'Wiederherstellen' : 'Archivieren'}
+          </button>
+        )
+      }
+    >
+      <div className="grid">
+        <Field label="Titel" invalid={fieldOf(error) === 'titel'} wide>
+          <input value={werte.titel} onChange={(e) => setWerte((w) => ({ ...w, titel: e.target.value }))} maxLength={200} autoComplete="off" autoFocus />
+        </Field>
+        <Field label="Beschreibung" wide>
+          <textarea rows={4} value={werte.beschreibung} onChange={(e) => setWerte((w) => ({ ...w, beschreibung: e.target.value }))} />
+        </Field>
+        <Field label="Spalte">
+          <select value={werte.spalte_id} onChange={(e) => setWerte((w) => ({ ...w, spalte_id: e.target.value }))}>
+            {spalten.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.titel}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Zuständig">
+          <select value={werte.zustaendig} onChange={(e) => setWerte((w) => ({ ...w, zustaendig: e.target.value }))}>
+            <option value="">Niemand</option>
+            {[...new Set([...team, werte.zustaendig].filter(Boolean))].map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Fällig" invalid={fieldOf(error) === 'faellig_am'}>
+          <input type="date" value={werte.faellig_am} onChange={(e) => setWerte((w) => ({ ...w, faellig_am: e.target.value }))} />
+        </Field>
+        <Field label="Labels" hint="Mit Komma getrennt, z. B. Theme, SEO">
+          <input value={werte.labels} onChange={(e) => setWerte((w) => ({ ...w, labels: e.target.value }))} autoComplete="off" />
+        </Field>
+        <Field label="Checkliste" wide>
+          <ul className="checkliste">
+            {punkte.map((p, i) => (
+              <li key={i}>
+                <label className="checkbox">
+                  <input type="checkbox" checked={p.erledigt} onChange={(e) => setPunkte((alle) => alle.map((q, j) => (j === i ? { ...q, erledigt: e.target.checked } : q)))} />
+                  <span className={p.erledigt ? 'is-erledigt' : ''}>{p.text}</span>
+                </label>
+                <button type="button" className="icon-button" onClick={() => setPunkte((alle) => alle.filter((_, j) => j !== i))} aria-label={`„${p.text}“ entfernen`}>
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="inline-form">
+            <input
+              value={neuerPunkt}
+              onChange={(e) => setNeuerPunkt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  punktHinzu();
+                }
+              }}
+              placeholder="Neuer Punkt"
+              autoComplete="off"
+            />
+            <button type="button" className="button small" onClick={punktHinzu}>
+              Hinzufügen
+            </button>
+          </div>
+        </Field>
+        {istKundenBoard && (
+          <Field label="Kunde" wide>
+            <label className="checkbox">
+              <input type="checkbox" checked={werte.sichtbar_kunde} onChange={(e) => setWerte((w) => ({ ...w, sichtbar_kunde: e.target.checked }))} />
+              Für den Kunden sichtbar (später im Kundenportal)
+            </label>
+          </Field>
+        )}
+        {aufgabe?.quelle_link && (
+          <Field label="Quelle" wide>
+            <a href={aufgabe.quelle_link} target="_blank" rel="noreferrer noopener">
+              {aufgabe.quelle === 'agent' ? 'Slack-Nachricht öffnen ↗' : 'Link öffnen ↗'}
+            </a>
+          </Field>
+        )}
+      </div>
+      <FormError error={error} />
+
+      {aufgabe && (
+        <section className="kommentare">
+          <h3 className="subheading">Kommentare</h3>
+          {eigene.length === 0 && <p className="muted small">Noch keine Kommentare.</p>}
+          <ul className="kommentar-liste">
+            {eigene.map((k) => (
+              <li key={k.id}>
+                <div className="timeline-meta">
+                  <strong>{shortUser(k.von)}</strong> · {formatDateTime(k.datum)}
+                </div>
+                <p className="timeline-text">{k.text}</p>
+              </li>
+            ))}
+          </ul>
+          <div className="inline-form">
+            <textarea rows={2} value={kommentar} onChange={(e) => setKommentar(e.target.value)} placeholder="Kommentar schreiben" />
+            <button type="button" className="button small" onClick={kommentieren} disabled={busy || !kommentar.trim()}>
+              Kommentieren
+            </button>
+          </div>
+        </section>
+      )}
+    </Dialog>
+  );
+}
+
+export function SpaltenDialog({ board, aendern, onClose }: { board: Board; aendern: Aendern; onClose(): void }) {
+  const [titel, setTitel] = useState(board.titel);
+  const [spalten, setSpalten] = useState<Spalte[]>(() => spaltenVon(board));
+  const { busy, error, run } = useSpeichern(aendern, onClose);
+
+  const tauschen = (i: number, j: number) =>
+    setSpalten((s) => {
+      const neu = [...s];
+      [neu[i], neu[j]] = [neu[j], neu[i]];
+      return neu;
+    });
+
+  const speichern = () => {
+    const fehlend = spaltenVon(board).filter((alt) => !spalten.some((s) => s.id === alt.id));
+    if (fehlend.length > 0 && !window.confirm(`${fehlend.map((s) => `„${s.titel}“`).join(', ')} entfernen? Karten darin wandern in die erste Spalte.`)) return;
+    void run((s) => s.saveBoard(board.id, titel, spalten, board.geaendert_am), 'Board gespeichert');
+  };
+
+  return (
+    <Dialog title="Board bearbeiten" onClose={onClose} onSubmit={speichern} busy={busy}>
+      <div className="grid">
+        <Field label="Name" invalid={fieldOf(error) === 'titel'} wide>
+          <input value={titel} onChange={(e) => setTitel(e.target.value)} autoComplete="off" />
+        </Field>
+        <Field label="Spalten" hint="Karten in der Spalte „Erledigt“ gelten als erledigt." invalid={fieldOf(error) === 'spalten'} wide>
+          <ul className="spalten-editor">
+            {spalten.map((s, i) => (
+              <li key={s.id}>
+                <input value={s.titel} onChange={(e) => setSpalten((alle) => alle.map((x, j) => (j === i ? { ...x, titel: e.target.value } : x)))} aria-label={`Name der Spalte ${i + 1}`} autoComplete="off" />
+                <label className="checkbox">
+                  <input
+                    type="radio"
+                    name="erledigt-spalte"
+                    checked={Boolean(s.erledigt)}
+                    onChange={() => setSpalten((alle) => alle.map((x, j) => ({ id: x.id, titel: x.titel, ...(j === i ? { erledigt: true } : {}) })))}
+                  />
+                  Erledigt
+                </label>
+                <button type="button" className="button small subtle" onClick={() => tauschen(i, i - 1)} disabled={i === 0} aria-label="Nach links">
+                  ←
+                </button>
+                <button type="button" className="button small subtle" onClick={() => tauschen(i, i + 1)} disabled={i === spalten.length - 1} aria-label="Nach rechts">
+                  →
+                </button>
+                <button type="button" className="icon-button" onClick={() => setSpalten((alle) => alle.filter((_, j) => j !== i))} disabled={spalten.length === 1} aria-label={`Spalte „${s.titel}“ entfernen`}>
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button type="button" className="button small" onClick={() => setSpalten((s) => [...s, { id: neueSpaltenId('Neue Spalte', s), titel: 'Neue Spalte' }])}>
+            + Spalte
+          </button>
+        </Field>
+      </div>
+      <FormError error={error} />
+    </Dialog>
+  );
+}

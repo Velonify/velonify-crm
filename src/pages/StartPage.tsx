@@ -19,6 +19,9 @@ import { istGeplant, WERKZEUGE } from '../werkzeuge';
 import { AnfragenKarte } from '../eingang/AnfragenKarte';
 import { MonsteraKarte } from '../monstera/MonsteraKarte';
 import { WordleKarte } from '../wordle/WordleKarte';
+import { SchemaError } from '../data/errors';
+import { faelligkeit, meineAufgaben } from '../data/todos';
+import { useTodoDaten } from '../todo/useTodoDaten';
 
 const MAX_AUFGABEN = 5;
 
@@ -59,6 +62,48 @@ function Werkzeuge({ heute, ueberfaellig, pipelineWert }: { heute: number; ueber
         </div>
       ))}
     </section>
+  );
+}
+
+/** Open cards of the signed-in person that are overdue or due soon. Hidden until the to-do tabs are set up. */
+function MeineTodos({ ich, heute }: { ich: string | null; heute: string }) {
+  const { data, error } = useTodoDaten();
+  if (error instanceof SchemaError || !ich) return null;
+  const karten = data ? meineAufgaben(data.aufgaben, data.boards, ich).filter((a) => ['ueberfaellig', 'heute', 'bald'].includes(faelligkeit(a, heute))) : [];
+  const board = (id: string) => data?.boards.find((b) => b.id === id);
+  return (
+    <Card
+      title={
+        <>
+          Meine To-dos <span className="count">{karten.length}</span>
+        </>
+      }
+      actions={
+        <Link to="/todo/meine" className="button small">
+          Alle
+        </Link>
+      }
+      className="task-card"
+    >
+      {error && <ErrorBox error={error} />}
+      {!data && !error && <Loading />}
+      {data && karten.length === 0 && <p className="muted">In den nächsten Tagen ist keine Karte fällig.</p>}
+      {karten.length > 0 && (
+        <ul className="task-list">
+          {karten.slice(0, MAX_AUFGABEN).map((a) => (
+            <li key={a.id} className={a.faellig_am < heute ? 'overdue' : a.faellig_am === heute ? 'today' : ''}>
+              <span className="task-kind open" aria-hidden="true" />
+              <div className="task-body">
+                <Link to={`/todo/${a.board_id}`}>{a.titel}</Link>
+                <div className="row-sub">
+                  {board(a.board_id)?.titel} · {faelligText(a.faellig_am, heute)}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }
 
@@ -327,6 +372,7 @@ export function StartPage() {
         <div className="start-main">
           <AnfragenKarte />
           <HeuteDran db={db} ich={ich} heute={heute} />
+          <MeineTodos ich={ich} heute={heute} />
           {spiele.data?.monstera && <MonsteraKarte eintraege={spiele.data.monstera} db={db} ich={ich} heute={heute} neuLaden={spiele.reload} />}
           <Kunden db={db} />
         </div>

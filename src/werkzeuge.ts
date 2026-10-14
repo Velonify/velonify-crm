@@ -47,6 +47,16 @@ export const WERKZEUGE: Werkzeug[] = [
     navigation: [{ label: 'Alle Kunden', pfad: '/kunden' }],
   },
   {
+    id: 'todo',
+    name: 'To-Dos',
+    beschreibung: 'Boards für Velonify und jeden Kunden: Karten, Fälligkeiten, wer was macht',
+    pfad: '/todo',
+    navigation: [
+      { label: 'Boards', pfad: '/todo', end: true },
+      { label: 'Meine Aufgaben', pfad: '/todo/meine' },
+    ],
+  },
+  {
     id: 'angebote',
     name: 'Angebots-Rechner',
     beschreibung: 'Leistungen auswählen, im Sheet kalkulieren, Angebot als PDF',

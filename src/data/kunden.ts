@@ -1,6 +1,6 @@
 import { ValidationError } from './errors';
 import { isIsoDate } from './ids';
-import type { Database, Firma, KundenLink, KundenLinkArt, KundenLinkInput, KundenNews, KundenNewsArt, KundenNewsInput } from './types';
+import type { Aufgabe, Database, Firma, KundenLink, KundenLinkArt, KundenLinkInput, KundenNews, KundenNewsArt, KundenNewsInput } from './types';
 import type { DriveFile } from './google/drive';
 
 /** Subfolder of the client folder template that the client portal will show. */
@@ -69,7 +69,7 @@ export interface TickerEintrag {
   id: string;
   /** YYYY-MM-DD */
   datum: string;
-  art: KundenNewsArt | 'datei';
+  art: KundenNewsArt | 'datei' | 'erledigt';
   titel: string;
   text: string;
   url?: string;
@@ -109,7 +109,24 @@ export function ticker(
       alleKunden: false,
     });
   }
-  return eintraege.sort((a, b) => Number(b.angeheftet) - Number(a.angeheftet) || b.datum.localeCompare(a.datum) || a.titel.localeCompare(b.titel, 'de'));
+  return sortiereTicker(eintraege);
+}
+
+/** Pinned first, then newest first. */
+export const sortiereTicker = (eintraege: TickerEintrag[]) =>
+  eintraege.sort((a, b) => Number(b.angeheftet) - Number(a.angeheftet) || b.datum.localeCompare(a.datum) || a.titel.localeCompare(b.titel, 'de'));
+
+/** Cards finished on the client board, as ticker entries linking to the board. */
+export function erledigtAlsTicker(karten: readonly Pick<Aufgabe, 'id' | 'titel' | 'erledigt_am' | 'board_id'>[]): TickerEintrag[] {
+  return karten.map((k) => ({
+    id: `karte-${k.id}`,
+    datum: k.erledigt_am.slice(0, 10),
+    art: 'erledigt',
+    titel: k.titel,
+    text: '',
+    angeheftet: false,
+    alleKunden: false,
+  }));
 }
 
 export interface HubWerkzeug {
