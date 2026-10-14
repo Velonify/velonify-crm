@@ -102,7 +102,12 @@ export function AuditUebersichtPage() {
       <PageHeader
         eyebrow="Shop-Audit"
         title="Übersicht"
-        subtitle={`${geprueft} von ${zeilen.length} Firmen mit Domain geprüft. Ein Audit dauert 20–60 Sekunden.`}
+        subtitle="Ein Audit dauert 20–60 Sekunden."
+        zahlen={[
+          { wert: `${geprueft} / ${zeilen.length}`, label: 'Firmen mit Domain geprüft' },
+          { wert: zeilen.filter((z) => z.veraltet).length, label: 'veraltet' },
+          { wert: zeilen.filter((z) => z.audit?.befunde.includes('"schwere":"hoch"')).length, label: 'mit schweren Befunden', warn: zeilen.some((z) => z.audit?.befunde.includes('"schwere":"hoch"')) },
+        ]}
         actions={
           <>
             <Link to="/audit/neu" className="button">

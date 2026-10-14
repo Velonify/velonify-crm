@@ -114,9 +114,11 @@ html {
 body { margin: 0; font: inherit; color: var(--ink); background: var(--ground); }
 ::selection { background: var(--selection-bg); color: var(--white); }
 h1, h2, h3 { margin: 0; font-weight: 400; }
-h1, h2 { font-family: var(--font-display); letter-spacing: 0.01em; text-transform: uppercase; line-height: 1.08; text-wrap: balance; }
+h1 { font-family: var(--font-display); letter-spacing: 0.01em; text-transform: uppercase; line-height: 1.08; text-wrap: balance; }
+/* Section headings: hierarchy through size and weight; Krona One stays for page titles and big figures. */
+h2 { font-family: var(--font-sans); font-weight: 800; letter-spacing: -0.005em; line-height: 1.25; text-wrap: balance; }
 h1 { font-size: clamp(26px, 1.4vw + 18px, 40px); }
-h2 { font-size: 15px; }
+h2 { font-size: 17px; }
 p { margin: 0.5rem 0; }
 strong { font-weight: 700; }
 a { color: var(--accent); text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
@@ -159,7 +161,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 }
 .brand { padding: 0 var(--space-1) var(--space-4); position: relative; display: flex; flex-direction: column; gap: 6px; }
 .wordmark { font-family: var(--font-display); font-size: 11px; line-height: 1; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted); }
-.sidebar-titel { font-size: 18px; line-height: 1.1; overflow-wrap: anywhere; }
+.sidebar-titel { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; letter-spacing: 0.01em; font-size: 18px; line-height: 1.1; overflow-wrap: anywhere; }
 .nav { display: flex; flex-direction: column; gap: 2px; }
 .nav-item {
   display: flex;
@@ -599,7 +601,7 @@ input[type='checkbox']:indeterminate::before { transform: scale(1); height: 3px;
 .button.is-disabled { pointer-events: none; color: var(--ink-muted); background: transparent; border-color: var(--line); }
 
 /* ─── Kalender ────────────────────────────────────────────────────────────── */
-.kalender-woche { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.kalender-woche { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--line); border: var(--border-rule) solid var(--rule); box-shadow: var(--off) var(--off) 0 var(--shadow); }
 .kalender-tag { background: var(--raised); min-height: 420px; padding: var(--space-2); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .kalender-tag.is-vergangen { background: var(--sunken); }
 .kalender-tag-kopf { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; padding-bottom: 8px; margin-bottom: 2px; border-bottom: var(--border-rule) solid var(--rule); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-muted); }
@@ -722,9 +724,10 @@ details summary { cursor: pointer; margin-top: var(--space-2); font-weight: 600;
 @keyframes pulse { from { opacity: 0.25; } to { opacity: 1; } }
 
 /* ─── Form ───────────────────────────────────────────────────────────────── */
-.form { display: flex; flex-direction: column; gap: var(--space-4); }
-.form fieldset { margin: 0; border: 1px solid var(--line); padding: var(--space-3) var(--space-4) var(--space-4); }
-.form legend { font-family: var(--font-display); font-size: 14px; letter-spacing: 0.01em; text-transform: uppercase; padding: 0 var(--space-1); margin-left: calc(-1 * var(--space-1)); }
+.form { display: flex; flex-direction: column; gap: calc(var(--space-4) + var(--off)); }
+.form fieldset { margin: 0; background: var(--raised); border: var(--border-rule) solid var(--rule); box-shadow: var(--off) var(--off) 0 var(--shadow); padding: var(--space-3) var(--space-4) var(--space-4); }
+.form legend { background: var(--raised); }
+.form legend { font-family: var(--font-sans); font-size: 17px; font-weight: 800; letter-spacing: -0.005em; padding: 0 var(--space-1); margin-left: calc(-1 * var(--space-1)); }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-4); }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field.wide { grid-column: 1 / -1; }
@@ -747,12 +750,12 @@ details summary { cursor: pointer; margin-top: var(--space-2); font-weight: 600;
 
 /* ─── Login ──────────────────────────────────────────────────────────────── */
 .login { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
-.login-panel { background: var(--panel); color: var(--on-panel); padding: var(--space-5) var(--space-6); display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-5); }
+.login-panel { background: var(--band); color: var(--on-band); padding: var(--space-5) var(--space-6); display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-5); }
 .login-panel .wordmark { color: var(--eisblau); }
 .login-claim { font-family: var(--font-display); font-size: clamp(34px, 4.2vw, 72px); line-height: 1.08; letter-spacing: 0.01em; text-transform: uppercase; text-wrap: balance; margin: 0; }
 .login-note { font-size: 11px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--on-panel-muted); margin: 0; }
-.login-main { padding: var(--space-5) var(--space-6); display: flex; flex-direction: column; justify-content: center; }
-.login-card { max-width: 420px; display: flex; flex-direction: column; gap: var(--space-2); }
+.login-main { padding: var(--space-5) var(--space-6); display: flex; flex-direction: column; justify-content: center; background: var(--ground); }
+.login-card { max-width: 460px; display: flex; flex-direction: column; gap: var(--space-2); background: var(--raised); border: var(--border-rule) solid var(--rule); box-shadow: var(--off) var(--off) 0 var(--shadow); padding: var(--space-5) var(--space-4); }
 .login-card h1 { font-size: clamp(30px, 2vw + 16px, 44px); }
 .login-card .lead-text { font-size: 18px; line-height: 1.5; color: var(--ink-muted); margin: 0 0 var(--space-3); }
 
@@ -762,7 +765,7 @@ details summary { cursor: pointer; margin-top: var(--space-2); font-weight: 600;
 .dialog.wide { max-width: 720px; }
 .dialog > form { display: flex; flex-direction: column; min-height: 0; }
 .dialog-header { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-2); padding: var(--space-4) var(--space-4) var(--space-2); }
-.dialog-header h2 { font-size: 18px; padding-top: 4px; }
+.dialog-header h2 { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; letter-spacing: 0.01em; font-size: 18px; line-height: 1.1; padding-top: 4px; }
 .dialog .card { box-shadow: none; }
 .dialog-body { padding: 4px var(--space-4) var(--space-3); overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-2); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-1); padding: var(--space-3) var(--space-4); flex-wrap: wrap; border-top: 1px solid var(--line); }
@@ -1196,7 +1199,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
 .social-balken { height: 6px; background: var(--sunken); border: 1px solid var(--line); }
 .social-balken span { display: block; height: 100%; background: var(--accent); }
 
-.social-inhalte { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.social-inhalte { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1px; background: var(--line); border: var(--border-rule) solid var(--rule); box-shadow: var(--off) var(--off) 0 var(--shadow); }
 .social-inhalte li.is-archived { opacity: 0.55; }
 .social-inhalt-karte { display: flex; flex-direction: column; gap: 8px; height: 100%; padding: var(--space-3) var(--space-4) var(--space-4); background: var(--raised); color: var(--ink); text-decoration: none; }
 .social-inhalt-karte:hover { background: var(--hover); text-decoration: none; }

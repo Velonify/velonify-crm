@@ -83,10 +83,15 @@ export function BacklogPage() {
       <PageHeader
         eyebrow="Lead-Finder"
         title="Backlog"
-        subtitle={
+        subtitle="Geprüfte Shops mit Anlass. Ins CRM kommt nur, was ihr übernehmt."
+        zahlen={
           liste.data
-            ? `${alle.length.toLocaleString('de-DE')} geprüfte Shops mit Anlass. Ins CRM kommt nur, was ihr übernehmt.`
-            : 'Geprüfte Shops mit Anlass. Ins CRM kommt nur, was ihr übernehmt.'
+            ? [
+                { wert: alle.length.toLocaleString('de-DE'), label: 'Shops mit Anlass' },
+                { wert: sichtbar.length.toLocaleString('de-DE'), label: 'nach Filter' },
+                { wert: gewaehlt.length, label: 'ausgewählt' },
+              ]
+            : undefined
         }
         actions={
           <Link to="/leads/suche" className="button">
