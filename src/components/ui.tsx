@@ -48,15 +48,52 @@ export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => v
   );
 }
 
-export function PageHeader({ eyebrow, title, subtitle, actions }: { eyebrow?: ReactNode; title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
+export interface BandZahl {
+  wert: ReactNode;
+  label: ReactNode;
+  /** Needs attention (overdue, errors). */
+  warn?: boolean;
+}
+
+/**
+ * Page head on the bordeaux band. `zahlen` adds the key figures of the page; `ueberlappen` lets the first content
+ * after the head (usually cards) lie over the lower edge of the band.
+ */
+export function PageHeader({
+  eyebrow,
+  title,
+  subtitle,
+  actions,
+  zahlen,
+  ueberlappen,
+}: {
+  eyebrow?: ReactNode;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  actions?: ReactNode;
+  zahlen?: BandZahl[];
+  ueberlappen?: boolean;
+}) {
   return (
-    <header className="page-header">
-      <div className="page-title">
-        {eyebrow && <div className="eyebrow-mark">{eyebrow}</div>}
-        <h1>{title}</h1>
-        {subtitle && <div className="page-subtitle">{subtitle}</div>}
+    <header className={`page-header${ueberlappen ? ' ueberlappt' : ''}`}>
+      <div className="page-header-zeile">
+        <div className="page-title">
+          {eyebrow && <div className="eyebrow-mark">{eyebrow}</div>}
+          <h1>{title}</h1>
+          {subtitle && <div className="page-subtitle">{subtitle}</div>}
+        </div>
+        {actions && <div className="page-actions">{actions}</div>}
       </div>
-      {actions && <div className="page-actions">{actions}</div>}
+      {zahlen && zahlen.length > 0 && (
+        <dl className="band-zahlen">
+          {zahlen.map((z, i) => (
+            <div key={i} className={z.warn ? 'is-warn' : undefined}>
+              <dt>{z.label}</dt>
+              <dd>{z.wert}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
     </header>
   );
 }

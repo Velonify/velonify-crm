@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDemoBackend } from './demo/seed';
-import { normalisiere, suche } from './suche';
+import { befehle, normalisiere, suche } from './suche';
 
 describe('suche', () => {
   it('treats umlaut spellings and accents as the same word', () => {
@@ -35,5 +35,12 @@ describe('suche', () => {
     db = await service.load();
     const firmen = suche(db, 'e').filter((t) => t.art === 'firma');
     expect(firmen.at(-1)).toMatchObject({ titel: 'Bergwerk Kaffeerösterei', archiviert: true });
+  });
+
+  it('finds actions and tools for the command palette', () => {
+    const werkzeuge = [{ id: 'todo', name: 'To-Dos', beschreibung: 'Boards', pfad: '/todo' }, { id: 'plan', name: 'Geplant', beschreibung: '' }];
+    expect(befehle('angebot', werkzeuge).map((t) => t.pfad)).toEqual(['/angebote/neu']);
+    expect(befehle('to-dos', werkzeuge).map((t) => t.titel)).toEqual(['To-Dos']);
+    expect(befehle('', werkzeuge).some((t) => t.titel === 'Geplant')).toBe(false);
   });
 });

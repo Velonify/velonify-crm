@@ -6,7 +6,7 @@ import { useCrm } from '../data/CrmContext';
 import { useTheme } from '../lib/useTheme';
 import { WERKZEUGE, seitentitel, werkzeugFuerPfad } from '../werkzeuge';
 import { Suche } from './Suche';
-import { WerkzeugWechsler } from './WerkzeugWechsler';
+import { WerkzeugIcon } from './Icons';
 
 const navClass = ({ isActive }: { isActive: boolean }) => `nav-item${isActive ? ' is-active' : ''}`;
 
@@ -29,16 +29,26 @@ export function Layout() {
 
   return (
     <div className="app">
-      {/* In light mode the sidebar is brand espresso; in dark mode it joins the dark theme. */}
-      <aside className="sidebar" data-theme={theme === 'dark' ? 'dark' : 'espresso'}>
-        <div className="brand">
-          <Link to="/" className="lockup" aria-label="Velonify – Home">
-            <img src="./zeichen-eisblau.png" alt="" />
-            <span className="wordmark">Velonify</span>
+      {/* Tool rail: always espresso, the brand's darkest surface; in dark mode it sinks one step further. */}
+      <nav className="rail" data-theme={theme === 'dark' ? 'dark' : 'espresso'} aria-label="Werkzeuge">
+        <Link to="/" className="rail-logo" aria-label="Velonify – Home">
+          <img src="./zeichen-eisblau.png" alt="" />
+        </Link>
+        {WERKZEUGE.filter((w) => w.pfad).map((w) => (
+          <Link key={w.id} to={w.pfad!} className={`rail-item${w.id === werkzeug.id ? ' is-active' : ''}`} aria-current={w.id === werkzeug.id ? 'page' : undefined} title={w.name}>
+            <WerkzeugIcon id={w.id} />
+            <span>{w.kurz}</span>
           </Link>
-          <div className="brand-sub">
-            <WerkzeugWechsler aktuell={werkzeug} />
-          </div>
+        ))}
+        <NavLink to="/einrichtung" className={({ isActive }) => `rail-item rail-unten${isActive ? ' is-active' : ''}`} title="Einrichtung">
+          <WerkzeugIcon id="einrichtung" />
+          <span>Setup</span>
+        </NavLink>
+      </nav>
+      <aside className="sidebar">
+        <div className="brand">
+          <span className="wordmark">Velonify</span>
+          <h2 className="sidebar-titel">{werkzeug.name}</h2>
           {loading && db && <span className="sync-dot" title="Wird aktualisiert …" aria-label="Wird aktualisiert" />}
         </div>
         <Suche />
@@ -50,9 +60,6 @@ export function Layout() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <NavLink to="/einrichtung" className={navClass}>
-            Einrichtung
-          </NavLink>
           <div className="segmented theme-switch" role="radiogroup" aria-label="Darstellung">
             <button type="button" role="radio" aria-checked={theme === 'light'} className={theme === 'light' ? 'is-active' : ''} onClick={() => setTheme('light')}>
               Hell

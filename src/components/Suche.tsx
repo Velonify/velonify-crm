@@ -2,10 +2,11 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useCrm } from '../data/CrmContext';
-import { suche, type Treffer, type TrefferArt } from '../data/suche';
+import { befehle, suche, type Treffer, type TrefferArt } from '../data/suche';
+import { WERKZEUGE } from '../werkzeuge';
 
-const ART_LABEL: Record<TrefferArt, string> = { firma: 'Firmen', kontakt: 'Kontakte', deal: 'Deals' };
-const REIHENFOLGE: TrefferArt[] = ['firma', 'kontakt', 'deal'];
+const ART_LABEL: Record<TrefferArt, string> = { firma: 'Firmen', kontakt: 'Kontakte', deal: 'Deals', aktion: 'Aktionen', werkzeug: 'Werkzeuge' };
+const REIHENFOLGE: TrefferArt[] = ['firma', 'kontakt', 'deal', 'aktion', 'werkzeug'];
 
 export const istMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -48,7 +49,7 @@ function SuchDialog({ onClose }: { onClose(): void }) {
 
   // Grouped for display, flat for keyboard navigation.
   const gruppen = useMemo(() => {
-    const treffer = db ? suche(db, eingabe) : [];
+    const treffer = [...(db ? suche(db, eingabe) : []), ...befehle(eingabe, WERKZEUGE)];
     return REIHENFOLGE.map((art) => ({ art, treffer: treffer.filter((t) => t.art === art) })).filter((g) => g.treffer.length > 0);
   }, [db, eingabe]);
   const flach = gruppen.flatMap((g) => g.treffer);
@@ -65,7 +66,7 @@ function SuchDialog({ onClose }: { onClose(): void }) {
 
   const oeffne = (t: Treffer) => {
     onClose();
-    navigate(`/crm/firmen/${t.firmaId}`);
+    navigate(t.pfad ?? `/crm/firmen/${t.firmaId}`);
   };
 
   const onKeyDown = (event: React.KeyboardEvent) => {
@@ -95,7 +96,7 @@ function SuchDialog({ onClose }: { onClose(): void }) {
             value={eingabe}
             onChange={(e) => setEingabe(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Firma, Kontakt, Deal, Domain, Kürzel, E-Mail …"
+            placeholder="Firma, Kontakt, Deal, Werkzeug oder Aktion …"
             role="combobox"
             aria-expanded={flach.length > 0}
             aria-controls={listId}
@@ -108,8 +109,8 @@ function SuchDialog({ onClose }: { onClose(): void }) {
         </div>
 
         {!db && <p className="search-empty">Daten werden geladen …</p>}
-        {db && eingabe.trim() === '' && <p className="search-empty">Tippen zum Suchen. ↑ ↓ zum Auswählen, Enter zum Öffnen.</p>}
-        {db && eingabe.trim() !== '' && flach.length === 0 && <p className="search-empty">Nichts gefunden für „{eingabe}“.</p>}
+        {eingabe.trim() === '' && <p className="search-empty">Firmen, Kontakte und Deals finden oder direkt etwas starten. ↑ ↓ zum Auswählen, Enter zum Öffnen.</p>}
+        {eingabe.trim() !== '' && flach.length === 0 && <p className="search-empty">Nichts gefunden für „{eingabe}“.</p>}
 
         {flach.length > 0 && (
           <ul ref={listRef} id={listId} role="listbox" className="search-results" aria-label="Suchergebnisse">
