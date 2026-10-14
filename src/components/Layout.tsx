@@ -29,6 +29,10 @@ export function Layout() {
 
   return (
     <div className="app">
+      {/* First stop for keyboard users: past the tool rail and page nav straight to the content. */}
+      <button type="button" className="skip-link" onClick={() => document.getElementById('inhalt')?.focus()}>
+        Zum Inhalt springen
+      </button>
       {/* Tool rail: always espresso, the brand's darkest surface; in dark mode it sinks one step further. */}
       <nav className="rail" data-theme={theme === 'dark' ? 'dark' : 'espresso'} aria-label="Werkzeuge">
         <Link to="/" className="rail-logo" aria-label="Velonify – Home">
@@ -87,7 +91,7 @@ export function Layout() {
           )}
         </div>
       </aside>
-      <main className="main">
+      <main className="main" id="inhalt" tabIndex={-1}>
         {isDemo && (
           <div className="demo-banner">
             <strong>Demo-Modus</strong> Erfundene Beispieldaten, Drive und Kalender sind simuliert. Änderungen gehen beim Neuladen verloren.
