@@ -66,11 +66,11 @@ describe('CRM-Werkzeuge', () => {
 
     const mit = await rufe('phase_aendern', { deal_id: deal.id, phase: 'kontaktiert', kontaktweg: 'LinkedIn', vermerk: 'über das Magento-Ende' });
     expect(mit.fehler).toBe(false);
-    expect(mit.daten.erledigt).toEqual(expect.arrayContaining(['zugeteilt an Lugge', 'Verlauf: Kontaktiert über LinkedIn: über das Magento-Ende']));
+    expect(mit.daten.erledigt).toEqual(expect.arrayContaining(['zugeteilt an Johannes, Lugge', 'Verlauf: Kontaktiert über LinkedIn: über das Magento-Ende']));
 
     const db = await service.load();
-    expect(db.deals.find((d) => d.id === deal.id)?.zustaendig).toBe('Lugge');
-    expect(db.firmen.find((f) => f.id === id)?.zustaendig).toBe('Lugge');
+    expect(db.deals.find((d) => d.id === deal.id)?.zustaendig).toBe('Johannes, Lugge');
+    expect(db.firmen.find((f) => f.id === id)?.zustaendig).toBe('Johannes, Lugge');
     expect(db.aktivitaeten.some((a) => a.deal_id === deal.id && a.von === 'lugge@velonify.de' && a.text.startsWith('Kontaktiert über LinkedIn'))).toBe(true);
   });
 
@@ -159,7 +159,7 @@ describe('Teamname über TEAM_ZUORDNUNG', () => {
     const id = await firmaId('Bergwerk');
     const deal = (await service.load()).deals.find((d) => d.firma_id === id)!;
     const { daten } = await rufe('phase_aendern', { deal_id: deal.id, phase: 'kontaktiert', kontaktweg: 'E-Mail' });
-    expect(daten.erledigt).toContain('zugeteilt an Lugge');
+    expect(daten.erledigt).toContain('zugeteilt an Johannes, Lugge');
   });
 
   it('übergeht einen Namen, der nicht im Team ist', async () => {
@@ -275,5 +275,122 @@ describe('Lead-Magnete', () => {
     expect(daten).toMatchObject({ adresse: 'shopify-skills', archiviert: true, aktiv: false });
     const liste = await rufe('magnete');
     expect(liste.daten.magnete.some((m: { adresse: string }) => m.adresse === 'shopify-skills')).toBe(false);
+  });
+});
+
+describe('To-dos', () => {
+  beforeEach(() => verbinde('lugge@velonify.de', 'Lugge Muster'));
+
+  const karteVon = async (titel: string) => (await service.loadTodoDaten()).aufgaben.find((a) => a.titel === titel)!;
+
+  it('bietet die To-do-Werkzeuge an, lesende als readOnly markiert', async () => {
+    const { tools } = await client.listTools();
+    const namen = tools.map((t) => t.name);
+    expect(namen).toEqual(expect.arrayContaining(['boards', 'karten', 'karte_anlegen', 'karte_verschieben', 'karte_erledigt', 'karte_kommentieren']));
+    expect(tools.find((t) => t.name === 'karten')?.annotations?.readOnlyHint).toBe(true);
+    expect(tools.find((t) => t.name === 'karte_anlegen')?.annotations?.readOnlyHint).toBe(false);
+  });
+
+  it('listet die Boards, das interne zuerst, mit Spalten und offenen Karten', async () => {
+    const { daten } = await rufe('boards');
+    expect(daten.boards[0]).toMatchObject({ titel: 'Velonify intern', kunde: 'intern', offene_karten: 2 });
+    expect(daten.boards[0].spalten.map((s: { spalte_id: string }) => s.spalte_id)).toEqual(['backlog', 'woche', 'arbeit', 'wartet', 'erledigt']);
+    const kunde = daten.boards.find((b: { kuerzel?: string }) => b.kuerzel === 'AGK');
+    expect(kunde).toMatchObject({ kunde: 'Alpenglanz Kosmetik AG', offene_karten: 5 });
+    expect(kunde.hub).toBe(`https://crm.velonify.de/#/todo/${kunde.board_id}`);
+  });
+
+  it('zeigt die Karten eines Boards in Spaltenreihenfolge und ohne board die eigenen', async () => {
+    const board = await rufe('karten', { board: 'agk' });
+    expect(board.daten.karten.map((k: { spalte: string }) => k.spalte)).toEqual(['Backlog', 'Diese Woche', 'In Arbeit', 'Wartet auf Kunde', 'Wartet auf Kunde']);
+    const flow = board.daten.karten.find((k: { titel: string }) => k.titel.startsWith('Klaviyo'));
+    expect(flow.checkliste).toEqual(['[x] Segment anlegen', '[ ] Mails texten', '[ ] Testversand']);
+    expect(board.daten.karten.find((k: { titel: string }) => k.titel === 'Produktfotos Winterkollektion').ueberfaellig).toBe(true);
+
+    const alle = await rufe('karten', { board: 'Alpenglanz', erledigte_zeigen: true });
+    expect(alle.daten.anzahl).toBe(6);
+    expect((await rufe('karten', { board: 'agk', zustaendig: 'Julian' })).daten.anzahl).toBe(2);
+
+    const meine = await rufe('karten');
+    expect(meine.daten.fuer).toBe('Lugge');
+    expect(meine.daten.karten.map((k: { board: string }) => k.board)).toEqual(['Velonify intern', 'Velonify intern']);
+    expect((await rufe('karten', { zustaendig: 'Johannes' })).daten.karten.map((k: { titel: string }) => k.titel)).toEqual(['Black-Week-Banner einbauen']);
+  });
+
+  it('legt eine Karte auf „Velonify intern“ an, mit mehreren Zuständigen', async () => {
+    const { daten } = await rufe('karte_anlegen', {
+      board: 'intern',
+      titel: 'Rechnungsvorlage überarbeiten',
+      beschreibung: 'Neue Bankverbindung eintragen.',
+      zustaendig: ['Lugge', 'Julian'],
+      faellig_am: '2026-11-02',
+      labels: ['Intern', 'Finanzen'],
+      checkliste: ['Vorlage öffnen', 'IBAN tauschen'],
+      spalte: 'Diese Woche',
+    });
+    expect(daten.angelegt).toBe(true);
+    expect(daten.board_neu).toBeUndefined();
+    expect(daten.karte).toMatchObject({ board: 'Velonify intern', spalte: 'Diese Woche', zustaendig: 'Lugge, Julian', faellig: '2026-11-02', labels: 'Intern, Finanzen' });
+    expect(daten.karte.checkliste).toEqual(['[ ] Vorlage öffnen', '[ ] IBAN tauschen']);
+
+    const gespeichert = await karteVon('Rechnungsvorlage überarbeiten');
+    expect(gespeichert).toMatchObject({ spalte_id: 'woche', quelle: 'manuell', erstellt_von: 'lugge@velonify.de', sichtbar_kunde: false });
+    expect((await rufe('karten', { zustaendig: 'Julian' })).daten.karten.map((k: { titel: string }) => k.titel)).toContain('Rechnungsvorlage überarbeiten');
+  });
+
+  it('nimmt standardmäßig die angemeldete Person und die erste Spalte', async () => {
+    const { daten } = await rufe('karte_anlegen', { board: 'Velonify intern', titel: 'Kurze Notiz' });
+    expect(daten.karte).toMatchObject({ spalte: 'Backlog', zustaendig: 'Lugge' });
+    expect((await rufe('karte_anlegen', { board: 'intern', titel: 'Ohne Person', zustaendig: [] })).daten.karte.zustaendig).toBeUndefined();
+  });
+
+  it('legt das Board eines Kunden beim ersten Mal an', async () => {
+    const id = await firmaId('Kleinod');
+    expect((await rufe('karten', { board: id })).daten.hinweis).toContain('kein Board');
+    const { daten } = await rufe('karte_anlegen', { board: id, titel: 'Kick-off vorbereiten', spalte: 'woche', sichtbar_kunde: true });
+    expect(daten.board_neu).toBe(true);
+    expect(daten.karte).toMatchObject({ spalte: 'Diese Woche', sichtbar_kunde: true });
+    const boards = (await rufe('boards')).daten.boards;
+    expect(boards.filter((b: { firma_id?: string }) => b.firma_id === id)).toHaveLength(1);
+  });
+
+  it('prüft Board, Spalte und Zuständige, bevor etwas angelegt wird', async () => {
+    const vorher = (await service.loadTodoDaten()).aufgaben.length;
+    const ohneBoard = await rufe('karte_anlegen', { board: 'Gibt es nicht', titel: 'x' });
+    expect(ohneBoard.fehler).toBe(true);
+    expect(ohneBoard.text).toContain('Kein Board');
+    const ohneSpalte = await rufe('karte_anlegen', { board: 'intern', titel: 'x', spalte: 'Irgendwann' });
+    expect(ohneSpalte.text).toContain('Möglich: Backlog');
+    const fremd = await rufe('karte_anlegen', { board: 'intern', titel: 'x', zustaendig: ['Lugge', 'Fremd'] });
+    expect(fremd.text).toContain('nicht im Team');
+    expect((await rufe('karte_anlegen', { board: 'intern', titel: 'x', sichtbar_kunde: true })).fehler).toBe(true);
+    expect((await service.loadTodoDaten()).aufgaben.length).toBe(vorher);
+  });
+
+  it('verschiebt, erledigt und öffnet Karten wieder', async () => {
+    const karte = await karteVon('Slack-App für den To-Do-Agenten anlegen');
+    const verschoben = await rufe('karte_verschieben', { karte_id: karte.id, spalte: 'In Arbeit' });
+    expect(verschoben.daten.karte.spalte).toBe('In Arbeit');
+
+    const erledigt = await rufe('karte_erledigt', { karte_id: karte.id });
+    expect(erledigt.daten.karte).toMatchObject({ spalte: 'Erledigt' });
+    expect(erledigt.daten.karte.erledigt_am).toBe(isoDate(new Date()));
+    expect((await karteVon(karte.titel)).erledigt_von).toBe('lugge@velonify.de');
+    expect((await rufe('karten')).daten.karten.map((k: { titel: string }) => k.titel)).not.toContain(karte.titel);
+
+    const offen = await rufe('karte_erledigt', { karte_id: karte.id, erledigt: false });
+    expect(offen.daten.karte.spalte).toBe('Backlog');
+    expect(offen.daten.karte.erledigt_am).toBeUndefined();
+
+    expect((await rufe('karte_verschieben', { karte_id: karte.id, spalte: 'erledigt', oben: true })).daten.karte.erledigt_am).toBe(isoDate(new Date()));
+    expect((await rufe('karte_verschieben', { karte_id: 'T-gibts-nicht', spalte: 'woche' })).text).toContain('`karten`');
+  });
+
+  it('kommentiert Karten mit der angemeldeten Person als Absender', async () => {
+    const karte = await karteVon('Black-Week-Banner einbauen');
+    const { daten } = await rufe('karte_kommentieren', { karte_id: karte.id, text: 'Banner-Entwurf liegt im Drive.' });
+    expect(daten).toMatchObject({ kommentiert: true, karte: karte.titel, kommentar: { text: 'Banner-Entwurf liegt im Drive.', von: 'lugge@velonify.de' } });
+    const board = await rufe('karten', { board: 'AGK' });
+    expect(board.daten.karten.find((k: { karte_id: string }) => k.karte_id === karte.id).kommentare).toBe(1);
   });
 });
