@@ -21,7 +21,9 @@ export function Dialog({ title, children, onClose, onSubmit, submitLabel = 'Spei
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    ref.current?.querySelector<HTMLElement>('input:not([type=hidden]), select, textarea, button')?.focus();
+    // First field first; the close button in the header only when the dialog has no fields.
+    const feld = ref.current?.querySelector<HTMLElement>('.dialog-body :is(input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea)');
+    (feld ?? ref.current?.querySelector<HTMLElement>('.dialog-body button, .dialog-actions button, button'))?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !latest.current.busy) latest.current.onClose();
     };

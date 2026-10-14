@@ -19,6 +19,8 @@
 [data-theme] {
   --rule: var(--ink);
   --line-strong: color-mix(in srgb, var(--ink) 38%, transparent);
+  /* Borders of form fields: at least 3:1 against the surface (WCAG 1.4.11), in every theme. */
+  --field-border: color-mix(in srgb, var(--ink) 50%, transparent);
   --hover: color-mix(in srgb, var(--ink) 5%, transparent);
   --sunken: color-mix(in srgb, var(--ink) 3%, var(--surface));
   --raised: var(--surface);
@@ -186,6 +188,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .sidebar .link-button { color: var(--ink-muted); font-size: 12px; text-align: left; }
 
 .main { min-width: 0; overflow-x: clip; }
+.main:focus { outline: none; }
+.skip-link { position: fixed; left: var(--space-2); top: var(--space-2); z-index: 50; transform: translateY(-200%); background: var(--eisblau); color: var(--espresso); border: var(--border-rule) solid var(--espresso); box-shadow: var(--off-s) var(--off-s) 0 var(--shadow); padding: 10px 14px; font: inherit; font-weight: 800; cursor: pointer; }
+.skip-link:focus-visible { transform: none; outline-offset: 2px; }
 .demo-banner { background: var(--espresso); color: #f3edef; padding: 10px var(--space-6); font-size: 13.5px; }
 .demo-banner strong { color: var(--eisblau); }
 .demo-banner strong { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; margin-right: 6px; }
@@ -224,7 +229,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .page-header .button:hover { background: var(--on-band); color: var(--band); border-color: var(--on-band); }
 .page-header .button.primary { background: var(--eisblau); border-color: var(--eisblau); color: var(--espresso); }
 .page-header .button.primary:hover { background: var(--on-band); border-color: var(--on-band); color: var(--band); }
-.page-header :is(select, input) { background: color-mix(in srgb, var(--on-band) 10%, transparent); color: var(--on-band); border-color: color-mix(in srgb, var(--on-band) 45%, transparent); }
+.page-header :is(select, input) { background: color-mix(in srgb, var(--on-band) 10%, transparent); color: var(--on-band); border-color: color-mix(in srgb, var(--on-band) 60%, transparent); }
+/* Focus on the bordeaux band and the espresso layers: eisblau, the default bordeaux ring would vanish there. */
+.page-header :focus-visible, .ticker :focus-visible, .rail :focus-visible { outline-color: var(--eisblau); }
 .page-header :is(select, input):hover { border-color: var(--on-band); }
 .page-header option { color: var(--ink); background: var(--surface); }
 .page-header .ich-auswahl { color: var(--on-band); }
@@ -282,7 +289,7 @@ input, select, textarea {
   font-weight: 500;
   color: var(--ink);
   background: var(--surface);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--field-border);
   border-radius: var(--radius-none);
   padding: 10px 12px;
   width: 100%;
@@ -751,11 +758,14 @@ details summary { cursor: pointer; margin-top: var(--space-2); font-weight: 600;
 /* ─── Login ──────────────────────────────────────────────────────────────── */
 .login { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
 .login-panel { background: var(--band); color: var(--on-band); padding: var(--space-5) var(--space-6); display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-5); }
-.login-panel .wordmark { color: var(--eisblau); }
+.lockup { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; }
+.lockup:hover { text-decoration: none; }
+.lockup img { height: 22px; width: auto; display: block; }
+.login-panel .wordmark { color: var(--eisblau); font-size: 18px; letter-spacing: 0.01em; }
 .login-claim { font-family: var(--font-display); font-size: clamp(34px, 4.2vw, 72px); line-height: 1.08; letter-spacing: 0.01em; text-transform: uppercase; text-wrap: balance; margin: 0; }
-.login-note { font-size: 11px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--on-panel-muted); margin: 0; }
+.login-note { font-size: 11px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--on-band-muted); margin: 0; }
 .login-main { padding: var(--space-5) var(--space-6); display: flex; flex-direction: column; justify-content: center; background: var(--ground); }
-.login-card { max-width: 460px; display: flex; flex-direction: column; gap: var(--space-2); background: var(--raised); border: var(--border-rule) solid var(--rule); box-shadow: var(--off) var(--off) 0 var(--shadow); padding: var(--space-5) var(--space-4); }
+.login-card { width: 100%; max-width: 460px; display: flex; flex-direction: column; gap: var(--space-2); background: var(--raised); border: var(--border-rule) solid var(--rule); box-shadow: var(--off) var(--off) 0 var(--shadow); padding: var(--space-5) var(--space-4); }
 .login-card h1 { font-size: clamp(30px, 2vw + 16px, 44px); }
 .login-card .lead-text { font-size: 18px; line-height: 1.5; color: var(--ink-muted); margin: 0 0 var(--space-3); }
 
