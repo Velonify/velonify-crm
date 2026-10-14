@@ -1,7 +1,7 @@
 import { NEWS_ART_LABEL, type TickerEintrag } from '../data/kunden';
 import { formatDate } from '../lib/format';
 
-const artLabel = (e: TickerEintrag) => (e.art === 'datei' ? 'Datei' : NEWS_ART_LABEL[e.art]);
+const artLabel = (e: TickerEintrag) => (e.art === 'datei' ? 'Datei' : e.art === 'erledigt' ? 'Erledigt' : NEWS_ART_LABEL[e.art]);
 
 /**
  * Running news strip at the top of a client page. The list is rendered twice so the loop has no gap; with

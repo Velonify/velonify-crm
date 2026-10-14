@@ -1,7 +1,7 @@
 import { ConflictError, NotFoundError, SchemaError } from '../errors';
-import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, EINGANG_TABS, KUNDEN_TABS, LISTEN_DEFAULTS, MAGNET_TABS, SCHEMA, MONSTERA_TABS, SOCIAL_TABS, WORDLE_TABS, type EntityTab, type TabSchema } from '../schema';
+import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, EINGANG_TABS, KUNDEN_TABS, LISTEN_DEFAULTS, MAGNET_TABS, SCHEMA, MONSTERA_TABS, SOCIAL_TABS, TODO_TABS, WORDLE_TABS, type EntityTab, type TabSchema } from '../schema';
 import type { RecordUpdate, Store } from '../store';
-import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, KundenDaten, Listen, MagnetDaten, MonsteraEintrag, SocialDaten, SpieleDaten, WordleErgebnis } from '../types';
+import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, KundenDaten, Listen, TodoDaten, MagnetDaten, MonsteraEintrag, SocialDaten, SpieleDaten, WordleErgebnis } from '../types';
 import { columnLetter, recordToRow, rowToRecord } from './rows';
 import { quoteTab, type SheetsApi, type SpreadsheetInfo, type ValueWrite } from './sheetsClient';
 
@@ -226,6 +226,22 @@ export class SheetStore implements Store {
       return table;
     });
     return { links: entityRows('kunden_links', tables[0]), news: entityRows('kunden_news', tables[1]) };
+  }
+
+  async loadTodoDaten(): Promise<TodoDaten> {
+    const info = await this.info();
+    const vorhanden = new Set(info.sheets?.map((sheet) => sheet.properties.title));
+    if (TODO_TABS.some((tab) => !vorhanden.has(tab))) {
+      throw new SchemaError('Die To-Dos sind noch nicht eingerichtet. Bitte unter \u201eEinrichtung\u201c auf \u201eEinrichten\u201c klicken.');
+    }
+    const values = await this.api.batchGetValues(TODO_TABS.map((tab) => fullRange(tab)));
+    const tables = TODO_TABS.map((tab, i) => {
+      const table = splitHeader(values[i]);
+      assertColumns(SCHEMA[tab], table.header);
+      this.headers.set(tab, table.header);
+      return table;
+    });
+    return { boards: entityRows('boards', tables[0]), aufgaben: entityRows('aufgaben', tables[1]), kommentare: entityRows('aufgaben_kommentare', tables[2]) };
   }
 
   /** Both games of the start page in a single request; a tab that is not set up yet comes back as null. */

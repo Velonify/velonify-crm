@@ -4,8 +4,8 @@ import { Card, ErrorBox, Loading, PageHeader, StatusBadge } from '../components/
 import { isDemo } from '../config';
 import { useCrm } from '../data/CrmContext';
 import { driveFolderUrl, isFolder, type DriveFile } from '../data/google/drive';
-import { isoDate } from '../data/ids';
-import { CLIENT_SHARE_ORDNER, hubWerkzeuge, kundenListe, LINK_ART_LABEL, linksVon, ordnerReiter, ticker, type TickerEintrag } from '../data/kunden';
+import { addDays, isoDate } from '../data/ids';
+import { CLIENT_SHARE_ORDNER, erledigtAlsTicker, hubWerkzeuge, sortiereTicker, kundenListe, LINK_ART_LABEL, linksVon, ordnerReiter, ticker, type TickerEintrag } from '../data/kunden';
 import { kontaktName } from '../data/rules';
 import { slackChannelUrl } from '../data/start';
 import type { Database, Firma, KundenDaten, KundenLink, KundenLinkArt } from '../data/types';
@@ -14,9 +14,18 @@ import { useLoad } from '../lib/useLoad';
 import { LinkDialog, NewsDialog, type Aendern } from './Dialoge';
 import { TickerBand, TickerListe } from './Ticker';
 import { useKundenDaten } from './useKundenDaten';
+import { useToast } from '../components/Toasts';
+import { boardVon, kuerzlichErledigt } from '../data/todos';
+import { errorMessage } from '../lib/errors';
+import { BoardAnsicht } from '../todo/BoardAnsicht';
+import { useTodoDaten } from '../todo/useTodoDaten';
+
+/** Finished cards of the client board stay in the ticker for a week. */
+const ERLEDIGT_TAGE = 7;
 
 const BEREICHE = [
   { pfad: '', label: 'Übersicht' },
+  { pfad: 'todos', label: 'To-dos' },
   { pfad: 'dateien', label: 'Dateien' },
   { pfad: 'tools', label: 'Tools & Ressourcen' },
   { pfad: 'news', label: 'News' },
@@ -41,7 +50,13 @@ export function KundePage() {
   const firma = db?.firmen.find((f) => f.id === id);
   const share = useClientShare(firma);
   const heute = isoDate(new Date());
-  const eintraege = useMemo(() => (daten.data ? ticker(daten.data.news, id, heute, share.data ?? []) : []), [daten.data, id, heute, share.data]);
+  const todos = useTodoDaten();
+  const board = todos.data ? boardVon(todos.data.boards, id) : undefined;
+  const eintraege = useMemo(() => {
+    if (!daten.data) return [];
+    const erledigt = board && todos.data ? erledigtAlsTicker(kuerzlichErledigt(todos.data.aufgaben, board.id, addDays(heute, -ERLEDIGT_TAGE))) : [];
+    return sortiereTicker([...ticker(daten.data.news, id, heute, share.data ?? []), ...erledigt]);
+  }, [daten.data, id, heute, share.data, board, todos.data]);
 
   if (!db) return <div className="page">{dbError ? <ErrorBox error={dbError} onRetry={refresh} /> : <Loading />}</div>;
   if (!firma) {
@@ -91,6 +106,7 @@ export function KundePage() {
 
       {daten.error && <ErrorBox error={daten.error} onRetry={daten.reload} />}
       {bereich === '' && <Uebersicht firma={firma} db={db} daten={daten.data} eintraege={eintraege} aendern={daten.aendern} />}
+      {bereich === 'todos' && <KundenTodos firma={firma} team={db.listen.team ?? []} todos={todos} />}
       {bereich === 'dateien' && <Dateien firma={firma} />}
       {bereich === 'tools' && (daten.data ? <ToolsUndRessourcen firma={firma} daten={daten.data} aendern={daten.aendern} /> : !daten.error && <Loading />)}
       {bereich === 'news' && (daten.data ? <News firma={firma} db={db} daten={daten.data} heute={heute} aendern={daten.aendern} /> : !daten.error && <Loading />)}
@@ -394,6 +410,42 @@ function News({ firma, db, daten, heute, aendern }: { firma: Firma; db: Database
         Archivierte zeigen
       </label>
       {dialog && <NewsDialog news={dialog.eintrag?.news} firmaId={firma.id} kunden={kundenListe(db)} aendern={aendern} onClose={() => setDialog(null)} />}
+    </>
+  );
+}
+
+function KundenTodos({ firma, team, todos }: { firma: Firma; team: readonly string[]; todos: ReturnType<typeof useTodoDaten> }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  if (todos.error) return <ErrorBox error={todos.error} onRetry={todos.reload} />;
+  if (!todos.data) return <Loading />;
+  const board = boardVon(todos.data.boards, firma.id);
+  if (!board) {
+    const anlegen = async () => {
+      setBusy(true);
+      try {
+        await todos.aendern((s) => s.boardFuer(firma.id));
+      } catch (err) {
+        toast.show(errorMessage(err), 'error');
+      } finally {
+        setBusy(false);
+      }
+    };
+    return (
+      <Card title="To-dos">
+        <p className="muted">{firma.kuerzel || firma.name} hat noch kein Board.</p>
+        <button type="button" className="button primary" onClick={() => void anlegen()} disabled={busy}>
+          {busy ? 'Legt an …' : 'Board anlegen'}
+        </button>
+      </Card>
+    );
+  }
+  return (
+    <>
+      <p className="hint">
+        <Link to={`/todo/${board.id}`}>Board in voller Breite öffnen</Link>
+      </p>
+      <BoardAnsicht board={board} daten={todos.data} setDaten={todos.setData} team={team} aendern={todos.aendern} />
     </>
   );
 }

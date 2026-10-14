@@ -24,6 +24,19 @@ import { anzahlPosten, parseAuswahl, prepareAngebot, statusLabel } from './angeb
 import { auditVerlaufText, auditZeile, firmaAbgleich, type AuditErgebnis } from './audit';
 import { ANFRAGE_STATUS, anfrageText, firmaAusAnfrage, istOffen, kontaktAusAnfrage } from './eingang';
 import { linksVon, prepareKundenLink, prepareKundenNews, tauscheLink } from './kunden';
+import {
+  boardTitelFuer,
+  boardVon,
+  erledigtSpalte,
+  INTERNES_BOARD_TITEL,
+  kartenNachSpalte,
+  prepareKarte,
+  prepareSpalten,
+  sortierungFuerPosition,
+  sortierungZwischen,
+  spaltenVon,
+  STANDARD_SPALTEN,
+} from './todos';
 import { firmaAusLead, istOffenerLead, kontaktAusLead, LEAD_STATUS, leadText, prepareMagnet } from './magnete';
 import { bereinigeReport, pruefeFreigabe, reportEntwurf, reportVon, type Report } from './roast';
 import { ANSCHREIBEN_STATUS, prepareAnschreiben, prepareOutreachLeistung, verlaufText, type AnschreibenInput } from './anschreiben';
@@ -82,7 +95,13 @@ import type {
   Leistungskategorie,
   LeistungskategorieInput,
   Meta,
+  Aufgabe,
+  AufgabeInput,
+  AufgabenKommentar,
+  Board,
   KundenDaten,
+  Spalte,
+  TodoDaten,
   KundenLink,
   KundenLinkInput,
   KundenNews,
@@ -1048,6 +1067,134 @@ export class CrmService {
   async ordnerDateien(ordnerId: string): Promise<DriveFile[]> {
     const dateien = await this.drive.listChildren(ordnerId);
     return dateien.sort((a, b) => Number(isFolder(b)) - Number(isFolder(a)) || a.name.localeCompare(b.name, 'de', { numeric: true }));
+  }
+
+  // ─── To-Dos ────────────────────────────────────────────────────────────────
+
+  loadTodoDaten(): Promise<TodoDaten> {
+    return this.store.loadTodoDaten();
+  }
+
+  /** The board of a client (or the internal one for an empty firm id); created with the standard columns when missing. */
+  async boardFuer(firmaId: string): Promise<Board> {
+    const { boards } = await this.store.loadTodoDaten();
+    const vorhanden = boardVon(boards, firmaId);
+    if (vorhanden) return vorhanden;
+    const titel = firmaId ? boardTitelFuer(CrmService.find((await this.store.load()).firmen, firmaId)) : INTERNES_BOARD_TITEL;
+    const board: Board = { id: newId(ID_PREFIX.boards), firma_id: firmaId, titel, spalten: JSON.stringify(STANDARD_SPALTEN), archiviert: false, ...this.created() };
+    await this.store.insert('boards', [board]);
+    return board;
+  }
+
+  /**
+   * Renames a board and replaces its columns. Cards of a removed column move to the first column, so nothing gets lost;
+   * cards in a column that becomes "Erledigt" (or stops being it) get their done date set or cleared.
+   */
+  async saveBoard(id: string, titel: string, spalten: Spalte[], expectedGeaendertAm: string): Promise<Board> {
+    const clean = prepareSpalten(spalten);
+    if (!titel.trim()) throw new ValidationError('titel', 'Bitte einen Namen eintragen.');
+    const { aufgaben } = await this.store.loadTodoDaten();
+    const [board] = await this.store.update('boards', [{ id, changes: { titel: titel.trim(), spalten: JSON.stringify(clean), ...this.changed() }, expectedGeaendertAm }]);
+    const ids = new Set(clean.map((s) => s.id));
+    const fertig = erledigtSpalte(clean)?.id;
+    const updates = aufgaben
+      .filter((a) => a.board_id === id && !a.archiviert)
+      .map((a) => {
+        const spalte_id = ids.has(a.spalte_id) ? a.spalte_id : clean[0].id;
+        return { a, changes: { spalte_id, ...this.erledigtFelder(a, spalte_id === fertig) } };
+      })
+      .filter(({ a, changes }) => changes.spalte_id !== a.spalte_id || changes.erledigt_am !== a.erledigt_am)
+      .map(({ a, changes }) => ({ id: a.id, changes: { ...changes, ...this.changed() } }));
+    await this.store.update('aufgaben', updates);
+    return board;
+  }
+
+  private erledigtFelder(aufgabe: Pick<Aufgabe, 'erledigt_am' | 'erledigt_von'>, erledigt: boolean): Pick<Aufgabe, 'erledigt_am' | 'erledigt_von'> {
+    if (erledigt) return aufgabe.erledigt_am ? { erledigt_am: aufgabe.erledigt_am, erledigt_von: aufgabe.erledigt_von } : { erledigt_am: this.timestamp(), erledigt_von: this.currentUser() };
+    return { erledigt_am: '', erledigt_von: '' };
+  }
+
+  async saveKarte(boardId: string, input: AufgabeInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<Aufgabe> {
+    const clean = prepareKarte(input);
+    const { boards, aufgaben } = await this.store.loadTodoDaten();
+    const board = CrmService.find(boards, boardId);
+    const spalten = spaltenVon(board);
+    if (existing) {
+      const alt = CrmService.find(aufgaben, existing.id);
+      const spalte_id = clean.spalte_id && spalten.some((s) => s.id === clean.spalte_id) ? clean.spalte_id : alt.spalte_id;
+      const wechsel = spalte_id !== alt.spalte_id;
+      const changes: Partial<Aufgabe> = {
+        titel: clean.titel, beschreibung: clean.beschreibung, zustaendig: clean.zustaendig, faellig_am: clean.faellig_am, labels: clean.labels,
+        checkliste: clean.checkliste, sichtbar_kunde: clean.sichtbar_kunde, spalte_id,
+        ...(wechsel ? { sortierung: sortierungFuerPosition(kartenNachSpalte(aufgaben, board).get(spalte_id) ?? [], alt.id, Infinity), ...this.erledigtFelder(alt, spalte_id === erledigtSpalte(spalten)?.id) } : {}),
+      };
+      const [aufgabe] = await this.store.update('aufgaben', [{ id: existing.id, changes: { ...changes, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm }]);
+      return aufgabe;
+    }
+    const spalte_id = clean.spalte_id && spalten.some((s) => s.id === clean.spalte_id) ? clean.spalte_id : spalten[0].id;
+    const spalte = kartenNachSpalte(aufgaben, board).get(spalte_id) ?? [];
+    const aufgabe: Aufgabe = {
+      id: newId(ID_PREFIX.aufgaben),
+      board_id: boardId,
+      spalte_id,
+      titel: clean.titel,
+      beschreibung: clean.beschreibung,
+      zustaendig: clean.zustaendig,
+      faellig_am: clean.faellig_am,
+      labels: clean.labels,
+      checkliste: clean.checkliste,
+      sortierung: sortierungZwischen(spalte[spalte.length - 1]?.sortierung, null),
+      quelle: clean.quelle === 'agent' ? 'agent' : 'manuell',
+      quelle_link: clean.quelle_link ?? '',
+      sichtbar_kunde: clean.sichtbar_kunde,
+      erledigt_am: '',
+      erledigt_von: '',
+      archiviert: false,
+      ...this.created(),
+    };
+    if (spalte_id === erledigtSpalte(spalten)?.id) Object.assign(aufgabe, this.erledigtFelder(aufgabe, true));
+    await this.store.insert('aufgaben', [aufgabe]);
+    return aufgabe;
+  }
+
+  /** Drag & drop: puts the card at `index` of the column (counted without the card) – one row is written. */
+  async verschiebeKarte(id: string, spalteId: string, index: number): Promise<Aufgabe> {
+    const { boards, aufgaben } = await this.store.loadTodoDaten();
+    const alt = CrmService.find(aufgaben, id);
+    const board = CrmService.find(boards, alt.board_id);
+    const spalten = spaltenVon(board);
+    if (!spalten.some((s) => s.id === spalteId)) throw new ValidationError('spalte_id', 'Diese Spalte gibt es auf dem Board nicht mehr.');
+    const sortierung = sortierungFuerPosition(kartenNachSpalte(aufgaben, board).get(spalteId) ?? [], id, index);
+    const [aufgabe] = await this.store.update('aufgaben', [
+      { id, changes: { spalte_id: spalteId, sortierung, ...this.erledigtFelder(alt, spalteId === erledigtSpalte(spalten)?.id), ...this.changed() } },
+    ]);
+    return aufgabe;
+  }
+
+  /** Checkbox on a card: moves it into the done column (or back to the first column) when the board has one. */
+  async setKarteErledigt(id: string, erledigt: boolean): Promise<Aufgabe> {
+    const { boards, aufgaben } = await this.store.loadTodoDaten();
+    const alt = CrmService.find(aufgaben, id);
+    const spalten = spaltenVon(CrmService.find(boards, alt.board_id));
+    const fertig = erledigtSpalte(spalten);
+    const ziel = erledigt ? fertig?.id ?? alt.spalte_id : alt.spalte_id === fertig?.id ? spalten.find((s) => !s.erledigt)?.id ?? alt.spalte_id : alt.spalte_id;
+    if (ziel !== alt.spalte_id) return this.verschiebeKarte(id, ziel, erledigt ? 0 : Infinity);
+    const [aufgabe] = await this.store.update('aufgaben', [{ id, changes: { ...this.erledigtFelder(alt, erledigt), ...this.changed() } }]);
+    return aufgabe;
+  }
+
+  async setKarteArchiviert(id: string, archiviert: boolean, expectedGeaendertAm: string): Promise<Aufgabe> {
+    const [aufgabe] = await this.store.update('aufgaben', [{ id, changes: { archiviert, ...this.changed() }, expectedGeaendertAm }]);
+    return aufgabe;
+  }
+
+  async kommentiereKarte(aufgabeId: string, text: string): Promise<AufgabenKommentar> {
+    const clean = text.trim();
+    if (!clean) throw new ValidationError('text', 'Bitte einen Kommentar schreiben.');
+    CrmService.find((await this.store.loadTodoDaten()).aufgaben, aufgabeId);
+    const kommentar: AufgabenKommentar = { id: newId(ID_PREFIX.aufgaben_kommentare), aufgabe_id: aufgabeId, text: clean, von: this.currentUser(), datum: this.timestamp() };
+    await this.store.insert('aufgaben_kommentare', [kommentar]);
+    return kommentar;
   }
 
   // ─── Lead-Magnete ──────────────────────────────────────────────────────────
