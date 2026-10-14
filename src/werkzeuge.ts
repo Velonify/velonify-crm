@@ -1,6 +1,8 @@
 export interface Werkzeug {
   id: string;
   name: string;
+  /** Label in the tool rail, at most ~8 characters. */
+  kurz: string;
   beschreibung: string;
   /** Start path; all pages of the tool live below it. Missing while the tool is only planned. */
   pfad?: string;
@@ -15,6 +17,7 @@ export const WERKZEUGE: Werkzeug[] = [
   {
     id: 'home',
     name: 'Home',
+    kurz: 'Home',
     beschreibung: 'Überblick, Kunden und Links',
     pfad: '/',
     bereiche: ['/kalender', '/anfragen', '/wort'],
@@ -28,6 +31,7 @@ export const WERKZEUGE: Werkzeug[] = [
   {
     id: 'crm',
     name: 'CRM',
+    kurz: 'CRM',
     beschreibung: 'Leads, Pipeline und Kundenakte',
     pfad: '/crm',
     navigation: [
@@ -42,6 +46,7 @@ export const WERKZEUGE: Werkzeug[] = [
   {
     id: 'kunden',
     name: 'Kunden',
+    kurz: 'Kunden',
     beschreibung: 'Client-Hub: Dateien, Tools, Ressourcen und News je Kunde',
     pfad: '/kunden',
     navigation: [{ label: 'Alle Kunden', pfad: '/kunden' }],
@@ -49,6 +54,7 @@ export const WERKZEUGE: Werkzeug[] = [
   {
     id: 'todo',
     name: 'To-Dos',
+    kurz: 'To-Dos',
     beschreibung: 'Boards für Velonify und jeden Kunden: Karten, Fälligkeiten, wer was macht',
     pfad: '/todo',
     navigation: [
@@ -59,6 +65,7 @@ export const WERKZEUGE: Werkzeug[] = [
   {
     id: 'angebote',
     name: 'Angebots-Rechner',
+    kurz: 'Angebote',
     beschreibung: 'Leistungen auswählen, im Sheet kalkulieren, Angebot als PDF',
     pfad: '/angebote',
     navigation: [
@@ -70,6 +77,7 @@ export const WERKZEUGE: Werkzeug[] = [
   {
     id: 'contact',
     name: 'Contact Generator',
+    kurz: 'Kontakt',
     beschreibung: 'Erste Nachricht für Instagram, LinkedIn oder E-Mail aus den CRM-Daten',
     pfad: '/contact',
     navigation: [
@@ -81,6 +89,7 @@ export const WERKZEUGE: Werkzeug[] = [
   {
     id: 'audit',
     name: 'Shop-Audit',
+    kurz: 'Audit',
     beschreibung: 'Shops prüfen und Aufhänger fürs Anschreiben finden',
     pfad: '/audit',
     navigation: [
@@ -91,6 +100,7 @@ export const WERKZEUGE: Werkzeug[] = [
   {
     id: 'social',
     name: 'Social Media',
+    kurz: 'Social',
     beschreibung: 'Der 90-Tage-Plan: Redaktionsplan, fertige Posts, Aufgaben und was die Zahlen sagen',
     pfad: '/social',
     navigation: [
@@ -105,6 +115,7 @@ export const WERKZEUGE: Werkzeug[] = [
   {
     id: 'leads',
     name: 'Lead-Finder',
+    kurz: 'Leads',
     beschreibung: 'Deutsche Shops mit Anlass finden, prüfen und gezielt ins CRM übernehmen',
     pfad: '/leads',
     navigation: [
@@ -116,6 +127,7 @@ export const WERKZEUGE: Werkzeug[] = [
   {
     id: 'magnete',
     name: 'Lead-Magnete',
+    kurz: 'Magnete',
     beschreibung: 'Downloads gegen E-Mail: Einträge von velonify.de/ressourcen, Mails und Übernahme ins CRM',
     pfad: '/magnete',
     navigation: [

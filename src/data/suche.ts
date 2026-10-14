@@ -2,7 +2,7 @@ import { phaseLabel } from './constants';
 import { kontaktName } from './rules';
 import type { Database } from './types';
 
-export type TrefferArt = 'firma' | 'kontakt' | 'deal';
+export type TrefferArt = 'firma' | 'kontakt' | 'deal' | 'aktion' | 'werkzeug';
 
 export interface Treffer {
   art: TrefferArt;
@@ -12,6 +12,35 @@ export interface Treffer {
   details: string;
   archiviert: boolean;
   score: number;
+  /** Where the hit leads; firms, contacts and deals open the firm file. */
+  pfad?: string;
+}
+
+/** Things to do from the command palette, found by name or by one of the extra words. */
+export const AKTIONEN: { titel: string; pfad: string; woerter: string }[] = [
+  { titel: 'Neue Firma anlegen', pfad: '/crm/firmen/neu', woerter: 'lead firma neu anlegen' },
+  { titel: 'Lead aus LinkedIn', pfad: '/crm/linkedin', woerter: 'linkedin profil lead' },
+  { titel: 'Neues Angebot', pfad: '/angebote/neu', woerter: 'angebot kalkulation pdf' },
+  { titel: 'Anschreiben erstellen', pfad: '/contact', woerter: 'nachricht mail linkedin instagram contact' },
+  { titel: 'Shop prüfen', pfad: '/audit/neu', woerter: 'audit domain shop check' },
+  { titel: 'Meine Aufgaben', pfad: '/todo/meine', woerter: 'todo karten aufgaben' },
+  { titel: 'Mein Tag', pfad: '/crm', woerter: 'heute wiedervorlagen fällig' },
+  { titel: 'Pipeline', pfad: '/crm/pipeline', woerter: 'deals phasen' },
+  { titel: 'Kalender', pfad: '/kalender', woerter: 'termine meet' },
+  { titel: 'Einrichtung', pfad: '/einrichtung', woerter: 'setup einstellungen tabs' },
+];
+
+/** Actions and tools for the palette; with an empty query all of them, so the palette is useful before typing. */
+export function befehle(eingabe: string, werkzeuge: readonly { id: string; name: string; beschreibung: string; pfad?: string }[]): Treffer[] {
+  const woerter = normalisiere(eingabe).split(/\s+/).filter(Boolean);
+  const passt = (text: string) => woerter.every((w) => normalisiere(text).includes(w));
+  const aktionen = AKTIONEN.filter((a) => passt(`${a.titel} ${a.woerter}`)).map((a, i) => ({
+    art: 'aktion' as const, id: `aktion-${i}`, firmaId: '', titel: a.titel, details: '', archiviert: false, score: 1, pfad: a.pfad,
+  }));
+  const tools = werkzeuge
+    .filter((w) => w.pfad && passt(`${w.name} ${w.beschreibung}`))
+    .map((w) => ({ art: 'werkzeug' as const, id: `werkzeug-${w.id}`, firmaId: '', titel: w.name, details: w.beschreibung, archiviert: false, score: 1, pfad: w.pfad }));
+  return woerter.length === 0 ? [...aktionen.slice(0, 6), ...tools] : [...aktionen, ...tools];
 }
 
 /**
