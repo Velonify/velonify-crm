@@ -29,11 +29,24 @@ import {
   sortiereLeads,
 } from '../../../src/data/magnete';
 import { roastPlaetze } from '../../../src/data/roast';
-import { istZustaendig, personen } from '../../../src/data/zustaendig';
+import {
+  boardVon,
+  checklisteVon,
+  faelligkeit,
+  INTERNES_BOARD_TITEL,
+  istErledigt,
+  kartenNachSpalte,
+  meineAufgaben,
+  sortiereBoards,
+  spaltenVon,
+} from '../../../src/data/todos';
+import { istZustaendig, personen, zustaendigWert } from '../../../src/data/zustaendig';
 import { kontaktName, suggestKuerzel } from '../../../src/data/rules';
 import { driveKonfiguration, findeTeamMitglied, indexById, kennzahlen, meinTag, offeneDeals, type Aufgabe } from '../../../src/data/selectors';
 import { suche } from '../../../src/data/suche';
 import {
+  type Aufgabe as Karte,
+  type Board,
   EMPTY_DEAL_INPUT,
   EMPTY_FIRMA_INPUT,
   EMPTY_KONTAKT_INPUT,
@@ -45,6 +58,8 @@ import {
   type Magnet,
   type MagnetInput,
   type MagnetLead,
+  type Spalte,
+  type TodoDaten,
 } from '../../../src/data/types';
 import type { Person } from './google';
 
@@ -59,6 +74,7 @@ export const ANLEITUNG = `Velonify-CRM (Google Sheet hinter crm.velonify.de). Sc
 - "zustaendig" sind ein oder mehrere Vornamen aus dem Team, mit Komma getrennt (z. B. "Lugge, Julian"; siehe \`ueberblick\`), keine E-Mail.
 - Daten im Format JJJJ-MM-TT. Die Zeitzone ist Europe/Berlin.
 - Nichts wird gelöscht. \`archivieren\` blendet Firmen, Deals, Kontakte oder Lead-Magnete aus und lässt sich rückgängig machen; vorher nachfragen.
+- To-dos (Karten auf den Boards unter crm.velonify.de/#/todo): \`boards\`, \`karten\`, \`karte_anlegen\`, \`karte_verschieben\`, \`karte_erledigt\`, \`karte_kommentieren\`. Board "intern" ist „${INTERNES_BOARD_TITEL}“, Kunden-Boards über Firmenname oder Kürzel. Karten-IDs über \`karten\` holen.
 - Lead-Magnete (Downloads gegen E-Mail auf velonify.de/ressourcen/<adresse>/): \`magnete\`, \`magnet_speichern\`, \`magnet_leads\`, \`magnet_lead_uebernehmen\`, \`magnet_lead_verwerfen\`. Ein aktiver Magnet hat sofort seine Landingpage; aktiv geht nur mit Untertitel und beim Typ „datei“ mit Datei-Link (Google Drive, per Link freigegeben). Typ „audit“ ist der Shop-Roast: kein Download, das Team prüft den Shop und schickt einen Report; \`plaetze\` begrenzt die Zahl, danach Warteliste. Wer nur den Download wollte, bekommt keine Werbe-Mails – Kontakt danach über LinkedIn.`;
 
 // ─── Ausgabe ────────────────────────────────────────────────────────────────
@@ -117,9 +133,9 @@ function aufgabeZeile(a: Aufgabe) {
   });
 }
 
-function finde<T extends { id: string }>(liste: readonly T[], id: string, was: string): T {
+function finde<T extends { id: string }>(liste: readonly T[], id: string, was: string, woher = 'suchen'): T {
   const treffer = liste.find((e) => e.id === id);
-  if (!treffer) throw new Error(`${was} „${id}“ nicht gefunden. IDs über \`suchen\` holen.`);
+  if (!treffer) throw new Error(`${was} „${id}“ nicht gefunden. IDs über \`${woher}\` holen.`);
   return treffer;
 }
 
@@ -173,6 +189,65 @@ const magnetInput = (m: Magnet): MagnetInput => ({
   slug: m.slug, titel: m.titel, beschreibung: m.beschreibung, stichwort: m.stichwort, datei_url: m.datei_url, mail_betreff: m.mail_betreff,
   mail_text: m.mail_text, aktiv: m.aktiv, untertitel: m.untertitel, inhalt: m.inhalt, knopf: m.knopf, typ: m.typ, plaetze: m.plaetze,
 });
+
+const boardLink = (id: string) => `${HUB}/#/todo/${id}`;
+const klein = (text: string) => text.trim().toLocaleLowerCase('de');
+
+const spalteZeile = (s: Spalte) => kompakt({ spalte_id: s.id, titel: s.titel, erledigt: s.erledigt ? true : '' });
+
+function karteZeile(k: Karte, board: Board | undefined, daten: TodoDaten, heute: string) {
+  const spalten = board ? spaltenVon(board) : [];
+  const punkte = checklisteVon(k);
+  const kommentare = daten.kommentare.filter((c) => c.aufgabe_id === k.id).length;
+  return kompakt({
+    karte_id: k.id,
+    titel: k.titel,
+    board: board?.titel,
+    spalte: (spalten.find((s) => s.id === k.spalte_id) ?? spalten[0])?.titel,
+    zustaendig: k.zustaendig,
+    faellig: k.faellig_am,
+    ueberfaellig: faelligkeit(k, heute) === 'ueberfaellig' ? true : '',
+    labels: k.labels,
+    beschreibung: k.beschreibung,
+    checkliste: punkte.length > 0 ? punkte.map((p) => `${p.erledigt ? '[x]' : '[ ]'} ${p.text}`) : '',
+    erledigt_am: k.erledigt_am.slice(0, 10),
+    sichtbar_kunde: k.sichtbar_kunde ? true : '',
+    freigabe: k.freigabe,
+    kommentare: kommentare || '',
+    link: k.quelle_link,
+  });
+}
+
+/**
+ * The board a name points to: "intern", a board id or title, or a client by firma_id, Kürzel or name.
+ * Returns the firm id for `boardFuer` and the board when it already exists.
+ */
+function findeBoard(db: Database, boards: readonly Board[], angabe: string): { firmaId: string; board?: Board } {
+  const wert = klein(angabe);
+  if (!wert || wert === 'intern' || wert === klein(INTERNES_BOARD_TITEL)) return { firmaId: '', board: boardVon(boards, '') };
+  const direkt = boards.find((b) => !b.archiviert && (b.id === angabe.trim() || klein(b.titel) === wert));
+  if (direkt) return { firmaId: direkt.firma_id, board: direkt };
+  const firmen = db.firmen.filter((f) => !f.archiviert);
+  const genau = firmen.filter((f) => f.id === angabe.trim() || klein(f.kuerzel) === wert || klein(f.name) === wert);
+  const treffer = genau.length > 0 ? genau : firmen.filter((f) => klein(f.name).includes(wert));
+  if (treffer.length === 0) throw new Error(`Kein Board und keine Firma zu „${angabe}“. Boards über \`boards\` holen.`);
+  if (treffer.length > 1) throw new Error(`„${angabe}“ ist nicht eindeutig: ${treffer.map((f) => (f.kuerzel ? `${f.name} (${f.kuerzel})` : f.name)).join(', ')}. Kürzel oder firma_id angeben.`);
+  return { firmaId: treffer[0].id, board: boardVon(boards, treffer[0].id) };
+}
+
+/** A column of the board by id or title. */
+function findeSpalte(board: Board, angabe: string): Spalte {
+  const spalten = spaltenVon(board);
+  const spalte = spalten.find((s) => s.id === angabe.trim()) ?? spalten.find((s) => klein(s.titel) === klein(angabe));
+  if (!spalte) throw new Error(`Spalte „${angabe}“ gibt es auf „${board.titel}“ nicht. Möglich: ${spalten.map((s) => s.titel).join(', ')}.`);
+  return spalte;
+}
+
+function findeKarte(daten: TodoDaten, karteId: string): { karte: Karte; board: Board } {
+  const karte = finde(daten.aufgaben, karteId, 'Karte', 'karten');
+  if (karte.archiviert) throw new Error(`Die Karte „${karte.titel}“ ist archiviert.`);
+  return { karte, board: finde(daten.boards, karte.board_id, 'Board', 'boards') };
+}
 
 // ─── Eingaben ───────────────────────────────────────────────────────────────
 
@@ -907,6 +982,176 @@ export function registriereWerkzeuge(server: McpServer, { service, person, teamN
     sicher(async ({ lead_id }) => {
       const lead = await service.verwirfMagnetLead(lead_id);
       return antwort({ erledigt: 'verworfen', lead_id: lead.id, email: lead.email, magnet: lead.magnet });
+    }),
+  );
+
+  // ─── To-dos ─────────────────────────────────────────────────────────────────
+
+  const boardAngabe = z.string().min(1).describe('"intern" für „Velonify intern“, sonst Firmenname, Kürzel, firma_id oder board_id');
+
+  server.registerTool(
+    'boards',
+    {
+      title: 'To-do-Boards anzeigen',
+      description: 'Alle To-do-Boards: „Velonify intern“ und je Kunde eines, mit Spalten und Zahl der offenen Karten. Kunden ohne Board bekommen eins beim ersten `karte_anlegen`.',
+      annotations: lesen,
+    },
+    sicher(async () => {
+      const [db, daten] = await Promise.all([service.load(), service.loadTodoDaten()]);
+      const firmen = indexById(db.firmen);
+      return antwort({
+        boards: sortiereBoards(daten.boards, db.firmen).map((b) => {
+          const firma = firmen.get(b.firma_id);
+          return kompakt({
+            board_id: b.id,
+            titel: b.titel,
+            kunde: firma ? firma.name : 'intern',
+            kuerzel: firma?.kuerzel,
+            firma_id: b.firma_id,
+            spalten: spaltenVon(b).map(spalteZeile),
+            offene_karten: daten.aufgaben.filter((a) => a.board_id === b.id && !a.archiviert && !istErledigt(a)).length,
+            hub: boardLink(b.id),
+          });
+        }),
+      });
+    }),
+  );
+
+  server.registerTool(
+    'karten',
+    {
+      title: 'To-do-Karten anzeigen',
+      description:
+        'Karten eines Boards in Spaltenreihenfolge oder, ohne board, die offenen Karten einer Person über alle Boards („Meine To-dos“, fällige zuerst). Standard ohne board: die angemeldete Person. Erledigte nur mit erledigte_zeigen.',
+      inputSchema: {
+        board: boardAngabe.optional(),
+        zustaendig: z.string().optional().describe('Vorname aus dem Team; ohne board Standard: angemeldete Person'),
+        erledigte_zeigen: z.boolean().optional(),
+      },
+      annotations: lesen,
+    },
+    sicher(async ({ board: angabe, zustaendig, erledigte_zeigen }) => {
+      const [db, daten] = await Promise.all([service.load(), service.loadTodoDaten()]);
+      const boards = indexById(daten.boards);
+      const zeile = (k: Karte) => karteZeile(k, boards.get(k.board_id), daten, heute());
+      if (zustaendig) pruefeTeam(db, zustaendig);
+
+      if (!angabe) {
+        const wer = zustaendig || meinName(db);
+        if (!wer) return fehler('Die angemeldete Person ist nicht im Team. zustaendig oder board angeben.');
+        const aktiv = new Set(daten.boards.filter((b) => !b.archiviert).map((b) => b.id));
+        const karten = erledigte_zeigen
+          ? daten.aufgaben.filter((a) => aktiv.has(a.board_id) && !a.archiviert && istZustaendig(a.zustaendig, wer))
+          : meineAufgaben(daten.aufgaben, daten.boards, wer);
+        return antwort({ fuer: wer, anzahl: karten.length, karten: karten.map(zeile), hub: `${HUB}/#/todo/meine` });
+      }
+
+      const { board } = findeBoard(db, daten.boards, angabe);
+      if (!board) return antwort({ anzahl: 0, karten: [], hinweis: 'Für diese Firma gibt es noch kein Board; `karte_anlegen` legt es an.' });
+      const karten = [...kartenNachSpalte(daten.aufgaben, board).values()]
+        .flat()
+        .filter((k) => (erledigte_zeigen || !istErledigt(k)) && (!zustaendig || istZustaendig(k.zustaendig, zustaendig)));
+      return antwort({ board: board.titel, board_id: board.id, anzahl: karten.length, karten: karten.map(zeile), hub: boardLink(board.id) });
+    }),
+  );
+
+  server.registerTool(
+    'karte_anlegen',
+    {
+      title: 'To-do-Karte anlegen',
+      description:
+        'Legt eine Karte auf einem Board an, wie „Neue Karte“ im Hub. Fehlt das Board eines Kunden, wird es mit den Standardspalten angelegt. Ohne spalte landet die Karte unten in der ersten Spalte (Backlog).',
+      inputSchema: {
+        board: boardAngabe,
+        titel: z.string().min(1).max(200).describe('Kurz; Details in die beschreibung'),
+        beschreibung: z.string().optional(),
+        zustaendig: z.array(z.string()).optional().describe('Vornamen aus dem Team; Standard: angemeldete Person; [] = niemand'),
+        faellig_am: datum.optional(),
+        labels: z.array(z.string()).optional().describe('z. B. ["SEO", "Theme"]'),
+        checkliste: z.array(z.string()).optional().describe('Punkte, alle offen'),
+        spalte: z.string().optional().describe('Spalten-ID oder -Name, siehe `boards`'),
+        sichtbar_kunde: z.boolean().optional().describe('Nur Kunden-Boards: Karte im Kundenportal zeigen, Standard false'),
+        link: z.string().optional().describe('Quelle, z. B. Slack- oder Mail-Link (https://…)'),
+      },
+      annotations: schreiben,
+    },
+    sicher(async ({ board: angabe, titel, beschreibung, zustaendig, faellig_am, labels, checkliste, spalte, sichtbar_kunde, link }) => {
+      const [db, daten] = await Promise.all([service.load(), service.loadTodoDaten()]);
+      const wer = zustaendig ? zustaendigWert(zustaendig) : meinName(db) ?? '';
+      pruefeTeam(db, wer);
+      const ziel = findeBoard(db, daten.boards, angabe);
+      if (sichtbar_kunde && !ziel.firmaId) return fehler('Karten auf „Velonify intern“ sind nie für Kunden sichtbar.');
+      // Check the column before a missing client board gets created.
+      if (ziel.board && spalte) findeSpalte(ziel.board, spalte);
+      const board = ziel.board ?? (await service.boardFuer(ziel.firmaId));
+      const karte = await service.saveKarte(board.id, {
+        titel,
+        beschreibung: beschreibung ?? '',
+        zustaendig: wer,
+        faellig_am: faellig_am ?? '',
+        labels: (labels ?? []).join(','),
+        checkliste: JSON.stringify((checkliste ?? []).map((text) => ({ text, erledigt: false }))),
+        sichtbar_kunde: sichtbar_kunde ?? false,
+        spalte_id: spalte ? findeSpalte(board, spalte).id : undefined,
+        quelle: 'manuell',
+        quelle_link: link ?? '',
+      });
+      return antwort({
+        angelegt: true,
+        ...(ziel.board ? {} : { board_neu: true }),
+        karte: karteZeile(karte, board, await service.loadTodoDaten(), heute()),
+        hub: boardLink(board.id),
+      });
+    }),
+  );
+
+  server.registerTool(
+    'karte_verschieben',
+    {
+      title: 'To-do-Karte verschieben',
+      description: 'Verschiebt eine Karte in eine andere Spalte ihres Boards (unten, mit oben: true ganz oben). In der Erledigt-Spalte gilt sie als erledigt, heraus wieder als offen.',
+      inputSchema: {
+        karte_id: z.string(),
+        spalte: z.string().describe('Spalten-ID oder -Name, siehe `boards`'),
+        oben: z.boolean().optional().describe('Ganz oben statt unten einsortieren'),
+      },
+      annotations: schreiben,
+    },
+    sicher(async ({ karte_id, spalte, oben }) => {
+      const { board } = findeKarte(await service.loadTodoDaten(), karte_id);
+      const ziel = findeSpalte(board, spalte);
+      const karte = await service.verschiebeKarte(karte_id, ziel.id, oben ? 0 : Infinity);
+      return antwort({ karte: karteZeile(karte, board, await service.loadTodoDaten(), heute()), hub: boardLink(board.id) });
+    }),
+  );
+
+  server.registerTool(
+    'karte_erledigt',
+    {
+      title: 'To-do-Karte erledigen',
+      description: 'Hakt eine Karte ab wie im Hub: Sie wandert in die Erledigt-Spalte ihres Boards (falls es eine gibt). Mit erledigt: false wieder öffnen, sie geht dann zurück in die erste offene Spalte.',
+      inputSchema: { karte_id: z.string(), erledigt: z.boolean().optional().describe('Standard true') },
+      annotations: { ...schreiben, idempotentHint: true },
+    },
+    sicher(async ({ karte_id, erledigt }) => {
+      const { board } = findeKarte(await service.loadTodoDaten(), karte_id);
+      const karte = await service.setKarteErledigt(karte_id, erledigt ?? true);
+      return antwort({ karte: karteZeile(karte, board, await service.loadTodoDaten(), heute()) });
+    }),
+  );
+
+  server.registerTool(
+    'karte_kommentieren',
+    {
+      title: 'To-do-Karte kommentieren',
+      description: 'Schreibt einen Kommentar unter eine Karte, mit der angemeldeten Person als Absender.',
+      inputSchema: { karte_id: z.string(), text: z.string().min(1) },
+      annotations: schreiben,
+    },
+    sicher(async ({ karte_id, text }) => {
+      const { karte } = findeKarte(await service.loadTodoDaten(), karte_id);
+      const kommentar = await service.kommentiereKarte(karte_id, text);
+      return antwort({ kommentiert: true, karte: karte.titel, kommentar: kompakt({ ...kommentar, aufgabe_id: undefined }) });
     }),
   );
 }
