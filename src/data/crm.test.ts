@@ -183,7 +183,7 @@ describe('CrmService', () => {
     expect(kontakte.filter((k) => k.hauptkontakt).map((k) => k.nachname)).toEqual(['Zwei']);
   });
 
-  it('assigns a lead to whoever moves it from qualified to contacted, and it stays editable', async () => {
+  it('adds whoever moves a lead from qualified to contacted to the people responsible, and it stays editable', async () => {
     const firma = await crm.createFirma(firmaInput({ name: 'Shop', zustaendig: 'Julian' }));
     const deal = await crm.saveDeal(firma.id, { ...EMPTY_DEAL_INPUT, titel: 'Migration', zustaendig: 'Julian' });
     const qualifiziert = await crm.changePhase(deal.id, 'qualifiziert', deal.geaendert_am, '', 'Lugge');
@@ -191,8 +191,8 @@ describe('CrmService', () => {
 
     const kontaktiert = await crm.changePhase(deal.id, 'kontaktiert', qualifiziert.geaendert_am, '', 'Lugge');
     let db = await crm.load();
-    expect(kontaktiert.zustaendig).toBe('Lugge');
-    expect(db.firmen[0].zustaendig).toBe('Lugge');
+    expect(kontaktiert.zustaendig).toBe('Julian, Lugge');
+    expect(db.firmen[0].zustaendig).toBe('Julian, Lugge');
     expect(db.aktivitaeten.at(-1)?.text).toBe('„Migration“: Qualifiziert → Kontaktiert, zugeteilt an Lugge');
 
     // Changing it by hand afterwards sticks; later phase changes leave it alone.
@@ -201,7 +201,7 @@ describe('CrmService', () => {
     const gespraech = await crm.changePhase(deal.id, 'gespraech', umgestellt.geaendert_am, '', 'Lugge');
     expect(gespraech.zustaendig).toBe('Johannes');
     db = await crm.load();
-    expect(db.firmen[0].zustaendig).toBe('Lugge');
+    expect(db.firmen[0].zustaendig).toBe('Julian, Lugge');
   });
 
   it('tracks a LinkedIn connection request: reminder in 7 days, assignment, accepted → kontaktiert', async () => {
@@ -211,9 +211,9 @@ describe('CrmService', () => {
     const q = await crm.changePhase(deal.id, 'qualifiziert', deal.geaendert_am);
 
     const wartend = await crm.sendeVernetzung(deal.id, q.geaendert_am, { kontaktId: lea.id, notiz: '', ich: 'Lugge' });
-    expect(wartend).toMatchObject({ phase: 'vernetzung', zustaendig: 'Lugge', kontakt_id: lea.id, naechster_schritt: 'Vernetzung prüfen: Lea Sommer', naechster_schritt_am: addDays(heute, 7) });
+    expect(wartend).toMatchObject({ phase: 'vernetzung', zustaendig: 'Julian, Lugge', kontakt_id: lea.id, naechster_schritt: 'Vernetzung prüfen: Lea Sommer', naechster_schritt_am: addDays(heute, 7) });
     let db = await crm.load();
-    expect(db.firmen[0].zustaendig).toBe('Lugge');
+    expect(db.firmen[0].zustaendig).toBe('Julian, Lugge');
     expect(db.aktivitaeten.at(-1)?.text).toBe('Vernetzungsanfrage auf LinkedIn an Lea Sommer');
     expect(tageSeitVernetzung(db.aktivitaeten, deal.id, addDays(heute, 4))).toBe(4);
     expect(meinTag(db, 'Lugge', heute).naechsteTage.map((a) => a.titel)).toEqual(['Vernetzung prüfen: Lea Sommer']);

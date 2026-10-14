@@ -9,6 +9,7 @@ import type { Audit, Firma } from '../data/types';
 import { formatDateTime, shortUser } from '../lib/format';
 import { BefundZahlen, Score } from './AuditTeile';
 import { useAudits, useAuditPruefen, useStapelPruefung } from './useAudits';
+import { istZustaendig } from '../data/zustaendig';
 
 type Zustand = '' | 'nie' | 'veraltet' | 'geprueft' | 'hoch';
 
@@ -63,7 +64,7 @@ export function AuditUebersichtPage() {
       ({ firma: f, audit, veraltet }) =>
         (!q || `${f.name} ${f.domain}`.toLowerCase().includes(q)) &&
         (!filter.tier || f.tier === filter.tier) &&
-        (!filter.zustaendig || f.zustaendig === filter.zustaendig) &&
+        (!filter.zustaendig || istZustaendig(f.zustaendig, filter.zustaendig)) &&
         (filter.zustand === '' ||
           (filter.zustand === 'nie' && !audit) ||
           (filter.zustand === 'veraltet' && veraltet) ||

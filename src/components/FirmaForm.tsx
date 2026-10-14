@@ -6,6 +6,7 @@ import { findeDubletten, type DublettenTreffer } from '../data/dubletten';
 import { DuplicateError, ValidationError } from '../data/errors';
 import type { Firma, FirmaInput, Listen } from '../data/types';
 import { errorMessage } from '../lib/errors';
+import { PersonenAuswahl } from './PersonenAuswahl';
 
 interface Props {
   initial: FirmaInput;
@@ -102,7 +103,7 @@ export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel, al
           {field('domain', 'Domain', text('domain', { placeholder: 'shop.de' }), 'Eindeutig – daran erkennt der Import Dubletten.')}
           {field('kuerzel', 'Kürzel', text('kuerzel', { placeholder: 'ABC' }), 'Neue Kürzel: 3 Buchstaben. Wie in Drive, Slack, Trello.')}
           {field('status', 'Status', select('status', [...STATUS], statusLabel))}
-          {field('zustaendig', 'Zuständig', select('zustaendig', listen.team ?? []))}
+          {field('zustaendig', 'Zuständig', <PersonenAuswahl team={listen.team ?? []} wert={values.zustaendig} onChange={(zustaendig) => setValues((v) => ({ ...v, zustaendig }))} />)}
         </div>
       </fieldset>
 

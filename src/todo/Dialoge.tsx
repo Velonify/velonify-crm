@@ -7,6 +7,7 @@ import { checklisteVon, neueSpaltenId, spaltenVon } from '../data/todos';
 import type { Aufgabe, AufgabeInput, AufgabenKommentar, Board, ChecklistenPunkt, Spalte } from '../data/types';
 import { fieldOf } from '../lib/errors';
 import { formatDateTime, shortUser } from '../lib/format';
+import { PersonenAuswahl } from '../components/PersonenAuswahl';
 
 export type Aendern = <T>(action: (s: CrmService) => Promise<T>) => Promise<T>;
 
@@ -118,14 +119,7 @@ export function KarteDialog({
           </select>
         </Field>
         <Field label="Zuständig">
-          <select value={werte.zustaendig} onChange={(e) => setWerte((w) => ({ ...w, zustaendig: e.target.value }))}>
-            <option value="">Niemand</option>
-            {[...new Set([...team, werte.zustaendig].filter(Boolean))].map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+          <PersonenAuswahl team={team} wert={werte.zustaendig} onChange={(zustaendig) => setWerte((w) => ({ ...w, zustaendig }))} />
         </Field>
         <Field label="Fällig" invalid={fieldOf(error) === 'faellig_am'}>
           <input type="date" value={werte.faellig_am} onChange={(e) => setWerte((w) => ({ ...w, faellig_am: e.target.value }))} />

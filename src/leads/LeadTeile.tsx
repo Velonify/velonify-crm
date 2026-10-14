@@ -7,6 +7,7 @@ import { ANLASS_BEREICH, ANLASS_LABEL, AUSSCHLUSS_LABEL, BEREICHE, type Bereich,
 import { useLoad } from '../lib/useLoad';
 import { useIch } from '../lib/useIch';
 import { useUebernahme, type StartPhase, type UebernahmeErgebnis, type Ziel } from './useLeadFinder';
+import { PersonenAuswahl } from '../components/PersonenAuswahl';
 
 export function Item({ label, children }: { label: string; children: ReactNode }) {
   const leer = children === '' || children === null || children === undefined || children === false;
@@ -197,14 +198,7 @@ export function EntscheidungsLeiste({ api, domains, bereich, onErledigt, disable
           )}
           <label className="field">
             <span className="field-label">Zuständig</span>
-            <select value={zustaendig} onChange={(e) => setZustaendig(e.target.value)}>
-              <option value="">Niemand</option>
-              {team.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+            <PersonenAuswahl team={team} wert={zustaendig} onChange={setZustaendig} />
           </label>
           {fehler && <p className="alert error">{fehler}</p>}
         </Dialog>

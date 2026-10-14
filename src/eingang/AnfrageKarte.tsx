@@ -6,6 +6,7 @@ import { anfrageDubletten, anfrageFirmenname } from '../data/eingang';
 import type { DublettenTreffer } from '../data/dubletten';
 import type { Anfrage, Firma } from '../data/types';
 import { formatDateTime } from '../lib/format';
+import { PersonenAuswahl } from '../components/PersonenAuswahl';
 
 /** One line of the inquiry: label left, value right; empty values are left out. */
 function Item({ label, children }: { label: string; children: ReactNode }) {
@@ -134,14 +135,7 @@ export function Uebernahme({
           </Field>
         )}
         <Field label="Zuständig">
-          <select value={zustaendig} onChange={(e) => setZustaendig(e.target.value)}>
-            <option value="">–</option>
-            {team.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+          <PersonenAuswahl team={team} wert={zustaendig} onChange={setZustaendig} />
         </Field>
         <Field label="Pipeline">
           <label className="checkbox">

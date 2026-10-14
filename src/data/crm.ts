@@ -1,3 +1,4 @@
+import { istZustaendig, mitPerson } from './zustaendig';
 import {
   DEFAULT_DEAL_TITEL,
   EINSTELLUNG,
@@ -395,7 +396,8 @@ export class CrmService {
     const alt = CrmService.find(db.deals, dealId);
     const firma = CrmService.find(db.firmen, alt.firma_id);
     if (alt.phase === phase) return alt;
-    const zuteilen = istZuteilung(alt.phase, phase) && Boolean(ich) && alt.zustaendig !== ich;
+    // Whoever moves the deal joins the people responsible; nobody already assigned is removed.
+    const zuteilen = istZuteilung(alt.phase, phase) && Boolean(ich) && !istZustaendig(alt.zustaendig, ich);
     const schrittWeg = alt.phase === 'vernetzung' && istVernetzungSchritt(alt.naechster_schritt);
 
     const [deal] = await this.store.update('deals', [
@@ -403,7 +405,7 @@ export class CrmService {
         id: dealId,
         changes: {
           phase,
-          ...(zuteilen ? { zustaendig: ich } : {}),
+          ...(zuteilen ? { zustaendig: mitPerson(alt.zustaendig, ich) } : {}),
           ...(schrittWeg ? { naechster_schritt: '', naechster_schritt_am: '' } : {}),
           verlustgrund: phase === 'verloren' ? verlustgrund.trim() : '',
           abgeschlossen_am: isAbgeschlossen(phase) ? this.today() : '',
@@ -423,8 +425,8 @@ export class CrmService {
       text: `„${deal.titel}“: ${phaseLabel(alt.phase)} → ${phaseLabel(phase as Phase)}${grund}${zugeteilt}`,
     });
 
-    if (zuteilen && firma.status === 'lead' && firma.zustaendig !== ich) {
-      await this.store.update('firmen', [{ id: firma.id, changes: { zustaendig: ich, ...this.changed() } }]);
+    if (zuteilen && firma.status === 'lead' && !istZustaendig(firma.zustaendig, ich)) {
+      await this.store.update('firmen', [{ id: firma.id, changes: { zustaendig: mitPerson(firma.zustaendig, ich), ...this.changed() } }]);
     }
 
     if (phase === 'gewonnen' && firma.status !== 'kunde') {

@@ -32,6 +32,7 @@ import type {
 } from '../data/types';
 import { fieldOf } from '../lib/errors';
 import type { Aendern } from './useSocial';
+import { PersonenAuswahl } from '../components/PersonenAuswahl';
 
 /** Shared plumbing of every dialog here: run a write, show the error inline, close on success. */
 function useSpeichern(aendern: Aendern, onClose: () => void) {
@@ -96,14 +97,7 @@ function AuswahlFeld({ label, wert, onChange, optionen, leer }: { label: string;
 function TeamFeld({ team, wert, onChange }: { team: readonly string[]; wert: string; onChange(wert: string): void }) {
   return (
     <Field label="Zuständig">
-      <select value={wert} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Niemand</option>
-        {team.map((name) => (
-          <option key={name} value={name}>
-            {name}
-          </option>
-        ))}
-      </select>
+      <PersonenAuswahl team={team} wert={wert} onChange={onChange} />
     </Field>
   );
 }

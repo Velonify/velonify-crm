@@ -29,6 +29,7 @@ import {
   sortiereLeads,
 } from '../../../src/data/magnete';
 import { roastPlaetze } from '../../../src/data/roast';
+import { istZustaendig, personen } from '../../../src/data/zustaendig';
 import { kontaktName, suggestKuerzel } from '../../../src/data/rules';
 import { driveKonfiguration, findeTeamMitglied, indexById, kennzahlen, meinTag, offeneDeals, type Aufgabe } from '../../../src/data/selectors';
 import { suche } from '../../../src/data/suche';
@@ -55,7 +56,7 @@ export const ANLEITUNG = `Velonify-CRM (Google Sheet hinter crm.velonify.de). Sc
 - IDs immer über \`suchen\` oder \`firma_anzeigen\` holen, nie raten.
 - Vor \`lead_anlegen\` suchen, ob die Firma schon existiert.
 - Phasen: ${PHASEN.join(' → ')}. Phasenwechsel nur mit \`phase_aendern\`, LinkedIn-Anfragen mit Phase "vernetzung" und danach \`vernetzung_ergebnis\`.
-- "zustaendig" ist ein Vorname aus dem Team (siehe \`ueberblick\`), keine E-Mail.
+- "zustaendig" sind ein oder mehrere Vornamen aus dem Team, mit Komma getrennt (z. B. "Lugge, Julian"; siehe \`ueberblick\`), keine E-Mail.
 - Daten im Format JJJJ-MM-TT. Die Zeitzone ist Europe/Berlin.
 - Nichts wird gelöscht. \`archivieren\` blendet Firmen, Deals, Kontakte oder Lead-Magnete aus und lässt sich rückgängig machen; vorher nachfragen.
 - Lead-Magnete (Downloads gegen E-Mail auf velonify.de/ressourcen/<adresse>/): \`magnete\`, \`magnet_speichern\`, \`magnet_leads\`, \`magnet_lead_uebernehmen\`, \`magnet_lead_verwerfen\`. Ein aktiver Magnet hat sofort seine Landingpage; aktiv geht nur mit Untertitel und beim Typ „datei“ mit Datei-Link (Google Drive, per Link freigegeben). Typ „audit“ ist der Shop-Roast: kein Download, das Team prüft den Shop und schickt einen Report; \`plaetze\` begrenzt die Zahl, danach Warteliste. Wer nur den Download wollte, bekommt keine Werbe-Mails – Kontakt danach über LinkedIn.`;
@@ -253,7 +254,8 @@ export function leseTeamZuordnung(wert: string): Map<string, string> {
 
 function pruefeTeam(db: Database, name: string | undefined): void {
   const team = db.listen.team ?? [];
-  if (name && team.length > 0 && !team.includes(name)) throw new Error(`„${name}“ ist nicht im Team. Möglich: ${team.join(', ')}.`);
+  const fremd = personen(name).filter((n) => !team.includes(n));
+  if (team.length > 0 && fremd.length > 0) throw new Error(`„${fremd.join(', ')}“ ist nicht im Team. Möglich: ${team.join(', ')}.`);
 }
 
 export function registriereWerkzeuge(server: McpServer, { service, person, teamName, heute }: Kontext): void {
@@ -373,7 +375,7 @@ export function registriereWerkzeuge(server: McpServer, { service, person, teamN
           !firmen.get(d.firma_id)?.archiviert &&
           (abgeschlossene_zeigen || phase === 'gewonnen' || phase === 'verloren' || !isAbgeschlossen(d.phase)) &&
           (!phase || d.phase === phase) &&
-          (!zustaendig || d.zustaendig === zustaendig),
+          (!zustaendig || istZustaendig(d.zustaendig, zustaendig)),
       );
       const nachPhase = PHASEN.map((p) => ({
         phase: p,

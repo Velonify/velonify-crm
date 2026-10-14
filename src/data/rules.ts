@@ -1,3 +1,4 @@
+import { normalisiereZustaendig } from './zustaendig';
 import { DuplicateError, ValidationError } from './errors';
 import { isIsoDate } from './ids';
 import type { DealInput, Firma, FirmaInput, KontaktInput, WiedervorlageInput } from './types';
@@ -103,6 +104,7 @@ export function prepareFirma<T extends Partial<FirmaInput>>(changes: T, alle: re
   }
   if (result.drive_ordner_id !== undefined) result.drive_ordner_id = extractDriveFolderId(result.drive_ordner_id);
   if (result.slack_channel !== undefined) result.slack_channel = result.slack_channel.replace(/^#/, '');
+  if (result.zustaendig !== undefined) result.zustaendig = normalisiereZustaendig(result.zustaendig);
   if (result.score !== undefined && result.score !== null && !Number.isFinite(result.score)) {
     throw new ValidationError('score', 'Score muss eine Zahl sein.');
   }
@@ -122,6 +124,7 @@ export function prepareKontakt(input: KontaktInput): KontaktInput {
 export function prepareDeal(input: DealInput): DealInput {
   const result = trimStrings(input);
   if (!result.titel) throw new ValidationError('titel', 'Bitte einen Titel angeben.');
+  result.zustaendig = normalisiereZustaendig(result.zustaendig);
   if (result.wert_eur !== null && (!Number.isFinite(result.wert_eur) || result.wert_eur < 0)) {
     throw new ValidationError('wert_eur', 'Der Angebotswert muss eine Zahl ab 0 sein.');
   }
@@ -141,6 +144,7 @@ export function prepareWiedervorlage(input: WiedervorlageInput): WiedervorlageIn
   const result = trimStrings(input);
   if (!result.titel) throw new ValidationError('titel', 'Bitte angeben, worum es geht.');
   if (!isIsoDate(result.faellig_am)) throw new ValidationError('faellig_am', 'Bitte ein Fälligkeitsdatum angeben.');
+  result.zustaendig = normalisiereZustaendig(result.zustaendig);
   return result;
 }
 

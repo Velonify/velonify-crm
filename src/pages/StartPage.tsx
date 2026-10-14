@@ -22,6 +22,7 @@ import { WordleKarte } from '../wordle/WordleKarte';
 import { SchemaError } from '../data/errors';
 import { faelligkeit, meineAufgaben } from '../data/todos';
 import { useTodoDaten } from '../todo/useTodoDaten';
+import { istZustaendig } from '../data/zustaendig';
 
 const MAX_AUFGABEN = 5;
 
@@ -350,7 +351,7 @@ export function StartPage() {
     if (!db) return null;
     const tag = meinTag(db, ich, heute);
     const firmen = new Map(db.firmen.map((f) => [f.id, f]));
-    const deals = db.deals.filter((d) => !firmen.get(d.firma_id)?.archiviert && (!ich || d.zustaendig === ich));
+    const deals = db.deals.filter((d) => !firmen.get(d.firma_id)?.archiviert && (!ich || istZustaendig(d.zustaendig, ich)));
     return { heute: tag.heute.length, ueberfaellig: tag.ueberfaellig.length, pipelineWert: kennzahlen(deals, heute).pipelineWert };
   }, [db, ich, heute]);
 

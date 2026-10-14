@@ -14,6 +14,7 @@ import { wahrscheinlichkeit } from '../data/selectors';
 import type { Deal } from '../data/types';
 import { formatDayShort, formatEuro } from '../lib/format';
 import { useIch } from '../lib/useIch';
+import { istZustaendig } from '../data/zustaendig';
 
 const ABGESCHLOSSEN_TAGE = 30;
 
@@ -36,7 +37,7 @@ export function PipelinePage() {
     return db.deals.flatMap((d) => {
       const firma = firmen.get(d.firma_id);
       if (!firma || firma.archiviert || d.archiviert) return [];
-      if (zustaendig && d.zustaendig !== zustaendig) return [];
+      if (zustaendig && !istZustaendig(d.zustaendig, zustaendig)) return [];
       // Won/lost columns only show the last month, so they don't grow forever.
       return !isAbgeschlossen(d.phase) || d.abgeschlossen_am >= grenze ? [{ deal: d, firma }] : [];
     });
