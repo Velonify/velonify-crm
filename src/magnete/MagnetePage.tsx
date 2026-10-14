@@ -232,6 +232,11 @@ export function MagnetePage() {
       <PageHeader
         eyebrow="Lead-Magnete"
         title="Magnete"
+        zahlen={[
+          { wert: data.magnete.filter((m) => m.aktiv && !m.archiviert).length, label: 'aktiv' },
+          { wert: data.leads.length, label: 'Einträge insgesamt' },
+          { wert: data.leads.filter((l) => l.eingegangen_am >= new Date(Date.now() - 7 * 86_400_000).toISOString()).length, label: 'in den letzten 7 Tagen' },
+        ]}
         subtitle="Was es zum Herunterladen gibt. Landingpage, Mail und Datei-Link kommen alle von hier: aktiv schalten genügt, die Seite auf velonify.de entsteht automatisch. Nach einem Kommentar den DM-Link kopieren und von Hand schicken."
         actions={
           <button type="button" className="button primary" onClick={() => setOffen({})}>

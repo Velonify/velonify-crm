@@ -48,10 +48,15 @@ export function GesendetPage() {
       <PageHeader
         eyebrow="Contact Generator"
         title="Gesendet"
-        subtitle={
-          alle.length === 0
-            ? 'Nachrichten erscheinen hier, sobald sie als gesendet markiert sind.'
-            : `${alle.length} Nachrichten, ${antworten} mit Antwort. Den Status von Hand pflegen, dann sieht man, was ankommt.`
+        subtitle={alle.length === 0 ? 'Nachrichten erscheinen hier, sobald sie als gesendet markiert sind.' : 'Den Status von Hand pflegen, dann sieht man, was ankommt.'}
+        zahlen={
+          alle.length > 0
+            ? [
+                { wert: alle.length, label: 'gesendet' },
+                { wert: antworten, label: antworten === 1 ? 'Antwort' : 'Antworten' },
+                { wert: `${Math.round((antworten / alle.length) * 100)} %`, label: 'Antwortquote' },
+              ]
+            : undefined
         }
         actions={
           <Link to="/contact" className="button primary">

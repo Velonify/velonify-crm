@@ -5,7 +5,7 @@ import { ANGEBOT_STATUS, anzahlPosten, parseAuswahl, statusLabel } from '../data
 import { isDemo } from '../config';
 import { useCrm } from '../data/CrmContext';
 import { spreadsheetFileUrl } from '../data/google/drive';
-import { relativeDays } from '../lib/format';
+import { formatEuro, relativeDays } from '../lib/format';
 import { useAngebotsDaten } from './useAngebotsDaten';
 
 export function AngebotePage() {
@@ -28,6 +28,9 @@ export function AngebotePage() {
   }
 
   const katalogLeer = data.kategorien.every((k) => k.archiviert);
+  const aktiv = data.angebote.filter((a) => !a.archiviert);
+  const laufend = aktiv.filter((a) => a.status === 'entwurf' || a.status === 'kalkulation');
+  const versendet = aktiv.filter((a) => a.status === 'versendet');
 
   return (
     <div className="page">
@@ -35,6 +38,12 @@ export function AngebotePage() {
         eyebrow="Angebots-Rechner"
         title="Angebote"
         subtitle="Leistungen ankreuzen, im Kalkulations-Sheet bepreisen, Angebot als PDF erzeugen."
+        zahlen={[
+          { wert: laufend.length, label: 'in Arbeit' },
+          { wert: versendet.length, label: 'versendet, offen' },
+          { wert: formatEuro(versendet.reduce((n, a) => n + (a.summe_einmalig_eur ?? 0), 0)), label: 'einmalig im Raum' },
+          { wert: formatEuro(versendet.reduce((n, a) => n + (a.summe_monatlich_eur ?? 0), 0)), label: 'monatlich im Raum' },
+        ]}
         actions={
           <Link to="/angebote/neu" className={`button primary${katalogLeer ? ' is-disabled' : ''}`} aria-disabled={katalogLeer}>
             Neues Angebot
