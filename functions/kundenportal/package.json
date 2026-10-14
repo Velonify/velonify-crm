@@ -1,0 +1,27 @@
+{
+  "name": "kundenportal",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Backend des Velonify-Kundenportals: Login per Link, Sitzung, nur freigegebene Daten des eigenen Kunden.",
+  "type": "module",
+  "main": "dist/index.js",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "gcp-build": "",
+    "start": "functions-framework --target=kundenportal",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^5.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.5",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}
