@@ -15,7 +15,8 @@ export async function schreibeSpiegel(store: PostgresStore, sheets: SheetsApi, j
   const tabs = Object.keys(SCHEMA) as TabName[];
   const daten = await Promise.all(tabs.map((tab) => store.ladeTabelle(tab)));
 
-  // Missing tabs first, then one request that sizes every tab and empties it.
+  // Missing tabs first, then one request that sizes every tab and empties it. At least two rows: Google refuses a tab
+  // that would consist of the frozen header row alone (empty tables).
   const vorhanden = new Map((await sheets.getSpreadsheet()).sheets?.map((s) => [s.properties.title, s.properties.sheetId]));
   const fehlend = [...tabs, STAND_TAB].filter((tab) => !vorhanden.has(tab));
   if (fehlend.length) {
@@ -26,7 +27,7 @@ export async function schreibeSpiegel(store: PostgresStore, sheets: SheetsApi, j
     tabs.flatMap((tab, i) => {
       const sheetId = vorhanden.get(tab)!;
       return [
-        { updateSheetProperties: { properties: { sheetId, gridProperties: { rowCount: daten[i].length + 1, columnCount: SCHEMA[tab].columns.length } }, fields: 'gridProperties(rowCount,columnCount)' } },
+        { updateSheetProperties: { properties: { sheetId, gridProperties: { rowCount: Math.max(daten[i].length + 1, 2), columnCount: SCHEMA[tab].columns.length } }, fields: 'gridProperties(rowCount,columnCount)' } },
         { updateCells: { range: { sheetId }, fields: 'userEnteredValue' } },
       ];
     }),
