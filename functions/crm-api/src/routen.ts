@@ -1,7 +1,7 @@
 import { ConflictError, NotFoundError } from '../../../src/data/errors';
 import { SCHEMA, type EntityTab } from '../../../src/data/schema';
 import type { RecordUpdate, Store } from '../../../src/data/store';
-import type { DbPool } from '../../../src/data/postgres/postgresStore';
+import type { DbPool, PostgresStore } from '../../../src/data/postgres/postgresStore';
 import { uebernimm, zaehle } from '../../../src/data/postgres/uebernahme';
 
 /** What the hub can load, one route per Store method. */
@@ -91,4 +91,31 @@ export async function behandleAdmin(methode: string, pfad: string, body: unknown
     return { status: 200, daten: { geschrieben: await uebernimm(db, body.tab as keyof typeof SCHEMA, body.zeilen) } };
   }
   return fehler(404, 'Unbekannte Route.');
+}
+
+/**
+ * Data view (Einrichtung → Daten), for the whole team: any table, the change log of a record and the select lists.
+ * Edits of records go through POST /aendern like every other write, with the same conflict check.
+ */
+export async function behandleDaten(methode: string, pfad: string, body: unknown, store: PostgresStore): Promise<Antwort | null> {
+  const tabelle = /^\/tabelle\/([a-z_]+)$/.exec(pfad);
+  if (tabelle) {
+    if (methode !== 'GET') return fehler(405, 'Nur GET.');
+    return tabelle[1] in SCHEMA ? { status: 200, daten: { records: await store.ladeTabelle(tabelle[1] as keyof typeof SCHEMA) } } : fehler(404, 'Unbekannte Tabelle.');
+  }
+  const verlauf = /^\/verlauf\/([a-z_]+)\/([^/]+)$/.exec(pfad);
+  if (verlauf) {
+    if (methode !== 'GET') return fehler(405, 'Nur GET.');
+    if (!(verlauf[1] in SCHEMA)) return fehler(404, 'Unbekannte Tabelle.');
+    return { status: 200, daten: { eintraege: await store.verlauf(verlauf[1] as keyof typeof SCHEMA, decodeURIComponent(verlauf[2])) } };
+  }
+  if (pfad === '/listen') {
+    if (methode !== 'POST') return fehler(405, 'Nur POST.');
+    if (!istObjekt(body) || typeof body.liste !== 'string' || !/^[a-z_]{1,40}$/.test(body.liste) || !Array.isArray(body.werte)) return fehler(400, 'Liste ungültig.');
+    const werte = [...new Set(body.werte.map((w) => String(w).trim()).filter(Boolean))];
+    if (werte.length === 0 || werte.length > 100) return fehler(400, 'Eine Liste braucht 1 bis 100 Werte.');
+    await store.setzeListe(body.liste, werte);
+    return { status: 200, daten: { ok: true } };
+  }
+  return null;
 }

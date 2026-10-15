@@ -18,6 +18,7 @@ import { ReauthDialog } from './components/ReauthDialog';
 import { ToastProvider } from './components/Toasts';
 import { CrmProvider } from './data/CrmContext';
 import { AnfragenPage } from './eingang/AnfragenPage';
+import { DatenPage } from './pages/DatenPage';
 import { EinrichtungPage } from './pages/EinrichtungPage';
 import { FirmaAktePage } from './pages/FirmaAktePage';
 import { FirmaNeuPage } from './pages/FirmaNeuPage';
@@ -124,6 +125,8 @@ export function App() {
                 <Route path="roast/:id" element={<RoastPage />} />
               </Route>
               <Route path="einrichtung" element={<EinrichtungPage />} />
+              <Route path="einrichtung/daten" element={<DatenPage />} />
+              <Route path="einrichtung/daten/:tab" element={<DatenPage />} />
               <Route path="pipeline" element={<AlteCrmAdresse />} />
               <Route path="firmen/*" element={<AlteCrmAdresse />} />
               <Route path="import" element={<AlteCrmAdresse />} />

@@ -6,6 +6,8 @@ Die API zwischen Hub und Postgres. Seit dem Umzug vom Google Sheet liegen die Da
 
 - **Hub** (`src/data/api/apiStore.ts`): `GET /daten/<gruppe>`, `POST /einfuegen`, `POST /aendern`, `POST /einstellungen`, 1:1 zur `Store`-Schnittstelle. Anmeldung mit dem Google-Token, das der Hub ohnehin hat (`tokeninfo`, nur @velonify.de, wie im Contact Generator). Konflikte über `geaendert_am` kommen als 409 zurück.
 - **Übernahme aus dem Sheet** (`/admin/uebernahme`, `/admin/zaehlen`, nur Lukas und Julian): Die Karte *Einrichtung → Übernahme aus dem Sheet* liest das Sheet im Browser und schickt es hierher, wahlweise nach `crm_test` (Probelauf) oder `crm`.
+- **Datenansicht** (`GET /tabelle/<tab>`, `GET /verlauf/<tab>/<id>`, `POST /listen`): *Einrichtung → Daten* im Hub, für das ganze Team. Einträge ändern läuft über `/aendern` mit Konfliktprüfung, „Zurücknehmen“ schreibt die alten Werte aus `aenderungen` zurück. Löschen darf die API nur in `listen` (Migration 003).
+- **Lese-Spiegel** (`POST /extern/spiegel?token=…`): Cloud Scheduler startet ihn jede Nacht. Er schreibt alle Tabellen in ein Sheet, das das Team nur lesen kann (`SPIEGEL_SHEET_ID`), mit dem Dienstkonto der Function.
 - **Website** (`/extern/eingang`, `/extern/magnete`, Token im Query-String): ersetzt die Apps Scripts `eingang` und `magnete` mit demselben Antwortformat (HTTP 200, Ergebnis in `status`). Die Netlify-Functions der Website brauchen dafür nur neue Adressen in `CRM_EINGANG_URL` und `CRM_MAGNETE_URL`. Magnet-Mails gehen über die Gmail-API (Refresh-Token von lukas@, nur `gmail.send`).
 - **Datenbank** (`../../db/verbindung.ts`): Cloud SQL Connector mit IAM-Anmeldung als `crm-api@velonify-crm.iam`, keine Passwörter. Pool mit 3 Verbindungen, die Rolle darf höchstens 5.
 - **Änderungsprotokoll**: Jede Schreibanfrage setzt `app.person`, ein Trigger schreibt alte und neue Werte nach `aenderungen`.
@@ -34,17 +36,35 @@ for s in crm-api-eingang-token crm-api-magnete-token crm-api-gmail-token crm-mcp
 done
 ```
 
+### Lese-Spiegel (einmalig)
+
+1. Neues Google Sheet „CRM-Spiegel (nur lesen)“ anlegen, im eigenen Drive (nicht in der Shared Drive, damit das Team dort nur Leserechte haben kann). Mit `crm-api@velonify-crm.iam.gserviceaccount.com` als **Bearbeiter** teilen, mit dem Team als **Betrachter**.
+2. Schlüssel und nächtlicher Aufruf:
+
+```bash
+openssl rand -hex 24 | tr -d '\n' | gcloud secrets create crm-api-spiegel-token --data-file=- --project=velonify-crm
+gcloud secrets add-iam-policy-binding crm-api-spiegel-token --project=velonify-crm \
+  --member=serviceAccount:crm-api@velonify-crm.iam.gserviceaccount.com --role=roles/secretmanager.secretAccessor
+gcloud scheduler jobs create http crm-spiegel --location=europe-west3 --project=velonify-crm --schedule="30 2 * * *" --time-zone=Europe/Berlin \
+  --http-method=POST --uri="https://europe-west3-velonify-crm.cloudfunctions.net/crm-api/extern/spiegel?token=$(gcloud secrets versions access latest --secret=crm-api-spiegel-token --project=velonify-crm)" \
+  --attempt-deadline=300s
+```
+
+Beim Deploy zusätzlich `SPIEGEL_SHEET_ID=<ID aus der Sheet-URL>` in `--set-env-vars`.
+
 ## Deploy
 
 ```bash
 npm install && npm test && npm run build
 gcloud functions deploy crm-api --gen2 --region=europe-west3 --runtime=nodejs24 --source=. --entry-point=crmApi \
   --trigger-http --no-allow-unauthenticated --service-account=crm-api@velonify-crm.iam.gserviceaccount.com \
-  --memory=512Mi --max-instances=3 --min-instances=0 --project=velonify-crm \
-  --set-env-vars=TZ=Europe/Berlin,DB_INSTANZ=velonify-apps:europe-west3:velonify-db,DB_NUTZER=crm-api@velonify-crm.iam,DB_NAME=crm,GOOGLE_CLIENT_ID=<CLIENT-ID-HUB>,GMAIL_CLIENT_ID=<CLIENT-ID-CRM-MCP> \
-  --set-secrets=EINGANG_TOKEN=crm-api-eingang-token:latest,MAGNETE_TOKEN=crm-api-magnete-token:latest,GMAIL_REFRESH_TOKEN=crm-api-gmail-token:latest,GMAIL_CLIENT_SECRET=crm-mcp-google-secret:latest
+  --memory=512Mi --cpu=1 --concurrency=40 --max-instances=1 --min-instances=0 --project=velonify-crm \
+  --set-env-vars=TZ=Europe/Berlin,DB_INSTANZ=velonify-apps:europe-west3:velonify-db,DB_NUTZER=crm-api@velonify-crm.iam,DB_NAME=crm,GOOGLE_CLIENT_ID=<CLIENT-ID-HUB>,GMAIL_CLIENT_ID=<CLIENT-ID-CRM-MCP>,SPIEGEL_SHEET_ID=<SHEET-ID> \
+  --set-secrets=EINGANG_TOKEN=crm-api-eingang-token:latest,MAGNETE_TOKEN=crm-api-magnete-token:latest,SPIEGEL_TOKEN=crm-api-spiegel-token:latest,GMAIL_REFRESH_TOKEN=crm-api-gmail-token:latest,GMAIL_CLIENT_SECRET=crm-mcp-google-secret:latest
 gcloud run services update crm-api --region=europe-west3 --no-invoker-iam-check --project=velonify-crm
 ```
+
+**Eine Instanz, viele Anfragen gleichzeitig** (`--cpu=1 --concurrency=40 --max-instances=1`): Mit der Voreinstellung (eine Anfrage je Instanz) startet Google bei jedem parallelen Laden eine weitere Instanz mit eigenen Verbindungen, und das Konto `crm-api` darf nur 5. So bleibt es bei höchstens 4 (3 für `crm`, 1 für Probeläufe in `crm_test`).
 
 `gcp-build` ist absichtlich leer: Cloud Build bekommt das fertige `dist/index.js` und installiert nur Functions Framework, `pg` und den Connector. Die Org-Policy verbietet `allUsers`, deshalb `--no-invoker-iam-check`; die Function prüft jede Anfrage selbst.
 

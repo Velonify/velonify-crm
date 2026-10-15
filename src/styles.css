@@ -1304,3 +1304,19 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
 .freigabe-zeile { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; margin-top: var(--space-2); }
 .freigabe-zeile .button { margin-left: auto; }
 @media (prefers-reduced-motion: reduce) { .schalter::after { transition: none; } }
+
+/* Datenansicht (Einrichtung → Daten) */
+.daten-wahl { margin-bottom: var(--space-4); }
+.daten-wahl select { min-width: 240px; }
+.daten-filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
+.daten-filter input[type='search'] { flex: 1 1 260px; min-width: 0; }
+.daten-wrap { max-height: 70vh; overflow: auto; }
+.daten-tabelle td { white-space: nowrap; max-width: 320px; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.daten-tabelle thead th { position: sticky; top: 0; background: var(--raised); z-index: 1; }
+.daten-tabelle tbody tr { cursor: pointer; }
+.daten-tabelle .mono { font-family: var(--font-mono, ui-monospace, monospace); }
+.daten-sort { all: unset; cursor: pointer; font: inherit; letter-spacing: inherit; text-transform: inherit; }
+.daten-sort:focus-visible { outline: 2px solid var(--focus, currentColor); outline-offset: 2px; }
+.daten-verlauf { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--space-2); font-size: 13.5px; }
+.daten-verlauf li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; border-bottom: 1px solid var(--line); padding-bottom: var(--space-2); }
+.daten-verlauf .button { margin-left: auto; }

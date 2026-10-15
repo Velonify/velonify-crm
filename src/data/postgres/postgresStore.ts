@@ -1,5 +1,5 @@
 import { ConflictError, NotFoundError } from '../errors';
-import { ANGEBOTS_TABS, CONTACT_TABS, ENTITY_TABS, KUNDEN_TABS, LISTEN_DEFAULTS, MAGNET_TABS, PORTAL_TABS, SCHEMA, SOCIAL_TABS, TODO_TABS, type EntityTab, type TabSchema } from '../schema';
+import { ANGEBOTS_TABS, CONTACT_TABS, ENTITY_TABS, KUNDEN_TABS, LISTEN_DEFAULTS, MAGNET_TABS, PORTAL_TABS, SCHEMA, SOCIAL_TABS, TODO_TABS, type EntityTab, type TabName, type TabSchema } from '../schema';
 import type { RecordUpdate, Store } from '../store';
 import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, KundenDaten, Listen, MagnetDaten, MonsteraEintrag, PortalDaten, SocialDaten, SpieleDaten, TodoDaten, WordleErgebnis } from '../types';
 
@@ -14,6 +14,16 @@ export interface DbPool extends Db {
 }
 
 type Wert = string | number | boolean | null;
+
+/** One entry of the change log; `vorher` is empty for inserts. */
+export interface Aenderung {
+  id: string;
+  aktion: 'insert' | 'update';
+  vorher: Record<string, unknown> | null;
+  nachher: Record<string, unknown>;
+  von: string | null;
+  am: string;
+}
 
 /** Value for the database: '' becomes NULL, numbers and booleans are parsed like the sheet did. */
 export function zuDb(schema: TabSchema, spalte: string, wert: unknown): Wert {
@@ -148,6 +158,29 @@ export class PostgresStore implements Store {
   async loadPortalDaten(): Promise<PortalDaten> {
     const [zugaenge, werkzeuge, meilensteine] = await Promise.all(PORTAL_TABS.map((tab) => this.tabelle(tab)));
     return { zugaenge, werkzeuge, meilensteine } as PortalDaten;
+  }
+
+  /** Any table as the app sees it, for the data view (Einrichtung → Daten). */
+  ladeTabelle(tab: TabName): Promise<Record<string, Wert>[]> {
+    const schema = SCHEMA[tab];
+    return this.db.query(`SELECT ${spaltenListe(schema)} FROM ${schema.name} ORDER BY nr`).then(({ rows }) => rows.map((z) => zuRecord(schema, z)));
+  }
+
+  /** Change log of one record, newest first. */
+  async verlauf(tab: TabName, id: string): Promise<Aenderung[]> {
+    const { rows } = await this.db.query<Aenderung>(
+      'SELECT id::text AS id, aktion, vorher, nachher, von, am::text AS am FROM aenderungen WHERE tabelle = $1 AND datensatz_id = $2 ORDER BY id DESC LIMIT 200',
+      [tab, id],
+    );
+    return rows;
+  }
+
+  /** Replaces the values of one select list (team, verlustgrund, …) in the given order. */
+  async setzeListe(liste: string, werte: string[]): Promise<void> {
+    await this.schreibend(async (db) => {
+      await db.query('DELETE FROM listen WHERE liste = $1', [liste]);
+      for (const wert of werte) await db.query('INSERT INTO listen (liste, wert) VALUES ($1, $2) ON CONFLICT DO NOTHING', [liste, wert]);
+    });
   }
 
   /** The tables always exist (migrations), so there is no structure to forget. */
