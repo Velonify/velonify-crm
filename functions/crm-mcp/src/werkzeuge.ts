@@ -74,7 +74,8 @@ export const ANLEITUNG = `Velonify-CRM (Google Sheet hinter crm.velonify.de). Sc
 - "zustaendig" sind ein oder mehrere Vornamen aus dem Team, mit Komma getrennt (z. B. "Lugge, Julian"; siehe \`ueberblick\`), keine E-Mail.
 - Daten im Format JJJJ-MM-TT. Die Zeitzone ist Europe/Berlin.
 - Nichts wird gelöscht. \`archivieren\` blendet Firmen, Deals, Kontakte oder Lead-Magnete aus und lässt sich rückgängig machen; vorher nachfragen.
-- To-dos (Karten auf den Boards unter crm.velonify.de/#/todo): \`boards\`, \`karten\`, \`karte_anlegen\`, \`karte_verschieben\`, \`karte_erledigt\`, \`karte_kommentieren\`. Board "intern" ist „${INTERNES_BOARD_TITEL}“, Kunden-Boards über Firmenname oder Kürzel. Karten-IDs über \`karten\` holen.
+- To-dos (Karten auf den Boards unter crm.velonify.de/#/todo): \`boards\`, \`karten\`, \`karte_anlegen\`, \`karte_verschieben\`, \`karte_erledigt\`, \`karte_kommentieren\`. Board "intern" ist „${INTERNES_BOARD_TITEL}“, Kunden-Boards über Firmenname, Kürzel oder den Slack-Channel mit # davor. Karten-IDs über \`karten\` holen. \`freigabe_anfragen\` legt eine Karte dem Kunden im Kundenportal zur Freigabe vor.
+- Aus Slack: Bei To-dos aus Nachrichten \`karte_anlegen\` mit \`aus_slack: true\` und dem Permalink als \`link\` – pro Nachricht entsteht nur eine Karte. "meine To-dos" heißt: zustaendig ist die Person, die schreibt. Neuigkeiten für einen Kunden mit \`kunden_news_anlegen\`; für den Kunden sichtbar nur, wenn ausdrücklich gewünscht.
 - Lead-Magnete (Downloads gegen E-Mail auf velonify.de/ressourcen/<adresse>/): \`magnete\`, \`magnet_speichern\`, \`magnet_leads\`, \`magnet_lead_uebernehmen\`, \`magnet_lead_verwerfen\`. Ein aktiver Magnet hat sofort seine Landingpage; aktiv geht nur mit Untertitel und beim Typ „datei“ mit Datei-Link (Google Drive, per Link freigegeben). Typ „audit“ ist der Shop-Roast: kein Download, das Team prüft den Shop und schickt einen Report; \`plaetze\` begrenzt die Zahl, danach Warteliste. Wer nur den Download wollte, bekommt keine Werbe-Mails – Kontakt danach über LinkedIn.`;
 
 // ─── Ausgabe ────────────────────────────────────────────────────────────────
@@ -222,9 +223,33 @@ function karteZeile(k: Karte, board: Board | undefined, daten: TodoDaten, heute:
  * The board a name points to: "intern", a board id or title, or a client by firma_id, Kürzel or name.
  * Returns the firm id for `boardFuer` and the board when it already exists.
  */
+/** Prefixes of Velonify's own Slack channels; their to-dos go to the internal board. */
+const INTERNE_CHANNELS = /^(ops|dev|sales|intern|team|general|allgemein|random)(-|$)/;
+
+/**
+ * The firm of a Slack channel: the channel stored on the firm (`slack_channel`), else the naming rule
+ * client-<kürzel>-… / ext-<kürzel>-…; Velonify's own channels mean the internal board. Undefined when unknown.
+ */
+function firmaAusChannel(db: Database, channel: string): { firmaId: string } | undefined {
+  const name = klein(channel).replace(/^#/, '');
+  const firmen = db.firmen.filter((f) => !f.archiviert);
+  const gespeichert = firmen.find((f) => f.slack_channel && klein(f.slack_channel).replace(/^#/, '') === name);
+  if (gespeichert) return { firmaId: gespeichert.id };
+  const kuerzel = /^(?:client|ext)-([a-z0-9]+)(?:-|$)/.exec(name)?.[1];
+  const firma = kuerzel ? firmen.find((f) => klein(f.kuerzel) === kuerzel) : undefined;
+  if (firma) return { firmaId: firma.id };
+  if (INTERNE_CHANNELS.test(name)) return { firmaId: '' };
+  return undefined;
+}
+
 function findeBoard(db: Database, boards: readonly Board[], angabe: string): { firmaId: string; board?: Board } {
   const wert = klein(angabe);
   if (!wert || wert === 'intern' || wert === klein(INTERNES_BOARD_TITEL)) return { firmaId: '', board: boardVon(boards, '') };
+  if (wert.startsWith('#')) {
+    const ausChannel = firmaAusChannel(db, wert);
+    if (!ausChannel) throw new Error(`Zum Channel „${angabe}“ gehört kein Kunde (weder als Slack-Channel der Firma eingetragen noch client-<kürzel>-…). Board "intern" oder den Kunden angeben.`);
+    return { firmaId: ausChannel.firmaId, board: boardVon(boards, ausChannel.firmaId) };
+  }
   const direkt = boards.find((b) => !b.archiviert && (b.id === angabe.trim() || klein(b.titel) === wert));
   if (direkt) return { firmaId: direkt.firma_id, board: direkt };
   const firmen = db.firmen.filter((f) => !f.archiviert);
@@ -987,7 +1012,7 @@ export function registriereWerkzeuge(server: McpServer, { service, person, teamN
 
   // ─── To-dos ─────────────────────────────────────────────────────────────────
 
-  const boardAngabe = z.string().min(1).describe('"intern" für „Velonify intern“, sonst Firmenname, Kürzel, firma_id oder board_id');
+  const boardAngabe = z.string().min(1).describe('"intern" für „Velonify intern“, sonst Firmenname, Kürzel, firma_id, board_id oder ein Slack-Channel mit # (z. B. "#client-agk-general")');
 
   server.registerTool(
     'boards',
@@ -1060,7 +1085,8 @@ export function registriereWerkzeuge(server: McpServer, { service, person, teamN
     {
       title: 'To-do-Karte anlegen',
       description:
-        'Legt eine Karte auf einem Board an, wie „Neue Karte“ im Hub. Fehlt das Board eines Kunden, wird es mit den Standardspalten angelegt. Ohne spalte landet die Karte unten in der ersten Spalte (Backlog).',
+        'Legt eine Karte auf einem Board an, wie „Neue Karte“ im Hub. Fehlt das Board eines Kunden, wird es mit den Standardspalten angelegt. Ohne spalte landet die Karte unten in der ersten Spalte (Backlog). ' +
+        'Für To-dos aus Slack aus_slack: true und den Permalink der Nachricht als link setzen: die Karte bekommt das Label „Slack“, und gibt es zu dem Link schon eine Karte, wird keine zweite angelegt (Antwort schon_vorhanden).',
       inputSchema: {
         board: boardAngabe,
         titel: z.string().min(1).max(200).describe('Kurz; Details in die beschreibung'),
@@ -1072,12 +1098,24 @@ export function registriereWerkzeuge(server: McpServer, { service, person, teamN
         spalte: z.string().optional().describe('Spalten-ID oder -Name, siehe `boards`'),
         sichtbar_kunde: z.boolean().optional().describe('Nur Kunden-Boards: Karte im Kundenportal zeigen, Standard false'),
         link: z.string().optional().describe('Quelle, z. B. Slack- oder Mail-Link (https://…)'),
+        aus_slack: z.boolean().optional().describe('To-do aus einer Slack-Nachricht (z. B. täglicher Lauf): link = Permalink, Pflicht; ohne zustaendig bleibt die Karte ohne Person'),
       },
       annotations: schreiben,
     },
-    sicher(async ({ board: angabe, titel, beschreibung, zustaendig, faellig_am, labels, checkliste, spalte, sichtbar_kunde, link }) => {
+    sicher(async ({ board: angabe, titel, beschreibung, zustaendig, faellig_am, labels, checkliste, spalte, sichtbar_kunde, link, aus_slack }) => {
       const [db, daten] = await Promise.all([service.load(), service.loadTodoDaten()]);
-      const wer = zustaendig ? zustaendigWert(zustaendig) : meinName(db) ?? '';
+      const quelleLink = (link ?? '').trim();
+      if (aus_slack) {
+        if (!/^https:\/\/[\w.-]+\.slack\.com\/archives\//.test(quelleLink)) return fehler('Für aus_slack bitte den Permalink der Slack-Nachricht als link angeben (https://….slack.com/archives/…).');
+        // The daily run reads overlapping windows; one message gives one card, also when it was archived or done meanwhile.
+        const vorhanden = daten.aufgaben.find((a) => a.quelle_link.trim() === quelleLink);
+        if (vorhanden) {
+          const vorhandenBoard = daten.boards.find((b) => b.id === vorhanden.board_id);
+          return antwort({ angelegt: false, schon_vorhanden: true, karte: karteZeile(vorhanden, vorhandenBoard, daten, heute()), hub: boardLink(vorhanden.board_id) });
+        }
+      }
+      // A run without a person behind it (the daily routine) must not assign the cards to whoever owns the connector.
+      const wer = zustaendig ? zustaendigWert(zustaendig) : aus_slack ? '' : meinName(db) ?? '';
       pruefeTeam(db, wer);
       const ziel = findeBoard(db, daten.boards, angabe);
       if (sichtbar_kunde && !ziel.firmaId) return fehler('Karten auf „Velonify intern“ sind nie für Kunden sichtbar.');
@@ -1089,12 +1127,12 @@ export function registriereWerkzeuge(server: McpServer, { service, person, teamN
         beschreibung: beschreibung ?? '',
         zustaendig: wer,
         faellig_am: faellig_am ?? '',
-        labels: (labels ?? []).join(','),
+        labels: [...new Set([...(labels ?? []), ...(aus_slack ? ['Slack'] : [])])].join(','),
         checkliste: JSON.stringify((checkliste ?? []).map((text) => ({ text, erledigt: false }))),
         sichtbar_kunde: sichtbar_kunde ?? false,
         spalte_id: spalte ? findeSpalte(board, spalte).id : undefined,
-        quelle: 'manuell',
-        quelle_link: link ?? '',
+        quelle: aus_slack ? 'agent' : 'manuell',
+        quelle_link: quelleLink,
       });
       return antwort({
         angelegt: true,
@@ -1152,6 +1190,50 @@ export function registriereWerkzeuge(server: McpServer, { service, person, teamN
       const { karte } = findeKarte(await service.loadTodoDaten(), karte_id);
       const kommentar = await service.kommentiereKarte(karte_id, text);
       return antwort({ kommentiert: true, karte: karte.titel, kommentar: kompakt({ ...kommentar, aufgabe_id: undefined }) });
+    }),
+  );
+
+  server.registerTool(
+    'freigabe_anfragen',
+    {
+      title: 'Freigabe beim Kunden anfragen',
+      description:
+        'Legt eine Karte eines Kunden-Boards dem Kunden zur Freigabe vor: Sie wird für den Kunden sichtbar und steht im Kundenportal unter „Für dich zu tun“. Mit zuruecknehmen: true wird die Anfrage zurückgezogen (oder die Antwort des Kunden als erledigt markiert).',
+      inputSchema: { karte_id: z.string(), zuruecknehmen: z.boolean().optional() },
+      annotations: schreiben,
+    },
+    sicher(async ({ karte_id, zuruecknehmen }) => {
+      const { karte, board } = findeKarte(await service.loadTodoDaten(), karte_id);
+      if (!board.firma_id) return fehler('Freigaben gibt es nur auf Kunden-Boards, nicht auf „Velonify intern“.');
+      const neu = zuruecknehmen ? await service.freigabeZuruecksetzen(karte.id, karte.geaendert_am) : await service.freigabeAnfragen(karte.id, karte.geaendert_am);
+      return antwort({ karte: neu.titel, board: board.titel, freigabe: neu.freigabe || 'keine', sichtbar_kunde: neu.sichtbar_kunde, hub: boardLink(board.id) });
+    }),
+  );
+
+  server.registerTool(
+    'kunden_news_anlegen',
+    {
+      title: 'Kunden-News anlegen',
+      description:
+        'Schreibt eine Meldung in den News-Ticker eines Kunden im Client-Hub (z. B. „Tracking ist live“). Mit kunde "alle" gilt sie für alle Kunden. Für den Kunden im Kundenportal sichtbar nur mit sichtbar_kunde: true – vorher nachfragen.',
+      inputSchema: {
+        kunde: z.string().min(1).describe('Firmenname, Kürzel, firma_id, Slack-Channel mit # oder "alle"'),
+        titel: z.string().min(1).max(160),
+        text: z.string().optional(),
+        art: z.enum(['update', 'meilenstein', 'hinweis']).optional().describe('Standard: update'),
+        datum: datum.optional().describe('Standard: heute'),
+        sichtbar_kunde: z.boolean().optional(),
+      },
+      annotations: schreiben,
+    },
+    sicher(async ({ kunde, titel, text, art, datum: tag, sichtbar_kunde }) => {
+      const db = await service.load();
+      const alle = klein(kunde) === 'alle';
+      const firmaId = alle ? '' : findeBoard(db, [], kunde).firmaId;
+      if (!alle && !firmaId) return fehler('Für „Velonify intern“ gibt es keine Kunden-News. Einen Kunden oder "alle" angeben.');
+      const news = await service.saveKundenNews({ firma_id: firmaId, art: art ?? 'update', titel, text: text ?? '', datum: tag ?? '', angeheftet: false, sichtbar_kunde: sichtbar_kunde ?? false });
+      const firma = db.firmen.find((f) => f.id === firmaId);
+      return antwort({ angelegt: true, kunde: firma?.name ?? 'alle Kunden', titel: news.titel, datum: news.datum, sichtbar_kunde: news.sichtbar_kunde, hub: firma ? `${HUB}/#/kunden/${firma.id}/news` : undefined });
     }),
   );
 }
