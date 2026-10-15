@@ -66,6 +66,8 @@ export interface Kundensicht {
   ich: { vorname: string; nachname: string; email: string };
   /** Set when a Velonify team member looks at the portal as this client (read only): their e-mail. */
   vorschau: string | null;
+  /** All clients this person may open (same e-mail, active login each), for the switcher; the current one included. */
+  firmen: { id: string; name: string }[];
   team: string[];
   fahrplan: { titel: string; datum: string; status: MeilensteinStatus }[];
   karten: PortalKarte[];
@@ -112,14 +114,23 @@ export function vorschauBerechtigung(db: Pick<Database, 'firmen'>, firmaId: stri
  * active client. Anything else is no login (the caller answers the same either way, so nobody can probe addresses).
  */
 export function findeBerechtigung(db: Pick<Database, 'firmen' | 'kontakte'>, portal: Pick<PortalDaten, 'zugaenge'>, email: string): Berechtigung | null {
+  return alleBerechtigungen(db, portal, email)[0] ?? null;
+}
+
+/**
+ * Every login of an e-mail address: one person can look after several clients (a contact with the same address at
+ * each firm, each with its own portal login). The one used last comes first, so the login link opens that firm.
+ */
+export function alleBerechtigungen(db: Pick<Database, 'firmen' | 'kontakte'>, portal: Pick<PortalDaten, 'zugaenge'>, email: string): Berechtigung[] {
   const gesucht = normalisiereEmail(email);
-  if (!gesucht) return null;
+  if (!gesucht) return [];
+  const liste: Berechtigung[] = [];
   for (const kontakt of db.kontakte) {
     if (kontakt.archiviert || normalisiereEmail(kontakt.email) !== gesucht) continue;
     const berechtigung = pruefeBerechtigung(db, portal, kontakt.id, kontakt.firma_id);
-    if (berechtigung) return berechtigung;
+    if (berechtigung && !liste.some((b) => b.firma.id === berechtigung.firma.id)) liste.push(berechtigung);
   }
-  return null;
+  return liste.sort((a, b) => b.zugang.zuletzt_am.localeCompare(a.zugang.zuletzt_am) || a.firma.name.localeCompare(b.firma.name, 'de'));
 }
 
 /** Re-checked on every request with a session: the login can be switched off in the hub at any time. */
@@ -214,6 +225,8 @@ export function kundensicht(args: {
   teamDomain: string;
   /** E-mail of the team member for a preview session */
   vorschau?: string;
+  /** All logins of the same e-mail (see `alleBerechtigungen`) */
+  andere?: readonly Berechtigung[];
 }): Kundensicht {
   const { berechtigung, kunden, todos, portal, dateien } = args;
   const { firma, kontakt } = berechtigung;
@@ -237,6 +250,9 @@ export function kundensicht(args: {
       : null,
     ich: { vorname: kontakt.vorname, nachname: kontakt.nachname, email: kontakt.email },
     vorschau: args.vorschau ?? null,
+    firmen: (args.andere?.length ? args.andere : [berechtigung])
+      .map((b) => ({ id: b.firma.id, name: b.firma.name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'de')),
     team: fuerKunden(firma.zustaendig),
     fahrplan: meilensteineVon(portal.meilensteine, firma.id).map((m) => ({ titel: m.titel, datum: m.datum, status: m.status })),
     karten: [...offen, ...erledigt].map((a) => portalKarte(a, kontext)),

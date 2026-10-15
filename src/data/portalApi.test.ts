@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDemoBackend } from './demo/seed';
-import { findeBerechtigung, fuerKunden, kundensicht, loginMail, pruefeBerechtigung, vorschauBerechtigung } from './portalApi';
+import { alleBerechtigungen, findeBerechtigung, fuerKunden, kundensicht, loginMail, pruefeBerechtigung, vorschauBerechtigung } from './portalApi';
 
 async function demo() {
   const { service } = await createDemoBackend(() => 'lukas@velonify.de');
@@ -16,6 +16,35 @@ describe('fuerKunden', () => {
 });
 
 describe('portal API', () => {
+  it('lets one person with logins at two clients switch between them, last used first', async () => {
+    const { service, firma } = await demo();
+    let db = await service.load();
+    const zweite = db.firmen.find((f) => f.id !== firma.id && !f.archiviert)!;
+    await service.updateFirma(zweite.id, { status: 'kunde' }, zweite.geaendert_am);
+    const kontakt = await service.saveKontakt(zweite.id, { vorname: 'Sophie', nachname: 'Beispiel', rolle: '', email: 'Sophie@Alpenglanz.example', telefon: '', linkedin: '', hauptkontakt: false, notiz: '' });
+    db = await service.load();
+    let portal = await service.loadPortalDaten();
+    // Without a login at the second client only the first one counts.
+    expect(alleBerechtigungen(db, portal, 'sophie@alpenglanz.example').map((b) => b.firma.id)).toEqual([firma.id]);
+
+    await service.setPortalZugang(zweite.id, kontakt.id, true);
+    portal = await service.loadPortalDaten();
+    const beide = alleBerechtigungen(db, portal, 'sophie@alpenglanz.example');
+    expect(beide.map((b) => b.firma.id).sort()).toEqual([firma.id, zweite.id].sort());
+    const [kunden, todos] = await Promise.all([service.loadKundenDaten(), service.loadTodoDaten()]);
+    const sicht = kundensicht({ berechtigung: beide[0], db, kunden, todos, portal, dateien: [], teamDomain: 'velonify.de', andere: beide });
+    expect(sicht.firmen.map((f) => f.id).sort()).toEqual([firma.id, zweite.id].sort());
+
+    // The one used last opens first.
+    const zuletzt = { ...portal, zugaenge: portal.zugaenge.map((x) => (x.kontakt_id === kontakt.id ? { ...x, zuletzt_am: '2099-01-01T00:00:00.000Z' } : x)) };
+    expect(findeBerechtigung(db, zuletzt, 'sophie@alpenglanz.example')?.firma.id).toBe(zweite.id);
+
+    // Switched off at one client: only the other one is left.
+    await service.setPortalZugang(zweite.id, kontakt.id, false);
+    portal = await service.loadPortalDaten();
+    expect(alleBerechtigungen(db, portal, 'sophie@alpenglanz.example').map((b) => b.firma.id)).toEqual([firma.id]);
+  });
+
   it('finds a login only for active logins of active clients, case-insensitive', async () => {
     const { service, db, firma } = await demo();
     let portal = await service.loadPortalDaten();
