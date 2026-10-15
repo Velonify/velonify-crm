@@ -39,6 +39,18 @@ export function erstelleSitzung(siegel: Siegel, b: Berechtigung, jetzt: number):
   return { sitzung: siegel.versiegle('sitzung', { k: b.kontakt.id, f: b.firma.id, exp } satisfies SitzungInhalt), gueltig_bis: new Date(exp).toISOString() };
 }
 
+/**
+ * Sessions slide: whoever opens the portal at least every 30 days stays logged in. A fresh session is handed out at
+ * most once a day (when the current one is older than a day), so most calls send nothing back.
+ */
+export function verlaengerteSitzung(siegel: Siegel, inhalt: SitzungInhalt, jetzt: number): { sitzung: string; gueltig_bis: string } | null {
+  if (inhalt.exp - jetzt > SITZUNG_GUELTIG_MS - VERLAENGERN_NACH_MS) return null;
+  const exp = jetzt + SITZUNG_GUELTIG_MS;
+  return { sitzung: siegel.versiegle('sitzung', { k: inhalt.k, f: inhalt.f, exp } satisfies SitzungInhalt), gueltig_bis: new Date(exp).toISOString() };
+}
+
+const VERLAENGERN_NACH_MS = 24 * 60 * 60_000;
+
 export function oeffneSitzung(siegel: Siegel, token: string, jetzt: number): SitzungInhalt | null {
   const inhalt = siegel.oeffne<SitzungInhalt>('sitzung', token);
   if (!inhalt || typeof inhalt.exp !== 'number' || inhalt.exp < jetzt) return null;
