@@ -232,7 +232,7 @@ export function loginMail(vorname: string, link: string): { betreff: string; tex
       '',
       link,
       '',
-      'Der Link gilt 15 Minuten und funktioniert nur einmal. Du bleibst danach 30 Tage angemeldet.',
+      'Der Link gilt 15 Minuten und funktioniert nur einmal. Danach bleibst du angemeldet, solange du das Portal mindestens alle 30 Tage öffnest.',
       '',
       'Du hast keinen Link angefordert? Dann kannst du diese Mail ignorieren.',
       '',

@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { Berechtigung } from '../../../src/data/portalApi';
-import { Begrenzer, erstelleLink, erstelleSitzung, linkNochGueltig, oeffneLink, oeffneSitzung } from './anmeldung';
+import { Begrenzer, erstelleLink, erstelleSitzung, linkNochGueltig, oeffneLink, oeffneSitzung, verlaengerteSitzung } from './anmeldung';
 import { rohMail } from './google';
 import { Siegel } from './siegel';
 
@@ -30,6 +30,16 @@ describe('login links and sessions', () => {
     expect(oeffneSitzung(siegel, sitzung, jetzt + 29 * 86_400_000)).toMatchObject({ k: 'K-1', f: 'F-1' });
     expect(oeffneSitzung(siegel, sitzung, jetzt + 31 * 86_400_000)).toBeNull();
     expect(new Date(gueltig_bis).getTime()).toBe(jetzt + 30 * 86_400_000);
+  });
+
+  it('slides the session at most once a day', () => {
+    const tag = 86_400_000;
+    const jetzt = Date.now();
+    const inhalt = oeffneSitzung(siegel, erstelleSitzung(siegel, b(), jetzt).sitzung, jetzt)!;
+    expect(verlaengerteSitzung(siegel, inhalt, jetzt + tag / 2)).toBeNull();
+    const neu = verlaengerteSitzung(siegel, inhalt, jetzt + 20 * tag)!;
+    expect(Date.parse(neu.gueltig_bis)).toBe(jetzt + 50 * tag);
+    expect(oeffneSitzung(siegel, neu.sitzung, jetzt + 45 * tag)).toMatchObject({ k: 'K-1', f: 'F-1' });
   });
 
   it('limits per key within the window', () => {

@@ -22,7 +22,7 @@ import { SheetStore } from '../../../src/data/sheets/sheetStore';
 import { PostgresStore } from '../../../src/data/postgres/postgresStore';
 import type { Store } from '../../../src/data/store';
 import { verbinde, type Verbindung } from '../../../db/verbindung';
-import { Begrenzer, erstelleLink, erstelleSitzung, linkNochGueltig, oeffneLink, oeffneSitzung } from './anmeldung';
+import { Begrenzer, erstelleLink, erstelleSitzung, linkNochGueltig, oeffneLink, oeffneSitzung, verlaengerteSitzung, type SitzungInhalt } from './anmeldung';
 import { dienstkontoToken, Mailer } from './google';
 import { Siegel } from './siegel';
 
@@ -90,13 +90,13 @@ async function store(lz: Laufzeit): Promise<Store> {
 }
 
 /** The login behind the Bearer session, re-checked against the sheet on every call. */
-async function angemeldet(req: Request, lz: Laufzeit, s: Store): Promise<{ berechtigung: Berechtigung; db: Awaited<ReturnType<Store['load']>> } | null> {
+async function angemeldet(req: Request, lz: Laufzeit, s: Store): Promise<{ berechtigung: Berechtigung; db: Awaited<ReturnType<Store['load']>>; sitzung: SitzungInhalt } | null> {
   const bearer = /^Bearer (.+)$/i.exec(req.get('authorization') ?? '')?.[1] ?? '';
   const sitzung = bearer ? oeffneSitzung(lz.siegel, bearer, Date.now()) : null;
   if (!sitzung) return null;
   const [db, portal] = await Promise.all([s.load(), s.loadPortalDaten()]);
   const berechtigung = pruefeBerechtigung(db, portal, sitzung.k, sitzung.f);
-  return berechtigung ? { berechtigung, db } : null;
+  return berechtigung ? { berechtigung, db, sitzung } : null;
 }
 
 async function anmelden(req: Request, res: Response, lz: Laufzeit): Promise<void> {
@@ -138,6 +138,9 @@ async function daten(req: Request, res: Response, lz: Laufzeit): Promise<void> {
   const anmeldung = await angemeldet(req, lz, s);
   if (!anmeldung) return json(res, 401, { fehler: NICHT_ANGEMELDET });
   if (!abrufeProSitzung.erlaubt(anmeldung.berechtigung.kontakt.id)) return json(res, 429, { fehler: 'Zu viele Abrufe. Bitte kurz warten.' });
+  // Opening the portal keeps the login alive; the portal stores the new session from these headers.
+  const neu = verlaengerteSitzung(lz.siegel, anmeldung.sitzung, Date.now());
+  if (neu) res.set('X-Sitzung', neu.sitzung).set('X-Sitzung-Bis', neu.gueltig_bis);
   const drive = new GoogleDrive(lz.token);
   const [kunden, todos, portal, dateien] = await Promise.all([
     s.loadKundenDaten(),
@@ -255,7 +258,7 @@ http('kundenportal', async (req: Request, res: Response) => {
   const origin = req.get('origin') ?? '';
   if (origin && lz.origins.has(origin)) {
     res.set('Access-Control-Allow-Origin', origin).set('Vary', 'Origin');
-    res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Dateiname, X-Dateityp').set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS').set('Access-Control-Max-Age', '3600');
+    res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Dateiname, X-Dateityp').set('Access-Control-Expose-Headers', 'X-Sitzung, X-Sitzung-Bis, Content-Disposition').set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS').set('Access-Control-Max-Age', '3600');
   }
   if (req.method === 'OPTIONS') return void res.status(204).send('');
 
