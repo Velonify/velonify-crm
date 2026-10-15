@@ -2,7 +2,11 @@ import * as functions from '@google-cloud/functions-framework';
 import { Limit, pruefeGoogleToken, ZugriffsFehler } from '../../contact-generator/src/auth';
 import { PostgresStore } from '../../../src/data/postgres/postgresStore';
 import { verbinde, type Verbindung } from '../../../db/verbindung';
+import { timingSafeEqual } from 'node:crypto';
 import { behandle, behandleAdmin } from './routen';
+import { nimmAnfrage } from './extern/eingang';
+import { gmailVersand } from './extern/gmail';
+import { behandleMagnet, type MagnetKonfig } from './extern/magnete';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 const DOMAIN = process.env.ALLOWED_DOMAIN ?? 'velonify.de';
@@ -28,6 +32,30 @@ function datenbank(name = HAUPT_DB): Promise<Verbindung> {
     verbindungen.set(name, verbindung);
   }
   return verbindung;
+}
+
+/** Shared secrets of the website's Netlify functions, in the query string like the Apps Scripts had them. */
+function passt(gegeben: unknown, erwartet: string | undefined): boolean {
+  if (!erwartet || typeof gegeben !== 'string') return false;
+  const a = Buffer.from(gegeben);
+  const b = Buffer.from(erwartet.trim());
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+let magnetKonfig: MagnetKonfig | null = null;
+function magnete(): MagnetKonfig {
+  magnetKonfig ??= {
+    basis: (process.env.BASIS_URL || 'https://velonify.de').replace(/\/$/, ''),
+    signatur: process.env.SIGNATUR_NAME || 'Lukas Hanke',
+    sende: gmailVersand({
+      clientId: process.env.GMAIL_CLIENT_ID ?? '',
+      clientSecret: (process.env.GMAIL_CLIENT_SECRET ?? '').trim(),
+      refreshToken: (process.env.GMAIL_REFRESH_TOKEN ?? '').trim(),
+      absender: process.env.MAIL_ABSENDER || 'Lukas von Velonify <lukas@velonify.de>',
+      antwortAn: process.env.MAIL_ANTWORT_AN || undefined,
+    }),
+  };
+  return magnetKonfig;
 }
 
 const erlaubteHerkunft = (origin: string) => ERLAUBTE_HERKUNFT.includes(origin) || /^http:\/\/localhost:\d+$/.test(origin);
@@ -57,6 +85,24 @@ functions.http('crmApi', async (req, res) => {
     } catch (err) {
       console.error('Datenbank nicht erreichbar', err);
       fehler(503, 'Datenbank nicht erreichbar.');
+    }
+    return;
+  }
+
+  // Website (Netlify functions): same answer format as the Apps Scripts, HTTP 200 with the outcome in `status`.
+  if (pfad === '/extern/eingang' || pfad === '/extern/magnete') {
+    const eingang = pfad === '/extern/eingang';
+    if (req.method !== 'POST' || !passt(req.query.token, eingang ? process.env.EINGANG_TOKEN : process.env.MAGNETE_TOKEN)) {
+      return void res.status(200).json({ status: 403, text: 'Falsches Token.' });
+    }
+    try {
+      const { pool } = await datenbank();
+      const antwort = eingang ? await nimmAnfrage(pool, req.body) : await behandleMagnet(pool, magnete(), req.body);
+      console.log(JSON.stringify({ pfad, aktion: (req.body as { aktion?: string })?.aktion, status: antwort.status, text: antwort.text }));
+      res.status(200).json(antwort);
+    } catch (err) {
+      console.error(`${pfad} fehlgeschlagen`, err);
+      res.status(200).json({ status: 500, text: err instanceof Error ? err.message : String(err) });
     }
     return;
   }
