@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { createDemoBackend } from './demo/seed';
 import { ValidationError } from './errors';
 import {
-  checklisteVon, faelligkeit, kartenNachSpalte, meineAufgaben, neueSpaltenId, prepareKarte, prepareSpalten, sortierungFuerPosition, sortierungZwischen, spaltenVon, STANDARD_SPALTEN,
+  brauchtAufmerksamkeit, checklisteVon, faelligkeit, gruppiereKarten, kartenNachSpalte, meineAufgaben, NIEMAND, offeneKarten, passtUebersicht, neueSpaltenId, prepareKarte, prepareSpalten, sortierungFuerPosition, sortierungZwischen, spaltenVon, STANDARD_SPALTEN,
 } from './todos';
+import { addDays, isoDate } from './ids';
 import type { Aufgabe } from './types';
 
 const leer = { titel: 'X', beschreibung: '', zustaendig: '', faellig_am: '', labels: '', checkliste: '', sichtbar_kunde: false };
@@ -72,5 +73,38 @@ describe('to-do logic', () => {
     expect(meineAufgaben(daten.aufgaben, daten.boards, 'Johannes').map((a) => a.titel)).toEqual(['Black-Week-Banner einbauen']);
     await service.kommentiereKarte(banner.id, 'Freigabe vom Kunden da');
     expect((await service.loadTodoDaten()).kommentare.filter((k) => k.aufgabe_id === banner.id)).toHaveLength(1);
+  });
+
+  it('groups open cards of all boards for the overview', async () => {
+    const { service } = await createDemoBackend(() => 'test@velonify.de');
+    const db = await service.load();
+    const daten = await service.loadTodoDaten();
+    const heute = isoDate(new Date());
+    const offen = offeneKarten(daten.aufgaben, daten.boards);
+    expect(offen.some((a) => a.titel === 'Neue Produktseiten live')).toBe(false);
+    const ctx = { boards: daten.boards, firmen: db.firmen, team: ['Lugge', 'Julian', 'Johannes'], heute };
+
+    const status = gruppiereKarten(offen, 'status', ctx);
+    expect(status.map((g) => g.titel)).toEqual(['Backlog', 'Diese Woche', 'In Arbeit', 'Wartet auf Kunde']);
+    // Columns of both boards are merged; the earliest due date comes first.
+    expect(status[1].karten.map((a) => a.titel)).toEqual(['Angebot Nordlicht nachfassen', 'Black-Week-Banner einbauen']);
+
+    const faellig = gruppiereKarten(offen, 'faelligkeit', ctx);
+    expect(faellig.map((g) => g.id)).toEqual(['ueberfaellig', 'heute', 'bald', 'ohne']);
+
+    const boards = gruppiereKarten(offen, 'board', ctx);
+    expect(boards[0].board?.firma_id).toBe('');
+
+    const personen = gruppiereKarten(offen, 'person', ctx);
+    expect(personen.map((g) => g.id)).toEqual(['Lugge', 'Julian', 'Johannes', NIEMAND]);
+
+    const filter = { person: NIEMAND, boardId: '', suche: '' };
+    expect(offen.filter((a) => passtUebersicht(a, filter)).map((a) => a.titel).sort()).toEqual(['Core Web Vitals der Kategorieseiten prüfen', 'Produktfotos Winterkollektion']);
+    expect(offen.filter((a) => passtUebersicht(a, { person: '', boardId: '', suche: 'klaviyo' }))).toHaveLength(1);
+
+    const ueberfaellig = offen.find((a) => a.titel === 'Produktfotos Winterkollektion')!;
+    expect(brauchtAufmerksamkeit(ueberfaellig, heute)).toBe(true);
+    expect(brauchtAufmerksamkeit({ ...ueberfaellig, faellig_am: addDays(heute, 5) }, heute)).toBe(false);
+    expect(brauchtAufmerksamkeit({ ...ueberfaellig, faellig_am: '', freigabe: 'aenderung' }, heute)).toBe(true);
   });
 });

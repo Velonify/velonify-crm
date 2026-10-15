@@ -1,4 +1,4 @@
-import { istZustaendig, normalisiereZustaendig } from './zustaendig';
+import { istZustaendig, normalisiereZustaendig, personen } from './zustaendig';
 import { ValidationError } from './errors';
 import { addDays, isIsoDate } from './ids';
 import type { Aufgabe, AufgabeInput, Board, ChecklistenPunkt, Firma, Spalte } from './types';
@@ -164,4 +164,127 @@ export const boardTitelFuer = (firma: Firma) => (firma.kuerzel ? `${firma.kuerze
 /** Cards of a client board that were finished recently, for the client hub ticker. */
 export function kuerzlichErledigt(aufgaben: readonly Aufgabe[], boardId: string, seit: string): Aufgabe[] {
   return aufgaben.filter((a) => a.board_id === boardId && !a.archiviert && istErledigt(a) && a.erledigt_am.slice(0, 10) >= seit);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Overview across all boards
+
+/** The column a card shows in; cards in a column that no longer exists count to the first one, as on the board. */
+export function spalteDerKarte(aufgabe: Pick<Aufgabe, 'spalte_id'>, board: Pick<Board, 'spalten'>): Spalte {
+  const spalten = spaltenVon(board);
+  return spalten.find((s) => s.id === aufgabe.spalte_id) ?? spalten[0];
+}
+
+/** Open, not archived cards on active boards. */
+export function offeneKarten(aufgaben: readonly Aufgabe[], boards: readonly Board[]): Aufgabe[] {
+  const aktiv = new Set(boards.filter((b) => !b.archiviert).map((b) => b.id));
+  return aufgaben.filter((a) => aktiv.has(a.board_id) && !a.archiviert && !istErledigt(a));
+}
+
+/** Person filter of the overview: a name, everyone, or cards nobody is responsible for. */
+export const ALLE = '';
+export const NIEMAND = '-';
+
+export interface UebersichtFilter {
+  person: string;
+  boardId: string;
+  suche: string;
+}
+
+export function passtUebersicht(aufgabe: Aufgabe, filter: UebersichtFilter): boolean {
+  if (filter.boardId && aufgabe.board_id !== filter.boardId) return false;
+  if (filter.person === NIEMAND ? personen(aufgabe.zustaendig).length > 0 : filter.person && !istZustaendig(aufgabe.zustaendig, filter.person)) return false;
+  const suche = filter.suche.trim().toLocaleLowerCase('de');
+  if (suche && ![aufgabe.titel, aufgabe.beschreibung, aufgabe.labels].some((t) => t.toLocaleLowerCase('de').includes(suche))) return false;
+  return true;
+}
+
+/** Most urgent first: by due date (cards without one last), then by their place on the board. */
+export const nachDringlichkeit = (a: Aufgabe, b: Aufgabe) =>
+  (a.faellig_am || '9999').localeCompare(b.faellig_am || '9999') || nachSortierung(a, b);
+
+/** Overdue, due today or sent back by the client: what should be looked at before anything else. */
+export function brauchtAufmerksamkeit(aufgabe: Aufgabe, heute: string): boolean {
+  return ['ueberfaellig', 'heute'].includes(faelligkeit(aufgabe, heute)) || aufgabe.freigabe === 'aenderung';
+}
+
+export type Gruppierung = 'status' | 'faelligkeit' | 'board' | 'person';
+
+export interface KartenGruppe {
+  id: string;
+  titel: string;
+  karten: Aufgabe[];
+  /** Set when the group stands for one board. */
+  board?: Board;
+}
+
+export const FAELLIGKEIT_TITEL: Record<Faelligkeit, string> = {
+  ueberfaellig: 'Überfällig',
+  heute: 'Heute',
+  bald: 'Nächste Tage',
+  spaeter: 'Später',
+  ohne: 'Ohne Datum',
+};
+
+/**
+ * Groups open cards for the overview. Status merges the columns of all boards by their title (every board starts with
+ * the same columns); boards come in display order, people in team order with "Niemand" last. A card with two people
+ * shows up under both. Empty groups are left out.
+ */
+export function gruppiereKarten(
+  karten: readonly Aufgabe[],
+  gruppierung: Gruppierung,
+  { boards, firmen, team, heute }: { boards: readonly Board[]; firmen: readonly Firma[]; team: readonly string[]; heute: string },
+): KartenGruppe[] {
+  const boardVonKarte = new Map(boards.map((b) => [b.id, b]));
+  const gruppen = new Map<string, KartenGruppe>();
+  const rein = (id: string, titel: string, a: Aufgabe, board?: Board) => {
+    const g = gruppen.get(id) ?? { id, titel, karten: [], ...(board ? { board } : {}) };
+    g.karten.push(a);
+    gruppen.set(id, g);
+  };
+
+  let reihenfolge: string[] = [];
+  if (gruppierung === 'status') {
+    reihenfolge = STANDARD_SPALTEN.map((s) => s.titel.toLocaleLowerCase('de'));
+    for (const a of karten) {
+      const board = boardVonKarte.get(a.board_id);
+      if (!board) continue;
+      const spalte = spalteDerKarte(a, board);
+      rein(spalte.titel.toLocaleLowerCase('de'), spalte.titel, a);
+    }
+  } else if (gruppierung === 'faelligkeit') {
+    reihenfolge = Object.keys(FAELLIGKEIT_TITEL);
+    for (const a of karten) {
+      const f = faelligkeit(a, heute);
+      rein(f, FAELLIGKEIT_TITEL[f], a);
+    }
+  } else if (gruppierung === 'board') {
+    reihenfolge = sortiereBoards(boards, firmen).map((b) => b.id);
+    for (const a of karten) {
+      const board = boardVonKarte.get(a.board_id);
+      if (board) rein(board.id, board.titel, a, board);
+    }
+  } else {
+    reihenfolge = [...team, NIEMAND];
+    for (const a of karten) {
+      const namen = personen(a.zustaendig);
+      if (namen.length === 0) rein(NIEMAND, 'Niemand zuständig', a);
+      for (const n of namen) rein(n, n, a);
+    }
+  }
+
+  const rang = (id: string) => {
+    const i = reihenfolge.indexOf(id);
+    return i < 0 ? reihenfolge.length : i;
+  };
+  return [...gruppen.values()]
+    .sort((a, b) => rang(a.id) - rang(b.id) || a.titel.localeCompare(b.titel, 'de'))
+    .map((g) => ({ ...g, karten: [...g.karten].sort(nachDringlichkeit) }));
+}
+
+/** Short name of a board for tight spots: the client's Kürzel, "Intern" for the internal board. */
+export function boardKurz(board: Pick<Board, 'firma_id' | 'titel'>, firmen: readonly Firma[]): string {
+  if (!board.firma_id) return 'Intern';
+  return firmen.find((f) => f.id === board.firma_id)?.kuerzel || board.titel;
 }

@@ -40,8 +40,7 @@ import { SocialUebersichtPage } from './social/UebersichtPage';
 import { KundePage } from './kunden/KundePage';
 import { KundenPage } from './kunden/KundenPage';
 import { BoardPage } from './todo/BoardPage';
-import { BoardsPage } from './todo/BoardsPage';
-import { MeinePage } from './todo/MeinePage';
+import { UebersichtPage } from './todo/UebersichtPage';
 import { MagnetLeadsPage } from './magnete/LeadsPage';
 import { MagnetePage } from './magnete/MagnetePage';
 import { RoastPage } from './magnete/RoastPage';
@@ -84,8 +83,8 @@ export function App() {
                 <Route path=":id/:bereich" element={<KundePage />} />
               </Route>
               <Route path="todo">
-                <Route index element={<BoardsPage />} />
-                <Route path="meine" element={<MeinePage />} />
+                <Route index element={<UebersichtPage />} />
+                <Route path="meine" element={<UebersichtPage nurIch />} />
                 <Route path=":id" element={<BoardPage />} />
               </Route>
               <Route path="angebote">

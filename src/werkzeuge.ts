@@ -55,10 +55,10 @@ export const WERKZEUGE: Werkzeug[] = [
     id: 'todo',
     name: 'To-Dos',
     kurz: 'To-Dos',
-    beschreibung: 'Boards für Velonify und jeden Kunden: Karten, Fälligkeiten, wer was macht',
+    beschreibung: 'Alle offenen Karten auf einen Blick, Boards für Velonify und jeden Kunden',
     pfad: '/todo',
     navigation: [
-      { label: 'Boards', pfad: '/todo', end: true },
+      { label: 'Übersicht', pfad: '/todo', end: true },
       { label: 'Meine Aufgaben', pfad: '/todo/meine' },
     ],
   },
