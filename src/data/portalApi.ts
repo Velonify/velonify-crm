@@ -6,6 +6,7 @@
 import { CLIENT_SHARE_ORDNER } from './kunden';
 import { freigabeVon, meilensteineVon, type FreigabeStatus } from './portal';
 import { checklisteVon, erledigtSpalte, spaltenVon } from './todos';
+import { slackChannelUrl } from './start';
 import { personen } from './zustaendig';
 import type { Aufgabe, AufgabenKommentar, Board, Database, Firma, Kontakt, KundenDaten, MeilensteinStatus, PortalDaten, PortalZugang, Spalte, TodoDaten } from './types';
 
@@ -59,6 +60,8 @@ export interface PortalDatei {
 
 export interface Kundensicht {
   kunde: { name: string; kuerzel: string };
+  /** The client's Slack channel (from the firm in the hub); the preferred way to reach the team. Null without one. */
+  slack: { channel: string; url: string } | null;
   ich: { vorname: string; nachname: string; email: string };
   team: string[];
   fahrplan: { titel: string; datum: string; status: MeilensteinStatus }[];
@@ -71,6 +74,11 @@ export interface Kundensicht {
 
 /** Columns that mean "the team is on it" on the standard board. */
 const ARBEIT_SPALTEN = new Set(['woche', 'arbeit', 'wartet']);
+
+/** Internal nicknames in `zustaendig` and the name clients see instead. */
+export const KUNDEN_NAME: Record<string, string> = { Lugge: 'Lukas' };
+/** The team members of a `zustaendig` value as clients see them. */
+export const fuerKunden = (wert: string) => [...new Set(personen(wert).map((n) => KUNDEN_NAME[n] ?? n))];
 
 export const normalisiereEmail = (email: string) => email.trim().toLowerCase();
 
@@ -155,7 +163,7 @@ export function portalKarte(a: Aufgabe, kontext: KartenKontext): PortalKarte {
     titel: a.titel,
     beschreibung: a.beschreibung,
     phase,
-    zustaendig: personen(a.zustaendig),
+    zustaendig: fuerKunden(a.zustaendig),
     faellig_am: a.faellig_am,
     erledigt_am: phase === 'erledigt' ? datumTeil(a.erledigt_am) : '',
     checkliste: checklisteVon(a).map((p) => ({ text: p.text, erledigt: p.erledigt })),
@@ -179,7 +187,7 @@ export function sichtbareKarten(todos: Pick<TodoDaten, 'boards' | 'aufgaben'>, f
 
 export function kundensicht(args: {
   berechtigung: Berechtigung;
-  db: Pick<Database, 'kontakte'>;
+  db: Pick<Database, 'kontakte'> & Partial<Pick<Database, 'einstellungen'>>;
   kunden: KundenDaten;
   todos: TodoDaten;
   portal: PortalDaten;
@@ -203,8 +211,11 @@ export function kundensicht(args: {
 
   return {
     kunde: { name: firma.name, kuerzel: firma.kuerzel },
+    slack: firma.slack_channel.trim()
+      ? { channel: firma.slack_channel.trim().replace(/^#/, ''), url: slackChannelUrl(args.db.einstellungen ?? {}, firma.slack_channel.trim()) }
+      : null,
     ich: { vorname: kontakt.vorname, nachname: kontakt.nachname, email: kontakt.email },
-    team: personen(firma.zustaendig),
+    team: fuerKunden(firma.zustaendig),
     fahrplan: meilensteineVon(portal.meilensteine, firma.id).map((m) => ({ titel: m.titel, datum: m.datum, status: m.status })),
     karten: [...offen, ...erledigt].map((a) => portalKarte(a, kontext)),
     news: kunden.news
