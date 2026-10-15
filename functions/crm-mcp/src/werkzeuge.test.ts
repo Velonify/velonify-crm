@@ -286,7 +286,7 @@ describe('To-dos', () => {
   it('bietet die To-do-Werkzeuge an, lesende als readOnly markiert', async () => {
     const { tools } = await client.listTools();
     const namen = tools.map((t) => t.name);
-    expect(namen).toEqual(expect.arrayContaining(['boards', 'karten', 'karte_anlegen', 'karte_verschieben', 'karte_erledigt', 'karte_kommentieren']));
+    expect(namen).toEqual(expect.arrayContaining(['boards', 'karten', 'karte_anlegen', 'karte_verschieben', 'karte_erledigt', 'karte_kommentieren', 'freigabe_anfragen', 'kunden_news_anlegen']));
     expect(tools.find((t) => t.name === 'karten')?.annotations?.readOnlyHint).toBe(true);
     expect(tools.find((t) => t.name === 'karte_anlegen')?.annotations?.readOnlyHint).toBe(false);
   });
@@ -336,6 +336,44 @@ describe('To-dos', () => {
     const gespeichert = await karteVon('Rechnungsvorlage überarbeiten');
     expect(gespeichert).toMatchObject({ spalte_id: 'woche', quelle: 'manuell', erstellt_von: 'lugge@velonify.de', sichtbar_kunde: false });
     expect((await rufe('karten', { zustaendig: 'Julian' })).daten.karten.map((k: { titel: string }) => k.titel)).toContain('Rechnungsvorlage überarbeiten');
+  });
+
+  it('legt To-dos aus Slack nur einmal je Nachricht an, ohne Person und mit Label', async () => {
+    const link = 'https://velonify.slack.com/archives/C0123ABC/p1760500000000100';
+    const erste = await rufe('karte_anlegen', { board: 'intern', titel: 'Angebot nachfassen', aus_slack: true, link, labels: ['Sales'] });
+    expect(erste.daten.angelegt).toBe(true);
+    expect(erste.daten.karte).toMatchObject({ labels: 'Sales, Slack', link });
+    expect(erste.daten.karte.zustaendig).toBeUndefined();
+    expect(await karteVon('Angebot nachfassen')).toMatchObject({ quelle: 'agent', quelle_link: link });
+
+    const zweite = await rufe('karte_anlegen', { board: 'intern', titel: 'Angebot nachfassen (nochmal)', aus_slack: true, link: ` ${link} ` });
+    expect(zweite.daten).toMatchObject({ angelegt: false, schon_vorhanden: true });
+    expect(zweite.daten.karte.titel).toBe('Angebot nachfassen');
+
+    expect((await rufe('karte_anlegen', { board: 'intern', titel: 'Ohne Link', aus_slack: true })).fehler).toBe(true);
+    expect((await rufe('karte_anlegen', { board: 'intern', titel: 'Falscher Link', aus_slack: true, link: 'https://example.com/x' })).text).toContain('Permalink');
+  });
+
+  it('findet das Board über den Slack-Channel', async () => {
+    const kunde = await rufe('karte_anlegen', { board: '#client-agk-general', titel: 'Banner tauschen', zustaendig: [] });
+    expect(kunde.daten.karte.board).toBe('AGK · Alpenglanz Kosmetik AG');
+    expect((await rufe('karte_anlegen', { board: '#client-agk-design', titel: 'Logo prüfen', zustaendig: [] })).daten.karte.board).toBe('AGK · Alpenglanz Kosmetik AG');
+    expect((await rufe('karte_anlegen', { board: '#ops-general', titel: 'Rechnungen', zustaendig: [] })).daten.karte.board).toBe('Velonify intern');
+    expect((await rufe('karte_anlegen', { board: '#zufall', titel: 'X' })).text).toContain('kein Kunde');
+  });
+
+  it('fragt Freigaben an und schreibt Kunden-News', async () => {
+    const angelegt = await rufe('karte_anlegen', { board: 'Alpenglanz', titel: 'Startseite freigeben', zustaendig: [] });
+    const frei = await rufe('freigabe_anfragen', { karte_id: angelegt.daten.karte.karte_id });
+    expect(frei.daten).toMatchObject({ freigabe: 'offen', sichtbar_kunde: true });
+    expect((await rufe('freigabe_anfragen', { karte_id: angelegt.daten.karte.karte_id, zuruecknehmen: true })).daten.freigabe).toBe('keine');
+    const intern = await rufe('karte_anlegen', { board: 'intern', titel: 'Intern', zustaendig: [] });
+    expect((await rufe('freigabe_anfragen', { karte_id: intern.daten.karte.karte_id })).fehler).toBe(true);
+
+    const news = await rufe('kunden_news_anlegen', { kunde: '#client-agk-general', titel: 'Tracking ist live', art: 'meilenstein' });
+    expect(news.daten).toMatchObject({ angelegt: true, kunde: 'Alpenglanz Kosmetik AG', sichtbar_kunde: false });
+    expect((await rufe('kunden_news_anlegen', { kunde: 'alle', titel: 'Freeze ab 24.11.' })).daten.kunde).toBe('alle Kunden');
+    expect((await rufe('kunden_news_anlegen', { kunde: 'intern', titel: 'X' })).fehler).toBe(true);
   });
 
   it('nimmt standardmäßig die angemeldete Person und die erste Spalte', async () => {

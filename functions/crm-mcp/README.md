@@ -4,7 +4,7 @@ Remote-MCP-Server für das Velonify-CRM. Claude (claude.ai, Desktop, Handy, Clau
 
 ## Aufbau
 
-- **Werkzeuge** (`src/werkzeuge.ts`): `ueberblick`, `suchen`, `firma_anzeigen`, `pipeline`, `mein_tag` (lesen) sowie `lead_anlegen`, `firma_aendern`, `kontakt_speichern`, `deal_speichern`, `phase_aendern`, `vernetzung_ergebnis`, `notiz_hinzufuegen`, `wiedervorlage_setzen`, `wiedervorlage_erledigt`, `archivieren` (schreiben). Für die Lead-Magnete: `magnete`, `magnet_leads` (lesen) sowie `magnet_speichern`, `magnet_lead_uebernehmen`, `magnet_lead_verwerfen` (schreiben); `archivieren` nimmt auch einen Magneten. Für die To-dos des Hubs: `boards`, `karten` (lesen) sowie `karte_anlegen`, `karte_verschieben`, `karte_erledigt`, `karte_kommentieren` (schreiben); das Board heißt „intern“ (Velonify intern) oder wird über Firmenname, Kürzel oder ID gefunden, ein fehlendes Kunden-Board legt `karte_anlegen` an. Gelöscht wird nichts, archivieren lässt sich rückgängig machen.
+- **Werkzeuge** (`src/werkzeuge.ts`): `ueberblick`, `suchen`, `firma_anzeigen`, `pipeline`, `mein_tag` (lesen) sowie `lead_anlegen`, `firma_aendern`, `kontakt_speichern`, `deal_speichern`, `phase_aendern`, `vernetzung_ergebnis`, `notiz_hinzufuegen`, `wiedervorlage_setzen`, `wiedervorlage_erledigt`, `archivieren` (schreiben). Für die Lead-Magnete: `magnete`, `magnet_leads` (lesen) sowie `magnet_speichern`, `magnet_lead_uebernehmen`, `magnet_lead_verwerfen` (schreiben); `archivieren` nimmt auch einen Magneten. Für die To-dos des Hubs: `boards`, `karten` (lesen) sowie `karte_anlegen`, `karte_verschieben`, `karte_erledigt`, `karte_kommentieren`, `freigabe_anfragen` (schreiben); das Board heißt „intern“ (Velonify intern) oder wird über Firmenname, Kürzel, ID oder Slack-Channel (`#client-<kürzel>-…`, eigene Channels wie `#ops-…` → intern) gefunden, ein fehlendes Kunden-Board legt `karte_anlegen` an. Mit `aus_slack: true` und dem Permalink als `link` entsteht je Slack-Nachricht nur eine Karte (Label „Slack“, ohne Person, wenn keine genannt ist) – dafür ist der tägliche Slack-Lauf da. Für den Client-Hub: `kunden_news_anlegen` (schreiben). Gelöscht wird nichts, archivieren lässt sich rückgängig machen. Gelöscht wird nichts, archivieren lässt sich rückgängig machen.
 - **Anmeldung** (`src/oauth.ts`, `src/google.ts`): Der Server ist sein eigener OAuth-Server (Client ID Metadata Documents von claude.ai sowie Dynamic Client Registration, PKCE S256). Die eigentliche Anmeldung läuft über Google, nur mit @velonify.de. Das Google-Refresh-Token steckt AES-256-GCM-verschlüsselt in den eigenen Codes und Tokens (`src/siegel.ts`), deshalb ohne Datenbank. Zugangstoken gelten 1 Stunde. Nach 90 Tagen ist eine neue Anmeldung fällig. Wer den Zugriff unter myaccount.google.com → Sicherheit → Drittanbieter-Apps entzieht, ist beim nächsten Erneuern draußen.
 - **Transport**: Streamable HTTP, zustandslos, unter `/mcp`. Metadaten unter `/.well-known/oauth-protected-resource/mcp` und `/.well-known/oauth-authorization-server`.
 
@@ -42,6 +42,10 @@ gcloud run services update crm-mcp --region=europe-west3 --no-invoker-iam-check
 `TEAM_ZUORDNUNG` ordnet Adressen einem Teamnamen aus der Liste `team` zu, wenn Vorname und Adresse nicht passen (mehrere mit `;` getrennt). Ohne Eintrag sucht der Server wie `useIch` im Hub nach Vorname oder Adresse.
 
 Wird `crm-mcp-schluessel` gewechselt, müssen sich alle neu verbinden.
+
+## In Slack (Claude Tag)
+
+Im Slack-Workspace von Velonify läuft die offizielle Claude-App. Jede Person aus dem Team verbindet diesen Server als persönlichen Connector, für den täglichen Lauf ist er zusätzlich als Admin-Connector mit einem festen Velonify-Konto verbunden. Einrichtung und Text der Routine: Vault `Hub-Intern/Claude in Slack - Einrichtung.md`.
 
 ## In Claude verbinden
 
