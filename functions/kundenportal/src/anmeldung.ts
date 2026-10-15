@@ -1,4 +1,4 @@
-import { LINK_GUELTIG_MS, SITZUNG_GUELTIG_MS, type Berechtigung } from '../../../src/data/portalApi';
+import { LINK_GUELTIG_MS, SITZUNG_GUELTIG_MS, VORSCHAU_GUELTIG_MS, type Berechtigung } from '../../../src/data/portalApi';
 import type { Siegel } from './siegel';
 
 /**
@@ -16,6 +16,8 @@ export interface SitzungInhalt {
   k: string;
   f: string;
   exp: number;
+  /** Team preview: e-mail of the Velonify member looking at the firm's portal (read only, no contact). */
+  v?: string;
 }
 
 export function erstelleLink(siegel: Siegel, b: Berechtigung, jetzt: number): string {
@@ -44,12 +46,19 @@ export function erstelleSitzung(siegel: Siegel, b: Berechtigung, jetzt: number):
  * most once a day (when the current one is older than a day), so most calls send nothing back.
  */
 export function verlaengerteSitzung(siegel: Siegel, inhalt: SitzungInhalt, jetzt: number): { sitzung: string; gueltig_bis: string } | null {
+  if (inhalt.v) return null;
   if (inhalt.exp - jetzt > SITZUNG_GUELTIG_MS - VERLAENGERN_NACH_MS) return null;
   const exp = jetzt + SITZUNG_GUELTIG_MS;
   return { sitzung: siegel.versiegle('sitzung', { k: inhalt.k, f: inhalt.f, exp } satisfies SitzungInhalt), gueltig_bis: new Date(exp).toISOString() };
 }
 
 const VERLAENGERN_NACH_MS = 24 * 60 * 60_000;
+
+/** A short read-only session for a team member, started from the hub ("Als Kunde ansehen"). */
+export function erstelleVorschau(siegel: Siegel, firmaId: string, email: string, jetzt: number): { sitzung: string; gueltig_bis: string } {
+  const exp = jetzt + VORSCHAU_GUELTIG_MS;
+  return { sitzung: siegel.versiegle('sitzung', { k: '', f: firmaId, exp, v: email } satisfies SitzungInhalt), gueltig_bis: new Date(exp).toISOString() };
+}
 
 export function oeffneSitzung(siegel: Siegel, token: string, jetzt: number): SitzungInhalt | null {
   const inhalt = siegel.oeffne<SitzungInhalt>('sitzung', token);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDemoBackend } from './demo/seed';
-import { findeBerechtigung, fuerKunden, kundensicht, loginMail, pruefeBerechtigung } from './portalApi';
+import { findeBerechtigung, fuerKunden, kundensicht, loginMail, pruefeBerechtigung, vorschauBerechtigung } from './portalApi';
 
 async function demo() {
   const { service } = await createDemoBackend(() => 'lukas@velonify.de');
@@ -55,6 +55,12 @@ describe('portal API', () => {
 
     expect(sicht.kunde.name).toBe('Alpenglanz Kosmetik AG');
     expect(sicht.ich.vorname).toBe('Sophie');
+    expect(sicht.vorschau).toBeNull();
+    const vorschau = kundensicht({ berechtigung: vorschauBerechtigung(db, firma.id)!, db, kunden, todos: await service.loadTodoDaten(), portal, dateien: [], teamDomain: 'velonify.de', vorschau: 'lukas@velonify.de' });
+    expect(vorschau.vorschau).toBe('lukas@velonify.de');
+    expect(vorschau.karten.map((k) => k.id)).toEqual(sicht.karten.map((k) => k.id));
+    expect(vorschau.karten.flatMap((k) => k.kommentare).some((c) => c.ich)).toBe(false);
+    expect(vorschauBerechtigung(db, 'F-GIBTSNICHT')).toBeNull();
     expect(sicht.slack).toEqual({ channel: 'client-agk-general', url: expect.stringContaining('app_redirect?channel=client-agk-general') });
     const titel = sicht.karten.map((k) => k.titel);
     expect(titel).toContain('Black-Week-Banner einbauen');

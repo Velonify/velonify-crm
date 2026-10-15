@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { Berechtigung } from '../../../src/data/portalApi';
-import { Begrenzer, erstelleLink, erstelleSitzung, linkNochGueltig, oeffneLink, oeffneSitzung, verlaengerteSitzung } from './anmeldung';
+import { Begrenzer, erstelleLink, erstelleSitzung, erstelleVorschau, linkNochGueltig, oeffneLink, oeffneSitzung, verlaengerteSitzung } from './anmeldung';
 import { rohMail } from './google';
 import { Siegel } from './siegel';
 
@@ -40,6 +40,14 @@ describe('login links and sessions', () => {
     const neu = verlaengerteSitzung(siegel, inhalt, jetzt + 20 * tag)!;
     expect(Date.parse(neu.gueltig_bis)).toBe(jetzt + 50 * tag);
     expect(oeffneSitzung(siegel, neu.sitzung, jetzt + 45 * tag)).toMatchObject({ k: 'K-1', f: 'F-1' });
+  });
+
+  it('opens a team preview for 8 hours without sliding', () => {
+    const jetzt = Date.now();
+    const inhalt = oeffneSitzung(siegel, erstelleVorschau(siegel, 'F-1', 'lukas@velonify.de', jetzt).sitzung, jetzt + 7 * 3_600_000)!;
+    expect(inhalt).toMatchObject({ k: '', f: 'F-1', v: 'lukas@velonify.de' });
+    expect(verlaengerteSitzung(siegel, inhalt, jetzt + 7 * 3_600_000)).toBeNull();
+    expect(oeffneSitzung(siegel, erstelleVorschau(siegel, 'F-1', 'lukas@velonify.de', jetzt).sitzung, jetzt + 9 * 3_600_000)).toBeNull();
   });
 
   it('limits per key within the window', () => {

@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_CONTACT_GENERATOR_URL?: string;
   readonly VITE_SHOP_AUDIT_URL?: string;
   readonly VITE_CRM_API_URL?: string;
+  readonly VITE_KUNDENPORTAL_API_URL?: string;
+  readonly VITE_KUNDENPORTAL_URL?: string;
 }
 
 interface ImportMeta {
