@@ -80,5 +80,7 @@ describe('portal API', () => {
     expect(mail.text).toContain('Hallo Sophie,');
     expect(mail.text).toContain('https://kunden.velonify.de/#/anmelden/abc');
     expect(loginMail('', 'x').text.startsWith('Hallo,')).toBe(true);
+    // Unique subject per request, so Gmail does not thread the mails and hide the newest link.
+    expect(loginMail('A', 'x', new Date('2026-10-15T17:14:00Z')).betreff).toBe('Dein Anmeldelink für das Velonify-Kundenportal (19:14 Uhr)');
   });
 });

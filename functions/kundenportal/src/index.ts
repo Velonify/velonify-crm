@@ -75,6 +75,8 @@ const abrufeProSitzung = new Begrenzer(300, 10 * 60_000);
 const schreibenProKontakt = new Begrenzer(60, 10 * 60_000);
 
 const NICHT_ANGEMELDET = 'Bitte melde dich neu an.';
+const LINK_ABGELAUFEN = 'Der Link ist abgelaufen, er gilt nur 15 Minuten. Fordere einfach einen neuen an.';
+const LINK_BENUTZT = 'Dieser Link wurde schon benutzt. Nimm den Link aus der neuesten Mail oder fordere einen neuen an.';
 const LINK_UNGUELTIG = 'Der Link ist abgelaufen oder wurde schon benutzt. Fordere einfach einen neuen an.';
 
 function json(res: Response, status: number, daten: unknown): void {
@@ -124,11 +126,22 @@ async function einloesen(req: Request, res: Response, lz: Laufzeit): Promise<voi
   if (!einloesenProIp.erlaubt(ip(req))) return json(res, 429, { fehler: 'Zu viele Versuche. Bitte warte ein paar Minuten.' });
   const token = String((req.body as { token?: unknown } | undefined)?.token ?? '');
   const inhalt = oeffneLink(lz.siegel, token, Date.now());
-  if (!inhalt) return json(res, 401, { fehler: LINK_UNGUELTIG });
+  if (!inhalt) {
+    const lesbar = lz.siegel.oeffne<{ exp: number }>('link', token);
+    console.warn('Anmeldelink abgelehnt:', lesbar ? 'abgelaufen' : `nicht lesbar (Länge ${token.length})`);
+    return json(res, 401, { fehler: lesbar ? LINK_ABGELAUFEN : LINK_UNGUELTIG });
+  }
   const s = await store(lz);
   const [db, portal] = await Promise.all([s.load(), s.loadPortalDaten()]);
   const berechtigung = pruefeBerechtigung(db, portal, inhalt.k, inhalt.f);
-  if (!berechtigung || !linkNochGueltig(inhalt, berechtigung)) return json(res, 401, { fehler: LINK_UNGUELTIG });
+  if (!berechtigung) {
+    console.warn('Anmeldelink abgelehnt: kein aktiver Zugang', inhalt.k);
+    return json(res, 401, { fehler: LINK_UNGUELTIG });
+  }
+  if (!linkNochGueltig(inhalt, berechtigung)) {
+    console.warn('Anmeldelink abgelehnt: schon benutzt oder durch neueren Login ersetzt', inhalt.k);
+    return json(res, 401, { fehler: LINK_BENUTZT });
+  }
   await s.update('portal_zugaenge', [{ id: berechtigung.zugang.id, changes: { zuletzt_am: new Date().toISOString() } }]);
   json(res, 200, erstelleSitzung(lz.siegel, berechtigung, Date.now()));
 }

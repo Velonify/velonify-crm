@@ -233,13 +233,15 @@ export function kundensicht(args: {
 }
 
 /** Text of the login mail (plain text, German, "du"). */
-export function loginMail(vorname: string, link: string): { betreff: string; text: string } {
+export function loginMail(vorname: string, link: string, jetzt = new Date()): { betreff: string; text: string } {
+  // The time makes every subject unique, so Gmail does not thread the mails and hide the newest link behind "…".
+  const uhr = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' }).format(jetzt);
   return {
-    betreff: 'Dein Anmeldelink für das Velonify-Kundenportal',
+    betreff: `Dein Anmeldelink für das Velonify-Kundenportal (${uhr} Uhr)`,
     text: [
       `Hallo${vorname ? ` ${vorname}` : ''},`,
       '',
-      'mit diesem Link meldest du dich im Velonify-Kundenportal an:',
+      `mit diesem Link meldest du dich im Velonify-Kundenportal an (angefordert um ${uhr} Uhr):`,
       '',
       link,
       '',
