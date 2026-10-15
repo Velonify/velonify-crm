@@ -7,7 +7,7 @@ import { CLIENT_SHARE_ORDNER } from './kunden';
 import { freigabeVon, meilensteineVon, type FreigabeStatus } from './portal';
 import { checklisteVon, erledigtSpalte, spaltenVon } from './todos';
 import { personen } from './zustaendig';
-import type { Database, Firma, Kontakt, KundenDaten, MeilensteinStatus, PortalDaten, PortalZugang, TodoDaten } from './types';
+import type { Aufgabe, AufgabenKommentar, Board, Database, Firma, Kontakt, KundenDaten, MeilensteinStatus, PortalDaten, PortalZugang, Spalte, TodoDaten } from './types';
 
 export { CLIENT_SHARE_ORDNER };
 
@@ -24,6 +24,8 @@ export interface PortalKommentar {
   von: string;
   /** Written by Velonify (true) or by someone of the client (false). */
   team: boolean;
+  /** Written by the logged-in contact. */
+  ich: boolean;
   text: string;
   datum: string;
 }
@@ -39,6 +41,8 @@ export interface PortalKarte {
   erledigt_am: string;
   checkliste: { text: string; erledigt: boolean }[];
   freigabe: FreigabeStatus | '';
+  /** ISO time the approval was asked for (`offen`) or answered (`freigegeben`, `aenderung`); empty without approval. */
+  freigabe_am: string;
   /** Came in as a request of the client. */
   anfrage: boolean;
   kommentare: PortalKommentar[];
@@ -49,6 +53,8 @@ export interface PortalDatei {
   name: string;
   mimeType: string;
   geaendert: string;
+  /** Shared by Velonify (directly in 07_Client-Share) or uploaded by the client (subfolder „Vom Kunden“). */
+  von: 'velonify' | 'kunde';
 }
 
 export interface Kundensicht {
@@ -102,14 +108,73 @@ export function pruefeBerechtigung(db: Pick<Database, 'firmen' | 'kontakte'>, po
 const datumTeil = (zeitpunkt: string) => zeitpunkt.slice(0, 10);
 
 /** Team members appear with their first name (from the address), people of the client with their name. */
-function absender(von: string, teamDomain: string, kontakte: readonly Kontakt[]): { von: string; team: boolean } {
+function absender(von: string, teamDomain: string, kontakte: readonly Kontakt[], ich: string): { von: string; team: boolean; ich: boolean } {
   const adresse = normalisiereEmail(von);
+  const selbst = adresse !== '' && adresse === normalisiereEmail(ich);
   if (adresse.endsWith(`@${teamDomain}`)) {
     const name = adresse.split('@')[0].split(/[._-]/)[0];
-    return { von: name.charAt(0).toUpperCase() + name.slice(1), team: true };
+    return { von: name.charAt(0).toUpperCase() + name.slice(1), team: true, ich: selbst };
   }
   const kontakt = kontakte.find((k) => normalisiereEmail(k.email) === adresse);
-  return { von: kontakt ? `${kontakt.vorname} ${kontakt.nachname}`.trim() : 'Kunde', team: false };
+  return { von: kontakt ? `${kontakt.vorname} ${kontakt.nachname}`.trim() : 'Kunde', team: false, ich: selbst };
+}
+
+/** What `portalKarte` needs besides the card: the board's columns, all comments and who is asking. */
+export interface KartenKontext {
+  spalten: Spalte[];
+  kommentare: readonly AufgabenKommentar[];
+  /** Contacts of the client, for the names under their comments. */
+  kontakte: readonly Kontakt[];
+  /** E-mail of the logged-in contact. */
+  ich: string;
+  teamDomain: string;
+}
+
+export function kartenKontext(args: { berechtigung: Berechtigung; db: Pick<Database, 'kontakte'>; todos: Pick<TodoDaten, 'boards' | 'kommentare'>; teamDomain: string }): KartenKontext {
+  const { berechtigung, db, todos, teamDomain } = args;
+  const board = kundenBoard(todos.boards, berechtigung.firma.id);
+  return {
+    spalten: board ? spaltenVon(board) : [],
+    kommentare: todos.kommentare,
+    kontakte: db.kontakte.filter((k) => k.firma_id === berechtigung.firma.id),
+    ich: berechtigung.kontakt.email,
+    teamDomain,
+  };
+}
+
+/** The (not archived) board of the client, if there is one. */
+export const kundenBoard = (boards: readonly Board[], firmaId: string) => boards.find((b) => b.firma_id === firmaId && !b.archiviert);
+
+/** One card as the portal shows it – whitelisted fields only. */
+export function portalKarte(a: Aufgabe, kontext: KartenKontext): PortalKarte {
+  const fertig = erledigtSpalte(kontext.spalten)?.id;
+  const freigabe = freigabeVon(a);
+  const phase: PortalPhase = a.spalte_id === fertig ? 'erledigt' : freigabe === 'offen' ? 'wartet' : ARBEIT_SPALTEN.has(a.spalte_id) ? 'arbeit' : 'geplant';
+  return {
+    id: a.id,
+    titel: a.titel,
+    beschreibung: a.beschreibung,
+    phase,
+    zustaendig: personen(a.zustaendig),
+    faellig_am: a.faellig_am,
+    erledigt_am: phase === 'erledigt' ? datumTeil(a.erledigt_am) : '',
+    checkliste: checklisteVon(a).map((p) => ({ text: p.text, erledigt: p.erledigt })),
+    freigabe: freigabe ?? '',
+    freigabe_am: freigabe ? a.freigabe_am : '',
+    anfrage: a.quelle === 'kunde',
+    kommentare: kontext.kommentare
+      .filter((k) => k.aufgabe_id === a.id)
+      .sort((x, y) => x.datum.localeCompare(y.datum))
+      .map((k) => ({ ...absender(k.von, kontext.teamDomain, kontext.kontakte, kontext.ich), text: k.text, datum: k.datum })),
+  };
+}
+
+/** Cards the client may see: on the client's board, released, not archived and in a column that still exists. */
+export function sichtbareKarten(todos: Pick<TodoDaten, 'boards' | 'aufgaben'>, firmaId: string): Aufgabe[] {
+  const board = kundenBoard(todos.boards, firmaId);
+  if (!board) return [];
+  const spaltenIds = new Set(spaltenVon(board).map((s) => s.id));
+  return todos.aufgaben.filter((a) => a.board_id === board.id && a.sichtbar_kunde && !a.archiviert && spaltenIds.has(a.spalte_id));
 }
 
 export function kundensicht(args: {
@@ -121,54 +186,27 @@ export function kundensicht(args: {
   dateien: PortalDatei[];
   teamDomain: string;
 }): Kundensicht {
-  const { berechtigung, db, kunden, todos, portal, dateien, teamDomain } = args;
+  const { berechtigung, kunden, todos, portal, dateien } = args;
   const { firma, kontakt } = berechtigung;
-  const firmenKontakte = db.kontakte.filter((k) => k.firma_id === firma.id);
+  const kontext = kartenKontext(args);
+  const fertig = erledigtSpalte(kontext.spalten)?.id;
+  const reihenfolge = (id: string) => kontext.spalten.findIndex((s) => s.id === id);
 
-  const board = todos.boards.find((b) => b.firma_id === firma.id && !b.archiviert);
-  const spalten = board ? spaltenVon(board) : [];
-  const fertig = erledigtSpalte(spalten)?.id;
-  const spaltenIds = new Set(spalten.map((s) => s.id));
-  const reihenfolge = (id: string) => spalten.findIndex((s) => s.id === id);
-
-  const sichtbar = board
-    ? todos.aufgaben
-        .filter((a) => a.board_id === board.id && a.sichtbar_kunde && !a.archiviert && spaltenIds.has(a.spalte_id))
-        .sort((a, b) => reihenfolge(a.spalte_id) - reihenfolge(b.spalte_id) || (a.sortierung ?? 0) - (b.sortierung ?? 0))
-    : [];
+  const sichtbar = sichtbareKarten(todos, firma.id).sort(
+    (a, b) => reihenfolge(a.spalte_id) - reihenfolge(b.spalte_id) || (a.sortierung ?? 0) - (b.sortierung ?? 0),
+  );
   const offen = sichtbar.filter((a) => a.spalte_id !== fertig);
   const erledigt = sichtbar
     .filter((a) => a.spalte_id === fertig)
     .sort((a, b) => b.erledigt_am.localeCompare(a.erledigt_am))
     .slice(0, MAX_ERLEDIGT);
 
-  const karten: PortalKarte[] = [...offen, ...erledigt].map((a) => {
-    const freigabe = freigabeVon(a);
-    const phase: PortalPhase = a.spalte_id === fertig ? 'erledigt' : freigabe === 'offen' ? 'wartet' : ARBEIT_SPALTEN.has(a.spalte_id) ? 'arbeit' : 'geplant';
-    return {
-      id: a.id,
-      titel: a.titel,
-      beschreibung: a.beschreibung,
-      phase,
-      zustaendig: personen(a.zustaendig),
-      faellig_am: a.faellig_am,
-      erledigt_am: phase === 'erledigt' ? datumTeil(a.erledigt_am) : '',
-      checkliste: checklisteVon(a).map((p) => ({ text: p.text, erledigt: p.erledigt })),
-      freigabe: freigabe ?? '',
-      anfrage: a.quelle === 'kunde',
-      kommentare: todos.kommentare
-        .filter((k) => k.aufgabe_id === a.id)
-        .sort((x, y) => x.datum.localeCompare(y.datum))
-        .map((k) => ({ ...absender(k.von, teamDomain, firmenKontakte), text: k.text, datum: k.datum })),
-    };
-  });
-
   return {
     kunde: { name: firma.name, kuerzel: firma.kuerzel },
     ich: { vorname: kontakt.vorname, nachname: kontakt.nachname, email: kontakt.email },
     team: personen(firma.zustaendig),
     fahrplan: meilensteineVon(portal.meilensteine, firma.id).map((m) => ({ titel: m.titel, datum: m.datum, status: m.status })),
-    karten,
+    karten: [...offen, ...erledigt].map((a) => portalKarte(a, kontext)),
     news: kunden.news
       .filter((n) => (n.firma_id === firma.id || n.firma_id === '') && n.sichtbar_kunde && !n.archiviert)
       .sort((a, b) => b.datum.localeCompare(a.datum))

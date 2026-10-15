@@ -8,7 +8,11 @@ import { checklisteVon, neueSpaltenId, spaltenVon } from '../data/todos';
 import type { Aufgabe, AufgabeInput, AufgabenKommentar, Board, ChecklistenPunkt, Spalte } from '../data/types';
 import { fieldOf } from '../lib/errors';
 import { formatDateTime, shortUser } from '../lib/format';
+import { config } from '../config';
 import { PersonenAuswahl } from '../components/PersonenAuswahl';
+
+/** Comments from outside the team domain come from the client portal. */
+const istTeam = (von: string) => von.trim().toLowerCase().endsWith(`@${config.allowedDomain}`);
 
 export type Aendern = <T>(action: (s: CrmService) => Promise<T>) => Promise<T>;
 
@@ -184,12 +188,24 @@ export function KarteDialog({
               <div className="freigabe-zeile">
                 {freigabe && <span className={`badge freigabe-${freigabe}`}>{FREIGABE_LABEL[freigabe]}</span>}
                 {freigabe === 'offen' && <span className="muted small">angefragt {formatDateTime(aufgabe.freigabe_am)} von {shortUser(aufgabe.freigabe_von)}</span>}
-                {(freigabe === 'freigegeben' || freigabe === 'aenderung') && <span className="muted small">{formatDateTime(aufgabe.freigabe_am)}</span>}
+                {(freigabe === 'freigegeben' || freigabe === 'aenderung') && (
+                  <span className="muted small">
+                    {formatDateTime(aufgabe.freigabe_am)}
+                    {aufgabe.freigabe_von && ` von ${shortUser(aufgabe.freigabe_von)}`}
+                  </span>
+                )}
                 <button type="button" className="button small" onClick={freigabeAendern} disabled={busy}>
                   {freigabe === 'offen' ? 'Anfrage zurückziehen' : freigabe ? 'Antwort erledigt' : 'Freigabe anfragen'}
                 </button>
               </div>
             )}
+          </Field>
+        )}
+        {aufgabe?.quelle === 'kunde' && (
+          <Field label="Quelle" wide>
+            <span>
+              Anfrage aus dem Kundenportal von {shortUser(aufgabe.erstellt_von)}, {formatDateTime(aufgabe.erstellt_am)}
+            </span>
           </Field>
         )}
         {aufgabe?.quelle_link && (
@@ -210,7 +226,14 @@ export function KarteDialog({
             {eigene.map((k) => (
               <li key={k.id}>
                 <div className="timeline-meta">
-                  <strong>{shortUser(k.von)}</strong> · {formatDateTime(k.datum)}
+                  <strong>{shortUser(k.von)}</strong>
+                  {!istTeam(k.von) && (
+                    <>
+                      {' '}
+                      <span className="badge ok">Kunde</span>
+                    </>
+                  )}{' '}
+                  · {formatDateTime(k.datum)}
                 </div>
                 <p className="timeline-text">{k.text}</p>
               </li>
