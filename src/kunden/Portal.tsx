@@ -13,6 +13,8 @@ import { errorMessage } from '../lib/errors';
 import { formatDate, formatDateTime } from '../lib/format';
 import { MeilensteinDialog, type Aendern } from './Dialoge';
 import { usePortalDaten } from './usePortalDaten';
+import { useAuth } from '../auth/AuthContext';
+import { config, isDemo } from '../config';
 
 /** The "Portal" tab of a client page: who may log in, which client tools are on, the roadmap and what the client sees. */
 export function Portal({ firma, db, kunden, todos }: { firma: Firma; db: Database; kunden?: KundenDaten; todos?: TodoDaten }) {
@@ -207,7 +209,7 @@ function Sichtbar({ firma, kunden, todos, portal }: { firma: Firma; kunden?: Kun
     </div>
   );
   return (
-    <Card title="Was der Kunde sieht">
+    <Card title="Was der Kunde sieht" actions={<AlsKundeAnsehen firma={firma} />}>
       <dl className="items">
         {zeile('Zugänge', sicht.zugaenge)}
         {zeile('Karten', board ? <Link to={`/kunden/${firma.id}/todos`}>{sicht.karten} von {sicht.kartenGesamt}</Link> : <span className="muted">noch kein Board</span>)}
@@ -220,5 +222,45 @@ function Sichtbar({ firma, kunden, todos, portal }: { firma: Firma; kunden?: Kun
       </dl>
       <p className="hint">Karten, News und Links zeigt das Portal nur mit „Für den Kunden sichtbar“. „Freigabe anfragen“ auf einer Karte setzt sie beim Kunden unter „Für dich zu tun“.</p>
     </Card>
+  );
+}
+
+/**
+ * Opens the client's portal in a new tab as a read-only preview: the portal function checks the hub's Google token
+ * and hands out an 8-hour preview session, which goes to the portal in the address (#/vorschau/<session>).
+ */
+function AlsKundeAnsehen({ firma }: { firma: Firma }) {
+  const { getToken } = useAuth();
+  const toast = useToast();
+  const [laeuft, setLaeuft] = useState(false);
+  if (isDemo || !config.kundenportalApiUrl) return null;
+
+  const oeffnen = async () => {
+    // Open the tab right away: browsers block windows that open only after an await.
+    const fenster = window.open('about:blank', '_blank');
+    setLaeuft(true);
+    try {
+      const antwort = await fetch(`${config.kundenportalApiUrl}/vorschau`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${await getToken()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firma_id: firma.id }),
+      });
+      const daten = (await antwort.json().catch(() => ({}))) as { sitzung?: string; fehler?: string };
+      if (!antwort.ok || !daten.sitzung) throw new Error(daten.fehler || 'Die Vorschau konnte nicht geöffnet werden.');
+      const ziel = `${config.kundenportalUrl}/#/vorschau/${daten.sitzung}`;
+      if (fenster) fenster.location.href = ziel;
+      else window.open(ziel, '_blank');
+    } catch (err) {
+      fenster?.close();
+      toast.show(errorMessage(err), 'error');
+    } finally {
+      setLaeuft(false);
+    }
+  };
+
+  return (
+    <button type="button" className="button small" onClick={() => void oeffnen()} disabled={laeuft} title="Öffnet das Kundenportal dieser Firma in einem neuen Tab, nur zum Ansehen">
+      {laeuft ? 'Öffnet …' : 'Als Kunde ansehen ↗'}
+    </button>
   );
 }

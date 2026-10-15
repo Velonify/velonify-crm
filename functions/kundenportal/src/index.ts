@@ -1,7 +1,8 @@
 import { http, type Request, type Response } from '@google-cloud/functions-framework';
 import { ConflictError, ValidationError } from '../../../src/data/errors';
 import { GoogleDrive } from '../../../src/data/google/drive';
-import { findeBerechtigung, kartenKontext, kundensicht, loginMail, normalisiereEmail, portalKarte, pruefeBerechtigung, type Berechtigung } from '../../../src/data/portalApi';
+import { findeBerechtigung, kartenKontext, kundensicht, loginMail, normalisiereEmail, portalKarte, pruefeBerechtigung, vorschauBerechtigung, type Berechtigung } from '../../../src/data/portalApi';
+import { pruefeGoogleToken, ZugriffsFehler } from '../../contact-generator/src/auth';
 import {
   anfrageHatAnhaenge,
   dateiErlaubt,
@@ -22,7 +23,7 @@ import { SheetStore } from '../../../src/data/sheets/sheetStore';
 import { PostgresStore } from '../../../src/data/postgres/postgresStore';
 import type { Store } from '../../../src/data/store';
 import { verbinde, type Verbindung } from '../../../db/verbindung';
-import { Begrenzer, erstelleLink, erstelleSitzung, linkNochGueltig, oeffneLink, oeffneSitzung, verlaengerteSitzung, type SitzungInhalt } from './anmeldung';
+import { Begrenzer, erstelleLink, erstelleSitzung, erstelleVorschau, linkNochGueltig, oeffneLink, oeffneSitzung, verlaengerteSitzung, type SitzungInhalt } from './anmeldung';
 import { dienstkontoToken, Mailer } from './google';
 import { Siegel } from './siegel';
 
@@ -36,6 +37,8 @@ interface Laufzeit {
   portalUrl: string;
   origins: Set<string>;
   teamDomain: string;
+  /** OAuth client of the hub: its Google tokens may open a team preview. Empty = no previews. */
+  hubClientId: string;
 }
 
 let laufzeit: Laufzeit | null = null;
@@ -61,8 +64,9 @@ function holeLaufzeit(): Laufzeit {
       ? verbinde({ instanz: process.env.DB_INSTANZ, datenbank: process.env.DB_NAME ?? 'crm', nutzer: process.env.DB_NUTZER!, max: 2 })
       : null,
     portalUrl,
-    origins: new Set([new URL(portalUrl).origin, ...(process.env.WEITERE_ORIGINS ?? '').split(',').map((o) => o.trim()).filter(Boolean)]),
+    origins: new Set([new URL(portalUrl).origin, new URL(process.env.HUB_URL || 'https://crm.velonify.de').origin, ...(process.env.WEITERE_ORIGINS ?? '').split(',').map((o) => o.trim()).filter(Boolean)]),
     teamDomain: (process.env.TEAM_DOMAIN || 'velonify.de').toLowerCase(),
+    hubClientId: process.env.GOOGLE_CLIENT_ID ?? '',
   };
   return laufzeit;
 }
@@ -96,9 +100,34 @@ async function angemeldet(req: Request, lz: Laufzeit, s: Store): Promise<{ berec
   const bearer = /^Bearer (.+)$/i.exec(req.get('authorization') ?? '')?.[1] ?? '';
   const sitzung = bearer ? oeffneSitzung(lz.siegel, bearer, Date.now()) : null;
   if (!sitzung) return null;
+  if (sitzung.v) {
+    // Team preview: no contact behind it, only the firm (which must still exist).
+    const db = await s.load();
+    const berechtigung = vorschauBerechtigung(db, sitzung.f);
+    return berechtigung ? { berechtigung, db, sitzung } : null;
+  }
   const [db, portal] = await Promise.all([s.load(), s.loadPortalDaten()]);
   const berechtigung = pruefeBerechtigung(db, portal, sitzung.k, sitzung.f);
   return berechtigung ? { berechtigung, db, sitzung } : null;
+}
+
+/** "Als Kunde ansehen" in the hub: a team member with their hub Google token gets a read-only preview session. */
+async function vorschau(req: Request, res: Response, lz: Laufzeit): Promise<void> {
+  if (!lz.hubClientId) return json(res, 503, { fehler: 'Die Vorschau ist nicht eingerichtet (GOOGLE_CLIENT_ID fehlt).' });
+  const token = /^Bearer (.+)$/i.exec(req.get('authorization') ?? '')?.[1] ?? '';
+  if (!token) return json(res, 401, { fehler: 'Bitte im Hub neu anmelden.' });
+  let email: string;
+  try {
+    email = await pruefeGoogleToken(token, { clientId: lz.hubClientId, domain: lz.teamDomain });
+  } catch (err) {
+    if (err instanceof ZugriffsFehler) return json(res, err.status, { fehler: err.message });
+    throw err;
+  }
+  const firmaId = String(eingabe(req).firma_id ?? '');
+  const s = await store(lz);
+  if (!vorschauBerechtigung(await s.load(), firmaId)) return json(res, 404, { fehler: 'Diese Firma gibt es nicht (mehr).' });
+  console.log(JSON.stringify({ vorschau: firmaId, von: email }));
+  json(res, 200, erstelleVorschau(lz.siegel, firmaId, email, Date.now()));
 }
 
 async function anmelden(req: Request, res: Response, lz: Laufzeit): Promise<void> {
@@ -150,7 +179,7 @@ async function daten(req: Request, res: Response, lz: Laufzeit): Promise<void> {
   const s = await store(lz);
   const anmeldung = await angemeldet(req, lz, s);
   if (!anmeldung) return json(res, 401, { fehler: NICHT_ANGEMELDET });
-  if (!abrufeProSitzung.erlaubt(anmeldung.berechtigung.kontakt.id)) return json(res, 429, { fehler: 'Zu viele Abrufe. Bitte kurz warten.' });
+  if (!abrufeProSitzung.erlaubt(anmeldung.sitzung.v ?? anmeldung.berechtigung.kontakt.id)) return json(res, 429, { fehler: 'Zu viele Abrufe. Bitte kurz warten.' });
   // Opening the portal keeps the login alive; the portal stores the new session from these headers.
   const neu = verlaengerteSitzung(lz.siegel, anmeldung.sitzung, Date.now());
   if (neu) res.set('X-Sitzung', neu.sitzung).set('X-Sitzung-Bis', neu.gueltig_bis);
@@ -161,7 +190,7 @@ async function daten(req: Request, res: Response, lz: Laufzeit): Promise<void> {
     s.loadPortalDaten(),
     ladeKundenDateien(drive, anmeldung.berechtigung.firma.drive_ordner_id),
   ]);
-  json(res, 200, kundensicht({ berechtigung: anmeldung.berechtigung, db: anmeldung.db, kunden, todos, portal, dateien: dateien.dateien, teamDomain: lz.teamDomain }));
+  json(res, 200, kundensicht({ berechtigung: anmeldung.berechtigung, db: anmeldung.db, kunden, todos, portal, dateien: dateien.dateien, teamDomain: lz.teamDomain, vorschau: anmeldung.sitzung.v }));
 }
 
 /** Streams one file of the client share or its „Vom Kunden“ folder; Google Docs, Sheets and Slides come as PDF. */
@@ -198,6 +227,7 @@ function eingabe(req: Request): Record<string, unknown> {
 async function schreibend(req: Request, lz: Laufzeit, s: Store): Promise<{ berechtigung: Berechtigung; db: Awaited<ReturnType<Store['load']>> }> {
   const anmeldung = await angemeldet(req, lz, s);
   if (!anmeldung) throw new PortalFehler(401, NICHT_ANGEMELDET);
+  if (anmeldung.sitzung.v) throw new PortalFehler(403, 'In der Vorschau kannst du nichts ändern. Das geht nur mit dem Login des Kunden.');
   if (!schreibenProKontakt.erlaubt(anmeldung.berechtigung.kontakt.id)) throw new PortalFehler(429, 'Das waren gerade sehr viele Änderungen. Bitte warte ein paar Minuten.');
   return anmeldung;
 }
@@ -279,6 +309,7 @@ http('kundenportal', async (req: Request, res: Response) => {
   try {
     if (req.method === 'POST' && pfad === '/anmelden') return await anmelden(req, res, lz);
     if (req.method === 'POST' && pfad === '/einloesen') return await einloesen(req, res, lz);
+    if (req.method === 'POST' && pfad === '/vorschau') return await vorschau(req, res, lz);
     if (req.method === 'GET' && pfad === '/daten') return await daten(req, res, lz);
     if (req.method === 'POST' && pfad === '/freigabe') return await freigabe(req, res, lz);
     if (req.method === 'POST' && pfad === '/kommentar') return await kommentar(req, res, lz);

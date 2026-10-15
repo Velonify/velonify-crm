@@ -33,6 +33,7 @@ jobs:
           VITE_CONTACT_GENERATOR_URL: ${{ vars.CONTACT_GENERATOR_URL }}
           VITE_SHOP_AUDIT_URL: ${{ vars.SHOP_AUDIT_URL }}
           VITE_CRM_API_URL: ${{ vars.CRM_API_URL }}
+          VITE_KUNDENPORTAL_API_URL: ${{ vars.KUNDENPORTAL_API_URL }}
       - if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v4
         with:

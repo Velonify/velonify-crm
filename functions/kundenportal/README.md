@@ -24,6 +24,16 @@ Links und Sitzungen sind mit AES-256-GCM versiegelt (`src/siegel.ts`), es gibt k
 
 Die Function liest und schreibt seit dem Umzug in Postgres (Datenbank `crm` auf `velonify-db`, IAM-Anmeldung ihres Dienstkontos, keine Passwörter); Drive liest sie mit demselben Dienstkonto (Token vom Metadatenserver, keine Schlüsseldatei). Ohne `DB_INSTANZ` fiele sie aufs alte Sheet zurück. Mails gehen über die Gmail-API mit einem Refresh-Token des Postfachs hallo@velonify.de (nur `gmail.send`).
 
+## Vorschau fürs Team
+
+Im Hub auf der Kundenseite → Reiter „Portal“ → **Als Kunde ansehen**. Der Hub schickt sein Google-Token an `POST /vorschau` `{ firma_id }`. Die Function prüft es wie crm-api (OAuth-Client des Hubs in `GOOGLE_CLIENT_ID`, nur verifizierte @velonify.de-Konten) und gibt eine Vorschau-Sitzung für 8 Stunden zurück. Das Portal öffnet sie über `#/vorschau/<sitzung>`. In der Vorschau:
+- sieht man alles wie ein Kontakt der Firma,
+- sind alle schreibenden Endpunkte gesperrt (403),
+- wird nichts als „Du“ markiert,
+- verlängert sich die Sitzung nicht.
+
+Der Hub braucht dafür die Repo-Variable `KUNDENPORTAL_API_URL`, die Function `GOOGLE_CLIENT_ID` (Client-ID des Hubs). `https://crm.velonify.de` ist als Origin immer erlaubt (`HUB_URL` ändert das).
+
 ## Einrichtung (einmalig)
 
 1. **Dienstkonto**

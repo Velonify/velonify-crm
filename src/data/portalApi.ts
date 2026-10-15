@@ -64,6 +64,8 @@ export interface Kundensicht {
   /** The client's Slack channel (from the firm in the hub); the preferred way to reach the team. Null without one. */
   slack: { channel: string; url: string } | null;
   ich: { vorname: string; nachname: string; email: string };
+  /** Set when a Velonify team member looks at the portal as this client (read only): their e-mail. */
+  vorschau: string | null;
   team: string[];
   fahrplan: { titel: string; datum: string; status: MeilensteinStatus }[];
   karten: PortalKarte[];
@@ -87,6 +89,22 @@ export interface Berechtigung {
   zugang: PortalZugang;
   kontakt: Kontakt;
   firma: Firma;
+}
+
+/** Hours a team preview ("Als Kunde ansehen" in the hub) stays open. */
+export const VORSCHAU_GUELTIG_MS = 8 * 60 * 60_000;
+
+/**
+ * What a team member sees in the preview: the client's portal exactly as a contact of the firm would, without a
+ * contact of their own (empty e-mail, so no comment counts as "Du"). Any firm that is not archived, so the team can
+ * check the portal before switching on the first login.
+ */
+export function vorschauBerechtigung(db: Pick<Database, 'firmen'>, firmaId: string): Berechtigung | null {
+  const firma = db.firmen.find((f) => f.id === firmaId && !f.archiviert);
+  if (!firma) return null;
+  const kontakt = { id: '', firma_id: firma.id, vorname: 'Vorschau', nachname: '', email: '' } as Kontakt;
+  const zugang = { id: '', firma_id: firma.id, kontakt_id: '', aktiv: true, zuletzt_am: '' } as PortalZugang;
+  return { zugang, kontakt, firma };
 }
 
 /**
@@ -194,6 +212,8 @@ export function kundensicht(args: {
   portal: PortalDaten;
   dateien: PortalDatei[];
   teamDomain: string;
+  /** E-mail of the team member for a preview session */
+  vorschau?: string;
 }): Kundensicht {
   const { berechtigung, kunden, todos, portal, dateien } = args;
   const { firma, kontakt } = berechtigung;
@@ -216,6 +236,7 @@ export function kundensicht(args: {
       ? { channel: firma.slack_channel.trim().replace(/^#/, ''), url: slackChannelUrl(args.db.einstellungen ?? {}, firma.slack_channel.trim()) }
       : null,
     ich: { vorname: kontakt.vorname, nachname: kontakt.nachname, email: kontakt.email },
+    vorschau: args.vorschau ?? null,
     team: fuerKunden(firma.zustaendig),
     fahrplan: meilensteineVon(portal.meilensteine, firma.id).map((m) => ({ titel: m.titel, datum: m.datum, status: m.status })),
     karten: [...offen, ...erledigt].map((a) => portalKarte(a, kontext)),
