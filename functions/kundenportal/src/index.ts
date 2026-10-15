@@ -115,7 +115,7 @@ async function anmelden(req: Request, res: Response, lz: Laufzeit): Promise<void
   const link = `${lz.portalUrl}/#/anmelden/${erstelleLink(lz.siegel, berechtigung, Date.now())}`;
   const mail = loginMail(berechtigung.kontakt.vorname, link);
   try {
-    await lz.mailer.sende(berechtigung.kontakt.email.trim(), mail.betreff, mail.text);
+    await lz.mailer.sende(berechtigung.kontakt.email.trim(), mail.betreff, mail.text, mail.html);
   } catch (err) {
     console.error('Login-Mail fehlgeschlagen', err);
   }
