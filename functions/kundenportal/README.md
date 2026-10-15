@@ -11,16 +11,16 @@ Backend des Velonify-Kundenportals (`kunden.velonify.de`). Kunden melden sich pe
 
 Links und Sitzungen sind mit AES-256-GCM versiegelt (`src/siegel.ts`), es gibt keine Sitzungstabelle. Wird `kundenportal-schluessel` gewechselt, müssen sich alle Kunden neu anmelden.
 
-Die Function liest und schreibt mit ihrem eigenen Dienstkonto (Token vom Metadatenserver, keine Schlüsseldatei). Mails gehen über die Gmail-API mit einem Refresh-Token des Postfachs hallo@velonify.de (nur `gmail.send`).
+Die Function liest und schreibt seit dem Umzug in Postgres (Datenbank `crm` auf `velonify-db`, IAM-Anmeldung ihres Dienstkontos, keine Passwörter); Drive liest sie mit demselben Dienstkonto (Token vom Metadatenserver, keine Schlüsseldatei). Ohne `DB_INSTANZ` fiele sie aufs alte Sheet zurück. Mails gehen über die Gmail-API mit einem Refresh-Token des Postfachs hallo@velonify.de (nur `gmail.send`).
 
 ## Einrichtung (einmalig)
 
 1. **Dienstkonto**
    ```bash
-   gcloud iam service-accounts create kundenportal --display-name="Kundenportal"
+   gcloud iam service-accounts create kundenportal --display-name="Kundenportal" --project=velonify-crm   # falls noch nicht da
    ```
-2. **Zugriff für das Dienstkonto** `kundenportal@<PROJEKT>.iam.gserviceaccount.com`:
-   - CRM-Datenbank (Google Sheet) → Teilen → als **Bearbeiter** hinzufügen.
+2. **Zugriff für das Dienstkonto** `kundenportal@velonify-crm.iam.gserviceaccount.com`:
+   - Datenbank: Rolle `roles/cloudsql.client` im Projekt `velonify-apps` und `roles/cloudsql.instanceUser`; der IAM-Datenbanknutzer `kundenportal@velonify-crm.iam` und seine Rechte stehen in `velonify-db - Rechte.sql` (Vault).
    - Shared Drive mit den Kundenordnern → Mitglieder verwalten → als **Betrachter** hinzufügen (für Uploads später „Mitbearbeiter“).
 3. **Gmail-API** im Projekt aktivieren: `gcloud services enable gmail.googleapis.com`
 4. **OAuth-Client für die Mail** in der Cloud Console (APIs & Dienste → Anmeldedaten → OAuth-Client-ID): Typ **Desktop-App**, Name „Kundenportal Mail“. Dann den Refresh-Token holen:
@@ -44,7 +44,7 @@ Die Function liest und schreibt mit ihrem eigenen Dienstkonto (Token vom Metadat
 npm install && npm test && npm run build
 gcloud functions deploy kundenportal --gen2 --region=europe-west3 --runtime=nodejs24 --source=. --entry-point=kundenportal \
   --trigger-http --no-allow-unauthenticated --service-account=kundenportal@<PROJEKT>.iam.gserviceaccount.com \
-  --set-env-vars=TZ=Europe/Berlin,PORTAL_URL=https://kunden.velonify.de,SPREADSHEET_ID=<SHEET-ID>,GMAIL_CLIENT_ID=<CLIENT-ID>,WEITERE_ORIGINS=http://localhost:5198 \
+  --set-env-vars=TZ=Europe/Berlin,PORTAL_URL=https://kunden.velonify.de,DB_INSTANZ=velonify-apps:europe-west3:velonify-db,DB_NAME=crm,DB_NUTZER=kundenportal@velonify-crm.iam,GMAIL_CLIENT_ID=<CLIENT-ID>,WEITERE_ORIGINS=http://localhost:5198 \
   --set-secrets=PORTAL_SCHLUESSEL=kundenportal-schluessel:latest,GMAIL_CLIENT_SECRET=kundenportal-gmail-secret:latest,GMAIL_REFRESH_TOKEN=kundenportal-gmail-token:latest
 gcloud run services update kundenportal --region=europe-west3 --no-invoker-iam-check
 ```
