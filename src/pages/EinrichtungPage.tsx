@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/Toasts';
 import { Card, ErrorBox, FormError, Loading, PageHeader } from '../components/ui';
@@ -208,9 +209,16 @@ function DriveKarte() {
 /** With crm-api there is nothing to set up: the tables come from migrations (db/migrationen). */
 function DatenbankKarte() {
   return (
-    <Card title="1. Datenbank">
+    <Card
+      title="1. Datenbank"
+      actions={
+        <Link className="button small" to="/einrichtung/daten/firmen">
+          Daten ansehen
+        </Link>
+      }
+    >
       <p className="muted">
-        Die Daten liegen in Postgres (Cloud SQL, Datenbank <code>crm</code>). Tabellen und Spalten kommen aus den Migrationen im Repo, hier ist nichts einzurichten.
+        Die Daten liegen in Postgres (Cloud SQL, Datenbank <code>crm</code>). Tabellen und Spalten kommen aus den Migrationen im Repo, hier ist nichts einzurichten. Nachsehen und korrigieren unter <Link to="/einrichtung/daten/firmen">Daten</Link>, jede Änderung steht im Verlauf und lässt sich zurücknehmen.
       </p>
     </Card>
   );
@@ -221,7 +229,16 @@ function TeamKarte() {
   return (
     <Card title="3. Team & Auswahllisten">
       <p className="muted">
-        Gepflegt in der Tabelle <code>listen</code> (Spalten <code>liste</code> und <code>wert</code>). Neue Einträge erscheinen nach dem nächsten Laden.
+        {config.crmApiUrl ? (
+          <>
+            Gepflegt unter <Link to="/einrichtung/daten/listen">Daten → listen</Link>.
+          </>
+        ) : (
+          <>
+            Gepflegt im Tabellenblatt <code>listen</code> (Spalten <code>liste</code> und <code>wert</code>).
+          </>
+        )}{' '}
+        Neue Einträge erscheinen nach dem nächsten Laden.
       </p>
       <dl className="items">
         <div className="item">

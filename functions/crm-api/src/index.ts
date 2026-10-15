@@ -3,10 +3,13 @@ import { Limit, pruefeGoogleToken, ZugriffsFehler } from '../../contact-generato
 import { PostgresStore } from '../../../src/data/postgres/postgresStore';
 import { verbinde, type Verbindung } from '../../../db/verbindung';
 import { timingSafeEqual } from 'node:crypto';
-import { behandle, behandleAdmin } from './routen';
+import { behandle, behandleAdmin, behandleDaten } from './routen';
 import { nimmAnfrage } from './extern/eingang';
 import { gmailVersand } from './extern/gmail';
 import { behandleMagnet, type MagnetKonfig } from './extern/magnete';
+import { schreibeSpiegel } from './extern/spiegel';
+import { dienstkontoToken } from '../../kundenportal/src/google';
+import { SheetsClient } from '../../../src/data/sheets/sheetsClient';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 const DOMAIN = process.env.ALLOWED_DOMAIN ?? 'velonify.de';
@@ -41,6 +44,9 @@ function passt(gegeben: unknown, erwartet: string | undefined): boolean {
   const b = Buffer.from(erwartet.trim());
   return a.length === b.length && timingSafeEqual(a, b);
 }
+
+/** Sheets access of the function's own service account (metadata server), only for the read-only copy. */
+const spiegelToken = dienstkontoToken();
 
 let magnetKonfig: MagnetKonfig | null = null;
 function magnete(): MagnetKonfig {
@@ -85,6 +91,21 @@ functions.http('crmApi', async (req, res) => {
     } catch (err) {
       console.error('Datenbank nicht erreichbar', err);
       fehler(503, 'Datenbank nicht erreichbar.');
+    }
+    return;
+  }
+
+  // Nightly copy into the read-only sheet, started by Cloud Scheduler with its own token.
+  if (pfad === '/extern/spiegel') {
+    if (req.method !== 'POST' || !passt(req.query.token, process.env.SPIEGEL_TOKEN) || !process.env.SPIEGEL_SHEET_ID) return void fehler(403, 'Falsches Token.');
+    try {
+      const { pool } = await datenbank();
+      const anzahl = await schreibeSpiegel(new PostgresStore(pool), new SheetsClient(process.env.SPIEGEL_SHEET_ID, spiegelToken));
+      console.log(JSON.stringify({ pfad, zeilen: Object.values(anzahl).reduce((a, b) => a + b, 0) }));
+      res.json({ ok: true, anzahl });
+    } catch (err) {
+      console.error('Spiegel fehlgeschlagen', err);
+      fehler(500, err instanceof Error ? err.message : String(err));
     }
     return;
   }
@@ -137,7 +158,8 @@ functions.http('crmApi', async (req, res) => {
   }
   try {
     const { pool } = await datenbank();
-    const antwort = await behandle(req.method, pfad, req.body, new PostgresStore(pool, () => email));
+    const store = new PostgresStore(pool, () => email);
+    const antwort = (await behandleDaten(req.method, pfad, req.body, store)) ?? (await behandle(req.method, pfad, req.body, store));
     if (req.method !== 'GET') console.log(JSON.stringify({ email, pfad, tab: (req.body as { tab?: string })?.tab, status: antwort.status, dauer_ms: Date.now() - start }));
     res.status(antwort.status).json(antwort.daten);
   } catch (err) {

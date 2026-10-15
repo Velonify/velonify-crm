@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PostgresStore } from '../../../src/data/postgres/postgresStore';
 import { testDb } from '../../../db/test/testDb';
-import { behandle, behandleAdmin } from './routen';
+import { behandle, behandleAdmin, behandleDaten } from './routen';
 
 async function store() {
   const { pool } = await testDb();
@@ -52,5 +52,24 @@ describe('Übernahme aus dem Sheet', () => {
     const { firmen } = await new PostgresStore(pool).load();
     expect(firmen[0]).toMatchObject({ id: 'F-1', name: 'Eins neu', score: 90 });
     expect((await pg.query('SELECT count(*)::int AS n FROM aenderungen')).rows).toEqual([{ n: 0 }]);
+  });
+});
+
+describe('Datenansicht', () => {
+  it('reads any table, shows the change log of a record and replaces a select list', async () => {
+    const { pool } = await testDb();
+    const s = new PostgresStore(pool, () => 'lukas@velonify.de');
+    await behandle('POST', '/einfuegen', { tab: 'deals', records: [deal] }, s);
+    await behandle('POST', '/aendern', { tab: 'deals', updates: [{ id: 'D-1', changes: { titel: 'Neu' } }] }, s);
+    expect(await behandleDaten('GET', '/tabelle/deals', undefined, s)).toMatchObject({ status: 200, daten: { records: [{ id: 'D-1', titel: 'Neu' }] } });
+    expect((await behandleDaten('GET', '/tabelle/pg_roles', undefined, s))?.status).toBe(404);
+    const verlauf = (await behandleDaten('GET', '/verlauf/deals/D-1', undefined, s))?.daten as { eintraege: { aktion: string; von: string; vorher: { titel: string } | null }[] };
+    expect(verlauf.eintraege.map((e) => e.aktion)).toEqual(['update', 'insert']);
+    expect(verlauf.eintraege[0]).toMatchObject({ von: 'lukas@velonify.de', vorher: { titel: 'Migration' } });
+    await behandleDaten('POST', '/listen', { liste: 'team', werte: ['Lugge', 'Johannes'] }, s);
+    await behandleDaten('POST', '/listen', { liste: 'team', werte: ['Lugge', 'Julian', 'Lugge'] }, s);
+    expect((await s.load()).listen.team).toEqual(['Lugge', 'Julian']);
+    expect((await behandleDaten('POST', '/listen', { liste: 'team', werte: [] }, s))?.status).toBe(400);
+    expect(await behandleDaten('GET', '/daten/kern', undefined, s)).toBeNull();
   });
 });
