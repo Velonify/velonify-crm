@@ -50,6 +50,7 @@ function KarteInhalt({ aufgabe, heute, kommentare }: { aufgabe: Aufgabe; heute: 
           </span>
         )}
         {aufgabe.quelle === 'agent' && <span className="badge subtle">Slack</span>}
+        {aufgabe.quelle === 'kunde' && <span className="badge subtle" title="Anfrage aus dem Kundenportal">Anfrage</span>}
         {freigabe ? <span className={`badge freigabe-${freigabe}`}>{FREIGABE_LABEL[freigabe]}</span> : aufgabe.sichtbar_kunde && <span className="badge ok" title="Für den Kunden sichtbar">Kunde</span>}
         {aufgabe.zustaendig && (
           <span className="karte-personen" title={aufgabe.zustaendig}>

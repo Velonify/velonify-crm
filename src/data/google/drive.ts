@@ -1,3 +1,4 @@
+import { GoogleApiError } from '../errors';
 import { googleRequest, missingScope, type TokenProvider } from './http';
 
 export const FOLDER_MIME = 'application/vnd.google-apps.folder';
@@ -28,6 +29,7 @@ export interface DriveApi {
 }
 
 const BASE_URL = 'https://www.googleapis.com/drive/v3/files';
+const UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
 const FIELDS = 'id,name,mimeType,parents,modifiedTime,webViewLink,iconLink';
 // Shared drives need these flags on every call, otherwise their files are invisible to the API.
 const SHARED = 'supportsAllDrives=true';
@@ -106,6 +108,28 @@ export class GoogleDrive implements DriveApi {
       method: 'POST',
       body: JSON.stringify({ name, parents: [parentId] }),
     });
+  }
+
+  /**
+   * Uploads bytes as a new file into a folder (client portal). A resumable session in one go: multipart uploads are
+   * only meant for files up to 5 MB, the portal takes up to 25 MB.
+   */
+  async upload(name: string, mimeType: string, parentId: string, inhalt: Uint8Array<ArrayBuffer>): Promise<DriveFile> {
+    const start = await fetch(`${UPLOAD_URL}?uploadType=resumable&fields=${FIELDS}&${SHARED}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${await this.getToken()}`,
+        'Content-Type': 'application/json; charset=UTF-8',
+        'X-Upload-Content-Type': mimeType,
+        'X-Upload-Content-Length': String(inhalt.byteLength),
+      },
+      body: JSON.stringify({ name, mimeType, parents: [parentId] }),
+    });
+    const sitzung = start.headers.get('location');
+    if (!start.ok || !sitzung) throw new GoogleApiError(start.status, describe(start.status, (await start.text()).slice(0, 300)));
+    const antwort = await fetch(sitzung, { method: 'PUT', headers: { 'Content-Type': mimeType }, body: inhalt });
+    if (!antwort.ok) throw new GoogleApiError(antwort.status, describe(antwort.status, (await antwort.text()).slice(0, 300)));
+    return (await antwort.json()) as DriveFile;
   }
 
   move(fileId: string, fromParentId: string, toParentId: string): Promise<DriveFile> {

@@ -1,13 +1,24 @@
 # kundenportal
 
-Backend des Velonify-Kundenportals (`kunden.velonify.de`). Kunden melden sich per Link an und sehen nur, was im Hub für sie freigegeben ist. Die Regeln dafür stehen in `src/data/portalApi.ts` (wird beim Bauen mitgebündelt): Zugang nur für Kontakte mit aktivem Portal-Zugang bei Firmen mit Status „Kunde“, Karten, News und Links nur mit „Für den Kunden sichtbar“, Dateien nur direkt aus `07_Client-Share`.
+Backend des Velonify-Kundenportals. Das Frontend liegt im Repo [Velonify/velonify-kundenportal](https://github.com/Velonify/velonify-kundenportal) und läuft unter https://kunden.velonify.de (lokal auf http://localhost:5199). Kunden melden sich per Link an, sehen nur, was im Velonify Hub für sie freigegeben ist, und können mitmachen: Freigaben beantworten, kommentieren, Anfragen stellen und Dateien hochladen.
+
+Die Regeln stehen in `src/data/portalApi.ts` (was der Kunde sieht) und `src/data/portalAktionen.ts` (was er ändern darf); beides wird beim Bauen mitgebündelt. Zugang nur für Kontakte mit aktivem Portal-Zugang bei Firmen mit Status „Kunde“, Karten, News und Links nur mit „Für den Kunden sichtbar“, Dateien nur direkt aus `07_Client-Share` und aus `07_Client-Share/Vom Kunden`. Schreibende Aufrufe prüfen jedes Mal serverseitig, dass die Karte auf dem (nicht archivierten) Board der eigenen Firma liegt, für den Kunden sichtbar und nicht archiviert ist.
 
 ## Aufbau
 
 - **`POST /anmelden`** `{ email }` – schickt einen Anmeldelink von hallo@velonify.de. Antwortet immer gleich, damit niemand herausfinden kann, wer einen Zugang hat. Höchstens 3 Links je Adresse in 15 Minuten.
 - **`POST /einloesen`** `{ token }` – tauscht den Link gegen eine Sitzung (30 Tage). Der Link gilt 15 Minuten und nur einmal: er enthält den letzten Login, und das Einlösen schreibt einen neuen (`portal_zugaenge.zuletzt_am`).
 - **`GET /daten`** – alles für das Portal in einem Abruf (`Kundensicht`). Jeder Abruf prüft den Zugang neu, Abschalten im Hub wirkt also sofort.
-- **`GET /datei/<id>`** – lädt eine Datei aus `07_Client-Share`, Google-Dokumente als PDF.
+- **`GET /datei/<id>`** – lädt eine Datei aus `07_Client-Share` oder `07_Client-Share/Vom Kunden`, Google-Dokumente als PDF.
+
+Mitmachen (alle mit der Sitzung als `Authorization: Bearer …`, höchstens 60 Änderungen je Kontakt in 10 Minuten; Fehler kommen wie überall als `{ fehler }`):
+
+- **`POST /freigabe`** `{ karte_id, entscheidung: 'freigegeben' | 'aenderung', notiz? }` – nur solange die Freigabe der Karte „offen“ ist (sonst 409). Bei `aenderung` ist die Notiz Pflicht; eine Notiz landet zusätzlich als Kommentar an der Karte. Antwort: die Karte (`PortalKarte`).
+- **`POST /kommentar`** `{ karte_id, text }` – Kommentar an einer sichtbaren Karte. Antwort: die Karte.
+- **`POST /anfrage`** `{ titel, details?, dringend?, datei_ids? }` – neue Karte in der ersten Spalte des Kunden-Boards (Quelle „kunde“, für den Kunden sichtbar, Label „Dringend“, zuständig sind die Zuständigen der Firma) und eine interne Kunden-News „Neue Anfrage: …“ für das Team. Anhänge nur aus „Vom Kunden“. Ohne Board: 409. Antwort: die neue Karte.
+- **`POST /hochladen`** – Datei roh im Body, `Content-Type` = Dateityp, Dateiname URI-kodiert in `X-Dateiname`. Landet in `07_Client-Share/Vom Kunden` (wird bei Bedarf angelegt). Höchstens 25 MB (413 mit Hinweis auf WeTransfer). JSON-Dateien besser als `application/octet-stream` schicken und den echten Typ in `X-Dateityp` angeben, sonst parst das Functions Framework den Body. Antwort: `PortalDatei`.
+
+Titel höchstens 200, Texte höchstens 5.000 Zeichen.
 
 Links und Sitzungen sind mit AES-256-GCM versiegelt (`src/siegel.ts`), es gibt keine Sitzungstabelle. Wird `kundenportal-schluessel` gewechselt, müssen sich alle Kunden neu anmelden.
 
@@ -21,7 +32,8 @@ Die Function liest und schreibt seit dem Umzug in Postgres (Datenbank `crm` auf 
    ```
 2. **Zugriff für das Dienstkonto** `kundenportal@velonify-crm.iam.gserviceaccount.com`:
    - Datenbank: Rolle `roles/cloudsql.client` im Projekt `velonify-apps` und `roles/cloudsql.instanceUser`; der IAM-Datenbanknutzer `kundenportal@velonify-crm.iam` und seine Rechte stehen in `velonify-db - Rechte.sql` (Vault).
-   - Shared Drive mit den Kundenordnern → Mitglieder verwalten → als **Betrachter** hinzufügen (für Uploads später „Mitbearbeiter“).
+   - Datenbank-Schreibrechte für das Mitmachen (Karten, Kommentare, Kunden-News anlegen, Freigabe ändern) kommen mit der Migration `db/migrationen/004_rechte_kundenportal_mitmachen.sql` (`npm run db:migrieren` im Repo-Root).
+   - Shared Drive mit den Kundenordnern → Mitglieder verwalten → als **Mitbearbeiter** (Contributor) hinzufügen. „Betrachter“ reicht nur zum Lesen; für Uploads und den Ordner „Vom Kunden“ braucht es Mitbearbeiter.
 3. **Gmail-API** im Projekt aktivieren: `gcloud services enable gmail.googleapis.com`
 4. **OAuth-Client für die Mail** in der Cloud Console (APIs & Dienste → Anmeldedaten → OAuth-Client-ID): Typ **Desktop-App**, Name „Kundenportal Mail“. Dann den Refresh-Token holen:
    ```bash
@@ -44,9 +56,9 @@ Die Function liest und schreibt seit dem Umzug in Postgres (Datenbank `crm` auf 
 npm install && npm test && npm run build
 gcloud functions deploy kundenportal --gen2 --region=europe-west3 --runtime=nodejs24 --source=. --entry-point=kundenportal \
   --trigger-http --no-allow-unauthenticated --service-account=kundenportal@<PROJEKT>.iam.gserviceaccount.com \
-  --set-env-vars=TZ=Europe/Berlin,PORTAL_URL=https://kunden.velonify.de,DB_INSTANZ=velonify-apps:europe-west3:velonify-db,DB_NAME=crm,DB_NUTZER=kundenportal@velonify-crm.iam,GMAIL_CLIENT_ID=<CLIENT-ID>,WEITERE_ORIGINS=http://localhost:5198 \
+  --set-env-vars='^;^TZ=Europe/Berlin;PORTAL_URL=https://kunden.velonify.de;DB_INSTANZ=velonify-apps:europe-west3:velonify-db;DB_NAME=crm;DB_NUTZER=kundenportal@velonify-crm.iam;GMAIL_CLIENT_ID=<CLIENT-ID>;WEITERE_ORIGINS=http://localhost:5198,http://localhost:5199' \
   --set-secrets=PORTAL_SCHLUESSEL=kundenportal-schluessel:latest,GMAIL_CLIENT_SECRET=kundenportal-gmail-secret:latest,GMAIL_REFRESH_TOKEN=kundenportal-gmail-token:latest
 gcloud run services update kundenportal --region=europe-west3 --no-invoker-iam-check
 ```
 
-`gcp-build` ist absichtlich leer: Cloud Build bekommt das fertige `dist/index.js`. Die Org-Policy verbietet `allUsers`, deshalb `--no-invoker-iam-check`. Die Function prüft jede Anfrage selbst. `WEITERE_ORIGINS` erlaubt zusätzliche Browser-Adressen (lokale Entwicklung), `MAIL_ABSENDER` ändert den Absender (Standard „Velonify <hallo@velonify.de>“).
+`gcp-build` ist absichtlich leer: Cloud Build bekommt das fertige `dist/index.js`. Die Org-Policy verbietet `allUsers`, deshalb `--no-invoker-iam-check`. Die Function prüft jede Anfrage selbst. `WEITERE_ORIGINS` erlaubt zusätzliche Browser-Adressen (lokale Entwicklung; das neue Frontend läuft lokal auf Port 5199), mit Komma getrennt – deshalb trennt `^;^` am Anfang von `--set-env-vars` die Variablen mit Semikolon statt Komma. Für die neuen Endpunkte braucht es sonst keine neuen Variablen oder Secrets. `MAIL_ABSENDER` ändert den Absender (Standard „Velonify <hallo@velonify.de>“).

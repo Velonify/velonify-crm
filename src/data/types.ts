@@ -686,7 +686,8 @@ export interface ChecklistenPunkt {
   erledigt: boolean;
 }
 
-export type AufgabenQuelle = 'manuell' | 'agent';
+/** `kunde`: a request the client sent from the client portal. */
+export type AufgabenQuelle = 'manuell' | 'agent' | 'kunde';
 
 /** A card on a board. */
 export interface Aufgabe extends Meta {

@@ -57,7 +57,7 @@ describe('portal API', () => {
     expect(heroSicht.phase).toBe('wartet');
     expect(heroSicht.kommentare).toEqual([expect.objectContaining({ von: 'Lukas', team: true, text: 'Entwurf ist fertig.' })]);
     expect(sicht.karten.find((k) => k.titel === 'Neue Produktseiten live')!.phase).toBe('erledigt');
-    expect(Object.keys(heroSicht).sort()).toEqual(['anfrage', 'beschreibung', 'checkliste', 'erledigt_am', 'faellig_am', 'freigabe', 'id', 'kommentare', 'phase', 'titel', 'zustaendig']);
+    expect(Object.keys(heroSicht).sort()).toEqual(['anfrage', 'beschreibung', 'checkliste', 'erledigt_am', 'faellig_am', 'freigabe', 'freigabe_am', 'id', 'kommentare', 'phase', 'titel', 'zustaendig']);
 
     // Released news of the client plus released company-wide news; internal links stay out.
     expect(sicht.news.every((n) => kunden.news.find((x) => x.id === n.id)!.sichtbar_kunde)).toBe(true);
