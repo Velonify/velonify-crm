@@ -40,19 +40,30 @@ export interface MailKonfig {
   absender: string;
 }
 
-/** RFC 2822 message, UTF-8 throughout, base64url for the Gmail API. */
-export function rohMail(absender: string, an: string, betreff: string, text: string): string {
+/**
+ * RFC 2822 message, UTF-8 throughout, base64url for the Gmail API. With `html` it is multipart/alternative:
+ * mail clients show the HTML, the plain text stays for clients and filters that prefer it.
+ */
+export function rohMail(absender: string, an: string, betreff: string, text: string, html?: string): string {
   const kodiert = (wert: string) => `=?UTF-8?B?${Buffer.from(wert, 'utf8').toString('base64')}?=`;
-  const zeilen = [
-    `From: ${absender}`,
-    `To: ${an}`,
-    `Subject: ${kodiert(betreff)}`,
-    'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8',
-    'Content-Transfer-Encoding: base64',
-    '',
-    Buffer.from(text, 'utf8').toString('base64').replace(/.{76}/g, '$&\r\n'),
-  ];
+  const b64 = (wert: string) => Buffer.from(wert, 'utf8').toString('base64').replace(/.{76}/g, '$&\r\n');
+  const kopf = [`From: ${absender}`, `To: ${an}`, `Subject: ${kodiert(betreff)}`, 'MIME-Version: 1.0'];
+  const teil = (typ: string, inhalt: string) => [`Content-Type: ${typ}; charset=UTF-8`, 'Content-Transfer-Encoding: base64', '', b64(inhalt)];
+  const zeilen = html
+    ? (() => {
+        const grenze = `velonify-${Date.now().toString(36)}`;
+        return [
+          ...kopf,
+          `Content-Type: multipart/alternative; boundary="${grenze}"`,
+          '',
+          `--${grenze}`,
+          ...teil('text/plain', text),
+          `--${grenze}`,
+          ...teil('text/html', html),
+          `--${grenze}--`,
+        ];
+      })()
+    : [...kopf, ...teil('text/plain', text)];
   return Buffer.from(zeilen.join('\r\n'), 'utf8').toString('base64url');
 }
 
@@ -75,11 +86,11 @@ export class Mailer {
     });
   }
 
-  async sende(an: string, betreff: string, text: string): Promise<void> {
+  async sende(an: string, betreff: string, text: string, html?: string): Promise<void> {
     const antwort = await this.fetchFn(GMAIL_SEND, {
       method: 'POST',
       headers: { Authorization: `Bearer ${await this.token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ raw: rohMail(this.konfig.absender, an, betreff, text) }),
+      body: JSON.stringify({ raw: rohMail(this.konfig.absender, an, betreff, text, html) }),
     });
     if (!antwort.ok) throw new Error(`Gmail hat die Mail nicht angenommen (${antwort.status}): ${await antwort.text()}`);
   }

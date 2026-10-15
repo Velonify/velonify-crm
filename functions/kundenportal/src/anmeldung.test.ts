@@ -57,4 +57,14 @@ describe('login links and sessions', () => {
     expect(roh).toContain(`Subject: =?UTF-8?B?${Buffer.from('Dein Anmeldelink für das Portal').toString('base64')}?=`);
     expect(roh.split('\r\n\r\n')[1]).toBe(Buffer.from('Grüße').toString('base64'));
   });
+
+  it('sends text and HTML as multipart/alternative', () => {
+    const roh = Buffer.from(rohMail('Lukas von Velonify <lukas@velonify.de>', 'a@b.example', 'Betreff', 'Text', '<p>Hallo</p>'), 'base64url').toString('utf8');
+    const grenze = /boundary="([^"]+)"/.exec(roh)![1];
+    expect(roh).toContain('From: Lukas von Velonify <lukas@velonify.de>');
+    expect(roh).toContain('Content-Type: text/plain; charset=UTF-8');
+    expect(roh).toContain('Content-Type: text/html; charset=UTF-8');
+    expect(roh).toContain(Buffer.from('<p>Hallo</p>').toString('base64'));
+    expect(roh.trimEnd().endsWith(`--${grenze}--`)).toBe(true);
+  });
 });

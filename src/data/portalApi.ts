@@ -6,6 +6,7 @@
 import { CLIENT_SHARE_ORDNER } from './kunden';
 import { freigabeVon, meilensteineVon, type FreigabeStatus } from './portal';
 import { checklisteVon, erledigtSpalte, spaltenVon } from './todos';
+import { loginMailHtml } from './portalMail';
 import { slackChannelUrl } from './start';
 import { personen } from './zustaendig';
 import type { Aufgabe, AufgabenKommentar, Board, Database, Firma, Kontakt, KundenDaten, MeilensteinStatus, PortalDaten, PortalZugang, Spalte, TodoDaten } from './types';
@@ -233,7 +234,7 @@ export function kundensicht(args: {
 }
 
 /** Text of the login mail (plain text, German, "du"). */
-export function loginMail(vorname: string, link: string, jetzt = new Date()): { betreff: string; text: string } {
+export function loginMail(vorname: string, link: string, jetzt = new Date()): { betreff: string; text: string; html: string } {
   // The time makes every subject unique, so Gmail does not thread the mails and hide the newest link behind "…".
   const uhr = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' }).format(jetzt);
   return {
@@ -252,5 +253,6 @@ export function loginMail(vorname: string, link: string, jetzt = new Date()): { 
       'Viele Grüße',
       'dein Velonify-Team',
     ].join('\n'),
+    html: loginMailHtml({ vorname, link, uhr }),
   };
 }
