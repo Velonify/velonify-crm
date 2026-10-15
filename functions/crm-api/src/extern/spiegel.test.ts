@@ -34,6 +34,9 @@ describe('Lese-Spiegel', () => {
     expect(sheets.titel.filter((t) => t === 'firmen')).toHaveLength(1);
     expect(sheets.titel).toContain(STAND_TAB);
     expect(sheets.requests.filter((r) => 'updateCells' in r)).toHaveLength(Object.keys(anzahl).length);
+    // Empty tables keep one row below the frozen header, otherwise Google rejects the request.
+    const groessen = sheets.requests.flatMap((r) => ('updateSheetProperties' in r ? [(r as { updateSheetProperties: { properties: { gridProperties: { rowCount: number } } } }).updateSheetProperties.properties.gridProperties.rowCount] : []));
+    expect(Math.min(...groessen)).toBe(2);
     const firmen = sheets.werte.find((w) => w.range === "'firmen'!A1")!;
     expect(firmen.values[0][0]).toBe('id');
     expect(firmen.values[1].slice(0, 2)).toEqual(['F-1', 'Eins']);
