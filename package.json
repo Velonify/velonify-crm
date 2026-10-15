@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "db:schema": "tsx scripts/db-schema.ts",
-    "test:postgres": "vitest run --config vitest.postgres.config.ts"
+    "test:postgres": "vitest run --config vitest.postgres.config.ts",
+    "db:migrieren": "tsx scripts/db-migrieren.ts"
   },
   "dependencies": {
     "react": "^19.3.0",

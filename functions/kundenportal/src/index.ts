@@ -3,6 +3,9 @@ import { GoogleDrive, isFolder } from '../../../src/data/google/drive';
 import { CLIENT_SHARE_ORDNER, findeBerechtigung, kundensicht, loginMail, normalisiereEmail, pruefeBerechtigung, type Berechtigung, type PortalDatei } from '../../../src/data/portalApi';
 import { SheetsClient } from '../../../src/data/sheets/sheetsClient';
 import { SheetStore } from '../../../src/data/sheets/sheetStore';
+import { PostgresStore } from '../../../src/data/postgres/postgresStore';
+import type { Store } from '../../../src/data/store';
+import { verbinde, type Verbindung } from '../../../db/verbindung';
 import { Begrenzer, erstelleLink, erstelleSitzung, linkNochGueltig, oeffneLink, oeffneSitzung } from './anmeldung';
 import { dienstkontoToken, Mailer } from './google';
 import { Siegel } from './siegel';
@@ -12,6 +15,8 @@ interface Laufzeit {
   mailer: Mailer;
   token: () => Promise<string>;
   spreadsheetId: string;
+  /** Set when the CRM data lives in Postgres (DB_INSTANZ); otherwise the sheet is used. */
+  db: Promise<Verbindung> | null;
   portalUrl: string;
   origins: Set<string>;
   teamDomain: string;
@@ -22,7 +27,8 @@ let laufzeit: Laufzeit | null = null;
 /** Built on first use, so a missing setting answers with a clear message instead of crashing the instance. */
 function holeLaufzeit(): Laufzeit {
   if (laufzeit) return laufzeit;
-  const fehlend = ['PORTAL_SCHLUESSEL', 'SPREADSHEET_ID', 'PORTAL_URL', 'GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN'].filter((name) => !process.env[name]);
+  const datenquelle = process.env.DB_INSTANZ ? 'DB_NUTZER' : 'SPREADSHEET_ID';
+  const fehlend = ['PORTAL_SCHLUESSEL', datenquelle, 'PORTAL_URL', 'GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN'].filter((name) => !process.env[name]);
   if (fehlend.length > 0) throw new Error(`Nicht eingerichtet, es fehlt: ${fehlend.join(', ')}`);
   const portalUrl = process.env.PORTAL_URL!.replace(/\/$/, '');
   laufzeit = {
@@ -34,7 +40,10 @@ function holeLaufzeit(): Laufzeit {
       absender: process.env.MAIL_ABSENDER || 'Velonify <hallo@velonify.de>',
     }),
     token: dienstkontoToken(),
-    spreadsheetId: process.env.SPREADSHEET_ID!,
+    spreadsheetId: process.env.SPREADSHEET_ID ?? '',
+    db: process.env.DB_INSTANZ
+      ? verbinde({ instanz: process.env.DB_INSTANZ, datenbank: process.env.DB_NAME ?? 'crm', nutzer: process.env.DB_NUTZER!, max: 2 })
+      : null,
     portalUrl,
     origins: new Set([new URL(portalUrl).origin, ...(process.env.WEITERE_ORIGINS ?? '').split(',').map((o) => o.trim()).filter(Boolean)]),
     teamDomain: (process.env.TEAM_DOMAIN || 'velonify.de').toLowerCase(),
@@ -58,12 +67,12 @@ function ip(req: Request): string {
   return (req.get('x-forwarded-for') ?? '').split(',')[0].trim() || req.ip || 'unbekannt';
 }
 
-function store(lz: Laufzeit): SheetStore {
-  return new SheetStore(new SheetsClient(lz.spreadsheetId, lz.token));
+async function store(lz: Laufzeit): Promise<Store> {
+  return lz.db ? new PostgresStore((await lz.db).pool, () => 'kundenportal') : new SheetStore(new SheetsClient(lz.spreadsheetId, lz.token));
 }
 
 /** The login behind the Bearer session, re-checked against the sheet on every call. */
-async function angemeldet(req: Request, lz: Laufzeit, s: SheetStore): Promise<{ berechtigung: Berechtigung; db: Awaited<ReturnType<SheetStore['load']>> } | null> {
+async function angemeldet(req: Request, lz: Laufzeit, s: Store): Promise<{ berechtigung: Berechtigung; db: Awaited<ReturnType<Store['load']>> } | null> {
   const bearer = /^Bearer (.+)$/i.exec(req.get('authorization') ?? '')?.[1] ?? '';
   const sitzung = bearer ? oeffneSitzung(lz.siegel, bearer, Date.now()) : null;
   if (!sitzung) return null;
@@ -91,7 +100,7 @@ async function anmelden(req: Request, res: Response, lz: Laufzeit): Promise<void
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(res, 400, { fehler: 'Bitte gib eine gültige E-Mail-Adresse ein.' });
   if (!loginProIp.erlaubt(ip(req))) return json(res, 429, { fehler: 'Zu viele Versuche. Bitte warte ein paar Minuten.' });
   if (!loginProMail.erlaubt(email)) return antwort();
-  const s = store(lz);
+  const s = await store(lz);
   const [db, portal] = await Promise.all([s.load(), s.loadPortalDaten()]);
   const berechtigung = findeBerechtigung(db, portal, email);
   if (!berechtigung) return antwort();
@@ -110,7 +119,7 @@ async function einloesen(req: Request, res: Response, lz: Laufzeit): Promise<voi
   const token = String((req.body as { token?: unknown } | undefined)?.token ?? '');
   const inhalt = oeffneLink(lz.siegel, token, Date.now());
   if (!inhalt) return json(res, 401, { fehler: LINK_UNGUELTIG });
-  const s = store(lz);
+  const s = await store(lz);
   const [db, portal] = await Promise.all([s.load(), s.loadPortalDaten()]);
   const berechtigung = pruefeBerechtigung(db, portal, inhalt.k, inhalt.f);
   if (!berechtigung || !linkNochGueltig(inhalt, berechtigung)) return json(res, 401, { fehler: LINK_UNGUELTIG });
@@ -119,7 +128,7 @@ async function einloesen(req: Request, res: Response, lz: Laufzeit): Promise<voi
 }
 
 async function daten(req: Request, res: Response, lz: Laufzeit): Promise<void> {
-  const s = store(lz);
+  const s = await store(lz);
   const anmeldung = await angemeldet(req, lz, s);
   if (!anmeldung) return json(res, 401, { fehler: NICHT_ANGEMELDET });
   if (!abrufeProSitzung.erlaubt(anmeldung.berechtigung.kontakt.id)) return json(res, 429, { fehler: 'Zu viele Abrufe. Bitte kurz warten.' });
@@ -135,7 +144,7 @@ async function daten(req: Request, res: Response, lz: Laufzeit): Promise<void> {
 
 /** Streams one file of the client share; Google Docs, Sheets and Slides come as PDF. */
 async function datei(req: Request, res: Response, lz: Laufzeit, id: string): Promise<void> {
-  const s = store(lz);
+  const s = await store(lz);
   const anmeldung = await angemeldet(req, lz, s);
   if (!anmeldung) return json(res, 401, { fehler: NICHT_ANGEMELDET });
   const drive = new GoogleDrive(lz.token);

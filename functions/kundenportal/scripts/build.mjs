@@ -9,7 +9,7 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node24',
-  external: ['@google-cloud/functions-framework'],
+  external: ['@google-cloud/functions-framework', '@google-cloud/cloud-sql-connector', 'pg'],
   // Some dependencies still use require(); give the ESM bundle one.
   banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
   logLevel: 'info',

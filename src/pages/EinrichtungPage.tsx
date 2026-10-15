@@ -11,6 +11,7 @@ import { extractDriveFolderId } from '../data/rules';
 import { checkSetup, runSetup } from '../data/sheets/setup';
 import { errorMessage } from '../lib/errors';
 import { useLoad } from '../lib/useLoad';
+import { UebernahmeKarte } from './einrichtung/UebernahmeKarte';
 
 function SheetKarte() {
   const { sheets, service, refresh } = useCrm();
@@ -297,6 +298,8 @@ export function EinrichtungPage() {
       )}
       {error && !(error instanceof AuthExpiredError) && <p className="alert error">{errorMessage(error)}</p>}
       {config.crmApiUrl ? <DatenbankKarte /> : <SheetKarte />}
+      {/* Until the sheet is retired: the takeover needs both the API and the sheet. */}
+      {config.crmApiUrl && config.spreadsheetId && <UebernahmeKarte />}
       {/* Remount once data is there, so the fields start with the saved values. */}
       <DriveKarte key={db ? 'bereit' : 'laedt'} />
       <TeamKarte />

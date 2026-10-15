@@ -176,6 +176,8 @@ export class PostgresStore implements Store {
       const aktuell = new Map(rows.map((zeile) => [String(zeile.id), zuRecord(schema, zeile)]));
 
       const ergebnisse: EntityMap[K][] = [];
+      // Only columns named in the changes are written: a narrower UPDATE right (kundenportal) is enough, and the log stays small.
+      const geaendert = new Map<string, Set<string>>();
       for (const update of updates) {
         const current = aktuell.get(update.id);
         if (!current) throw new NotFoundError();
@@ -186,14 +188,17 @@ export class PostgresStore implements Store {
         const roh = { ...current, ...update.changes, id: update.id } as Record<string, unknown>;
         const next = zuRecord(schema, Object.fromEntries(schema.columns.map((s) => [s, zuDb(schema, s, roh[s])])));
         aktuell.set(update.id, next);
+        const spalten = geaendert.get(update.id) ?? new Set<string>();
+        for (const spalte of Object.keys(update.changes)) if (spalte !== 'id' && (schema.columns as readonly string[]).includes(spalte)) spalten.add(spalte);
+        geaendert.set(update.id, spalten);
         ergebnisse.push(next as unknown as EntityMap[K]);
       }
 
-      const spalten = schema.columns.filter((s) => s !== 'id');
-      const setzen = spalten.map((s, i) => `${s} = $${i + 2}`).join(', ');
-      for (const id of ids) {
+      for (const [id, spalten] of geaendert) {
+        if (spalten.size === 0) continue;
+        const liste = [...spalten];
         const record = aktuell.get(id)!;
-        await db.query(`UPDATE ${schema.name} SET ${setzen} WHERE id = $1`, [id, ...spalten.map((s) => zuDb(schema, s, record[s]))]);
+        await db.query(`UPDATE ${schema.name} SET ${liste.map((s, i) => `${s} = $${i + 2}`).join(', ')} WHERE id = $1`, [id, ...liste.map((s) => zuDb(schema, s, record[s]))]);
       }
       return ergebnisse;
     });

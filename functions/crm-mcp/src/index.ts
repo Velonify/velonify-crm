@@ -7,6 +7,8 @@ import { GoogleDrive } from '../../../src/data/google/drive';
 import { isoDate } from '../../../src/data/ids';
 import { SheetsClient } from '../../../src/data/sheets/sheetsClient';
 import { SheetStore } from '../../../src/data/sheets/sheetStore';
+import { PostgresStore } from '../../../src/data/postgres/postgresStore';
+import { verbinde, type Verbindung } from '../../../db/verbindung';
 import { GoogleAbgelaufen, googleAnmeldeUrl, GoogleTokens, tauscheGoogleCode, ZugriffVerweigert, type GoogleKonfig } from './google';
 import { AuthServer, OAuthFehler, ressourceUrl, schutzMetadaten, SCOPE, serverMetadaten, type OAuthKonfig } from './oauth';
 import { fehlerSeite, freigabeSeite } from './seiten';
@@ -24,6 +26,8 @@ interface Laufzeit {
   auth: AuthServer;
   tokens: GoogleTokens;
   spreadsheetId: string;
+  /** Set when the CRM data lives in Postgres (DB_INSTANZ); otherwise the sheet is used. */
+  db: Promise<Verbindung> | null;
 }
 
 function basisUrl(req: Request): string {
@@ -35,7 +39,8 @@ let laufzeit: Laufzeit | null = null;
 /** Built on first use, so metadata still answers while secrets are missing (first deploy). */
 function holeLaufzeit(req: Request): Laufzeit {
   if (laufzeit) return laufzeit;
-  const fehlend = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'CRM_MCP_SCHLUESSEL', 'SPREADSHEET_ID'].filter((name) => !process.env[name]);
+  const datenquelle = process.env.DB_INSTANZ ? 'DB_NUTZER' : 'SPREADSHEET_ID';
+  const fehlend = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'CRM_MCP_SCHLUESSEL', datenquelle].filter((name) => !process.env[name]);
   if (fehlend.length > 0) throw new Error(`Nicht eingerichtet, es fehlt: ${fehlend.join(', ')}`);
   const basis = basisUrl(req);
   const konfig: OAuthKonfig = { basis, cimdHosts: (process.env.CIMD_HOSTS || 'claude.ai,claude.com').split(',').map((h) => h.trim()) };
@@ -50,7 +55,10 @@ function holeLaufzeit(req: Request): Laufzeit {
     google,
     auth: new AuthServer(konfig, new Siegel(process.env.CRM_MCP_SCHLUESSEL!.trim())),
     tokens: new GoogleTokens(google),
-    spreadsheetId: process.env.SPREADSHEET_ID!,
+    spreadsheetId: process.env.SPREADSHEET_ID ?? '',
+    db: process.env.DB_INSTANZ
+      ? verbinde({ instanz: process.env.DB_INSTANZ, datenbank: process.env.DB_NAME ?? 'crm', nutzer: process.env.DB_NUTZER!, max: 2 })
+      : null,
   };
   return laufzeit;
 }
@@ -102,7 +110,7 @@ async function mcp(req: Request, res: Response, lz: Laufzeit): Promise<void> {
   }
   const getToken = () => lz.tokens.zugangstoken(zugang.g);
   const service = new CrmService({
-    store: new SheetStore(new SheetsClient(lz.spreadsheetId, getToken)),
+    store: lz.db ? new PostgresStore((await lz.db).pool, () => zugang.email) : new SheetStore(new SheetsClient(lz.spreadsheetId, getToken)),
     drive: new GoogleDrive(getToken),
     calendar: new GoogleCalendar(getToken),
     currentUser: () => zugang.email,
