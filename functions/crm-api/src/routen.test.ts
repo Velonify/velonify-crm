@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PostgresStore } from '../../../src/data/postgres/postgresStore';
 import { testDb } from '../../../db/test/testDb';
-import { behandle } from './routen';
+import { behandle, behandleAdmin } from './routen';
 
 async function store() {
   const { pool } = await testDb();
@@ -36,5 +36,21 @@ describe('crm-api Routen', () => {
     expect((await behandle('POST', '/einfuegen', { tab: 'deals', records: [{ titel: 'ohne id' }] }, s)).status).toBe(400);
     expect((await behandle('POST', '/einstellungen', { werte: { a: 1 } }, s)).status).toBe(400);
     expect((await behandle('DELETE', '/einfuegen', {}, s)).status).toBe(405);
+  });
+});
+
+describe('Übernahme aus dem Sheet', () => {
+  it('writes rows with their ids, updates on a second run and counts per table', async () => {
+    const { pool, pg } = await testDb();
+    const zeilen = [{ id: 'F-1', name: 'Eins', score: '80', archiviert: 'FALSE' }, { id: 'F-2', name: 'Zwei' }];
+    expect((await behandleAdmin('POST', '/admin/uebernahme', { tab: 'firmen', zeilen }, pool)).daten).toEqual({ geschrieben: 2 });
+    await behandleAdmin('POST', '/admin/uebernahme', { tab: 'firmen', zeilen: [{ id: 'F-1', name: 'Eins neu', score: 90 }] }, pool);
+    await behandleAdmin('POST', '/admin/uebernahme', { tab: 'listen', zeilen: [{ liste: 'team', wert: 'Lugge' }] }, pool);
+    await behandleAdmin('POST', '/admin/uebernahme', { tab: 'listen', zeilen: [{ liste: 'team', wert: 'Lugge' }] }, pool);
+    const zahlen = (await behandleAdmin('GET', '/admin/zaehlen', undefined, pool)).daten as Record<string, number>;
+    expect(zahlen).toMatchObject({ firmen: 2, listen: 1, deals: 0 });
+    const { firmen } = await new PostgresStore(pool).load();
+    expect(firmen[0]).toMatchObject({ id: 'F-1', name: 'Eins neu', score: 90 });
+    expect((await pg.query('SELECT count(*)::int AS n FROM aenderungen')).rows).toEqual([{ n: 0 }]);
   });
 });

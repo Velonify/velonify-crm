@@ -1,6 +1,8 @@
 import { ConflictError, NotFoundError } from '../../../src/data/errors';
 import { SCHEMA, type EntityTab } from '../../../src/data/schema';
 import type { RecordUpdate, Store } from '../../../src/data/store';
+import type { DbPool } from '../../../src/data/postgres/postgresStore';
+import { uebernimm, zaehle } from '../../../src/data/postgres/uebernahme';
 
 /** What the hub can load, one route per Store method. */
 const LADEN: Record<string, (store: Store) => Promise<unknown>> = {
@@ -77,4 +79,16 @@ export async function behandle(methode: string, pfad: string, body: unknown, sto
     if (err instanceof NotFoundError) return fehler(404, err.message);
     throw err;
   }
+}
+
+/** Takeover from the sheet (admins only, checked by the caller): POST /admin/uebernahme, GET /admin/zaehlen. */
+export async function behandleAdmin(methode: string, pfad: string, body: unknown, db: DbPool): Promise<Antwort> {
+  if (pfad === '/admin/zaehlen' && methode === 'GET') return { status: 200, daten: await zaehle(db) };
+  if (pfad === '/admin/uebernahme' && methode === 'POST') {
+    if (!istObjekt(body) || typeof body.tab !== 'string' || !(body.tab in SCHEMA) || !Array.isArray(body.zeilen) || !body.zeilen.every(istObjekt)) {
+      return fehler(400, 'Tabelle oder Zeilen ungültig.');
+    }
+    return { status: 200, daten: { geschrieben: await uebernimm(db, body.tab as keyof typeof SCHEMA, body.zeilen) } };
+  }
+  return fehler(404, 'Unbekannte Route.');
 }
