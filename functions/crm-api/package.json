@@ -1,0 +1,30 @@
+{
+  "name": "crm-api",
+  "private": true,
+  "version": "0.1.0",
+  "description": "API zwischen Hub und Postgres: prüft das Velonify-Login und liest und schreibt die Datenbank crm auf Cloud SQL.",
+  "type": "module",
+  "main": "dist/index.js",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "gcp-build": "",
+    "start": "functions-framework --target=crmApi",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google-cloud/cloud-sql-connector": "^1.12.1",
+    "@google-cloud/functions-framework": "^5.0.5",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.5",
+    "@types/pg": "^8.23.1",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}
