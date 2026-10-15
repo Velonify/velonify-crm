@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDemoBackend } from './demo/seed';
-import { findeBerechtigung, kundensicht, loginMail, pruefeBerechtigung } from './portalApi';
+import { findeBerechtigung, fuerKunden, kundensicht, loginMail, pruefeBerechtigung } from './portalApi';
 
 async function demo() {
   const { service } = await createDemoBackend(() => 'lukas@velonify.de');
@@ -8,6 +8,12 @@ async function demo() {
   const firma = db.firmen.find((f) => f.name === 'Alpenglanz Kosmetik AG')!;
   return { service, db, firma };
 }
+
+describe('fuerKunden', () => {
+  it('shows the real first name instead of the internal nickname', () => {
+    expect(fuerKunden('Lugge, Julian')).toEqual(['Lukas', 'Julian']);
+  });
+});
 
 describe('portal API', () => {
   it('finds a login only for active logins of active clients, case-insensitive', async () => {
@@ -49,6 +55,7 @@ describe('portal API', () => {
 
     expect(sicht.kunde.name).toBe('Alpenglanz Kosmetik AG');
     expect(sicht.ich.vorname).toBe('Sophie');
+    expect(sicht.slack).toEqual({ channel: 'client-agk-general', url: expect.stringContaining('app_redirect?channel=client-agk-general') });
     const titel = sicht.karten.map((k) => k.titel);
     expect(titel).toContain('Black-Week-Banner einbauen');
     expect(titel).not.toContain('Core Web Vitals der Kategorieseiten prüfen');
