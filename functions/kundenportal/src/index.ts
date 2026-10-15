@@ -1,7 +1,7 @@
 import { http, type Request, type Response } from '@google-cloud/functions-framework';
 import { ConflictError, ValidationError } from '../../../src/data/errors';
 import { GoogleDrive } from '../../../src/data/google/drive';
-import { findeBerechtigung, kartenKontext, kundensicht, loginMail, normalisiereEmail, portalKarte, pruefeBerechtigung, vorschauBerechtigung, type Berechtigung } from '../../../src/data/portalApi';
+import { alleBerechtigungen, findeBerechtigung, kartenKontext, kundensicht, loginMail, normalisiereEmail, portalKarte, pruefeBerechtigung, vorschauBerechtigung, type Berechtigung } from '../../../src/data/portalApi';
 import { pruefeGoogleToken, ZugriffsFehler } from '../../contact-generator/src/auth';
 import {
   anfrageHatAnhaenge,
@@ -111,6 +111,22 @@ async function angemeldet(req: Request, lz: Laufzeit, s: Store): Promise<{ berec
   return berechtigung ? { berechtigung, db, sitzung } : null;
 }
 
+/**
+ * Switches to another client of the same person (same e-mail, active login there): a new session for that firm.
+ * The target's last login is updated, so the next login link opens the client looked at last.
+ */
+async function wechseln(req: Request, res: Response, lz: Laufzeit): Promise<void> {
+  const s = await store(lz);
+  const anmeldung = await angemeldet(req, lz, s);
+  if (!anmeldung) return json(res, 401, { fehler: NICHT_ANGEMELDET });
+  if (anmeldung.sitzung.v) return json(res, 403, { fehler: 'In der Vorschau gibt es keinen Wechsel.' });
+  const firmaId = String(eingabe(req).firma_id ?? '');
+  const ziel = alleBerechtigungen(anmeldung.db, await s.loadPortalDaten(), anmeldung.berechtigung.kontakt.email).find((b) => b.firma.id === firmaId);
+  if (!ziel) return json(res, 403, { fehler: 'Für diesen Kunden hast du keinen Zugang (mehr).' });
+  await s.update('portal_zugaenge', [{ id: ziel.zugang.id, changes: { zuletzt_am: new Date().toISOString() } }]);
+  json(res, 200, erstelleSitzung(lz.siegel, ziel, Date.now()));
+}
+
 /** "Als Kunde ansehen" in the hub: a team member with their hub Google token gets a read-only preview session. */
 async function vorschau(req: Request, res: Response, lz: Laufzeit): Promise<void> {
   if (!lz.hubClientId) return json(res, 503, { fehler: 'Die Vorschau ist nicht eingerichtet (GOOGLE_CLIENT_ID fehlt).' });
@@ -190,7 +206,9 @@ async function daten(req: Request, res: Response, lz: Laufzeit): Promise<void> {
     s.loadPortalDaten(),
     ladeKundenDateien(drive, anmeldung.berechtigung.firma.drive_ordner_id),
   ]);
-  json(res, 200, kundensicht({ berechtigung: anmeldung.berechtigung, db: anmeldung.db, kunden, todos, portal, dateien: dateien.dateien, teamDomain: lz.teamDomain, vorschau: anmeldung.sitzung.v }));
+  json(res, 200, kundensicht({ berechtigung: anmeldung.berechtigung, db: anmeldung.db, kunden, todos, portal, dateien: dateien.dateien, teamDomain: lz.teamDomain, vorschau: anmeldung.sitzung.v,
+    andere: anmeldung.sitzung.v ? [] : alleBerechtigungen(anmeldung.db, portal, anmeldung.berechtigung.kontakt.email),
+  }));
 }
 
 /** Streams one file of the client share or its „Vom Kunden“ folder; Google Docs, Sheets and Slides come as PDF. */
@@ -310,6 +328,7 @@ http('kundenportal', async (req: Request, res: Response) => {
     if (req.method === 'POST' && pfad === '/anmelden') return await anmelden(req, res, lz);
     if (req.method === 'POST' && pfad === '/einloesen') return await einloesen(req, res, lz);
     if (req.method === 'POST' && pfad === '/vorschau') return await vorschau(req, res, lz);
+    if (req.method === 'POST' && pfad === '/wechseln') return await wechseln(req, res, lz);
     if (req.method === 'GET' && pfad === '/daten') return await daten(req, res, lz);
     if (req.method === 'POST' && pfad === '/freigabe') return await freigabe(req, res, lz);
     if (req.method === 'POST' && pfad === '/kommentar') return await kommentar(req, res, lz);
