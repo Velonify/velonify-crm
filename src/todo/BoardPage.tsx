@@ -1,14 +1,15 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ErrorBox, Loading, PageHeader } from '../components/ui';
 import { useCrm } from '../data/CrmContext';
 import { addDays, isoDate } from '../data/ids';
-import { faelligkeit, istErledigt, kuerzlichErledigt } from '../data/todos';
+import { boardKurz, faelligkeit, istErledigt, kuerzlichErledigt, sortiereBoards } from '../data/todos';
 import { BoardAnsicht } from './BoardAnsicht';
 import { useTodoDaten } from './useTodoDaten';
 
 export function BoardPage() {
   const { id = '' } = useParams();
   const { db } = useCrm();
+  const navigate = useNavigate();
   const { data, error, reload, setData, aendern } = useTodoDaten();
   const board = data?.boards.find((b) => b.id === id);
   const heute = isoDate(new Date());
@@ -19,7 +20,7 @@ export function BoardPage() {
       <PageHeader
         eyebrow={
           <nav aria-label="Pfad">
-            <Link to="/todo">To-Dos</Link>
+            <Link to="/todo">To-Dos · Übersicht</Link>
           </nav>
         }
         title={board?.titel ?? 'Board'}
@@ -38,11 +39,25 @@ export function BoardPage() {
             : undefined
         }
         actions={
-          firma && (
-            <Link to={`/kunden/${firma.id}`} className="button">
-              Zum Kunden
-            </Link>
-          )
+          <>
+            {data && db && data.boards.filter((b) => !b.archiviert).length > 1 && (
+              <label className="ich-auswahl">
+                Board
+                <select value={board?.id ?? ''} onChange={(e) => navigate(`/todo/${e.target.value}`)}>
+                  {sortiereBoards(data.boards, db.firmen).map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {boardKurz(b, db.firmen)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {firma && (
+              <Link to={`/kunden/${firma.id}`} className="button">
+                Zum Kunden
+              </Link>
+            )}
+          </>
         }
       />
       {error && <ErrorBox error={error} onRetry={reload} />}
