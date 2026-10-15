@@ -8,10 +8,12 @@ export const config = {
   contactGeneratorUrl: env.VITE_CONTACT_GENERATOR_URL || '',
   /** Cloud Function of the shop audit */
   shopAuditUrl: env.VITE_SHOP_AUDIT_URL || '',
+  /** Cloud Function crm-api in front of Postgres; when set, the data no longer comes from the sheet. */
+  crmApiUrl: env.VITE_CRM_API_URL || '',
 };
 
-/** Without a client ID and sheet ID the app runs on in-memory sample data. */
-export const isDemo = !config.googleClientId || !config.spreadsheetId;
+/** Without a client ID and a data source (crm-api or sheet) the app runs on in-memory sample data. */
+export const isDemo = !config.googleClientId || (!config.crmApiUrl && !config.spreadsheetId);
 
 // Sheets for data, Drive for lead/client folders, Calendar for Meet appointments.
 export const GOOGLE_SCOPES = [

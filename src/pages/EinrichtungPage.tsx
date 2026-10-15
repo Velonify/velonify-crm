@@ -204,12 +204,23 @@ function DriveKarte() {
   );
 }
 
+/** With crm-api there is nothing to set up: the tables come from migrations (db/migrationen). */
+function DatenbankKarte() {
+  return (
+    <Card title="1. Datenbank">
+      <p className="muted">
+        Die Daten liegen in Postgres (Cloud SQL, Datenbank <code>crm</code>). Tabellen und Spalten kommen aus den Migrationen im Repo, hier ist nichts einzurichten.
+      </p>
+    </Card>
+  );
+}
+
 function TeamKarte() {
   const { db } = useCrm();
   return (
     <Card title="3. Team & Auswahllisten">
       <p className="muted">
-        Gepflegt im Tabellenblatt <code>listen</code> (Spalten <code>liste</code> und <code>wert</code>). Neue Einträge erscheinen nach dem nächsten Laden.
+        Gepflegt in der Tabelle <code>listen</code> (Spalten <code>liste</code> und <code>wert</code>). Neue Einträge erscheinen nach dem nächsten Laden.
       </p>
       <dl className="items">
         <div className="item">
@@ -285,7 +296,7 @@ export function EinrichtungPage() {
         </div>
       )}
       {error && !(error instanceof AuthExpiredError) && <p className="alert error">{errorMessage(error)}</p>}
-      <SheetKarte />
+      {config.crmApiUrl ? <DatenbankKarte /> : <SheetKarte />}
       {/* Remount once data is there, so the fields start with the saved values. */}
       <DriveKarte key={db ? 'bereit' : 'laedt'} />
       <TeamKarte />
