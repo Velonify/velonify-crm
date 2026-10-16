@@ -101,9 +101,9 @@ async function angemeldet(req: Request, lz: Laufzeit, s: Store): Promise<{ berec
   const sitzung = bearer ? oeffneSitzung(lz.siegel, bearer, Date.now()) : null;
   if (!sitzung) return null;
   if (sitzung.v) {
-    // Team preview: no contact behind it, only the firm (which must still exist).
+    // Team access: no contact behind it, only the firm (which must still exist) and the team member.
     const db = await s.load();
-    const berechtigung = vorschauBerechtigung(db, sitzung.f);
+    const berechtigung = vorschauBerechtigung(db, sitzung.f, sitzung.v);
     return berechtigung ? { berechtigung, db, sitzung } : null;
   }
   const [db, portal] = await Promise.all([s.load(), s.loadPortalDaten()]);
@@ -127,7 +127,7 @@ async function wechseln(req: Request, res: Response, lz: Laufzeit): Promise<void
   json(res, 200, erstelleSitzung(lz.siegel, ziel, Date.now()));
 }
 
-/** "Als Kunde ansehen" in the hub: a team member with their hub Google token gets a read-only preview session. */
+/** "Portal öffnen" in the hub: a team member with their hub Google token gets a team session for the firm. */
 async function vorschau(req: Request, res: Response, lz: Laufzeit): Promise<void> {
   if (!lz.hubClientId) return json(res, 503, { fehler: 'Die Vorschau ist nicht eingerichtet (GOOGLE_CLIENT_ID fehlt).' });
   const token = /^Bearer (.+)$/i.exec(req.get('authorization') ?? '')?.[1] ?? '';
@@ -141,7 +141,7 @@ async function vorschau(req: Request, res: Response, lz: Laufzeit): Promise<void
   }
   const firmaId = String(eingabe(req).firma_id ?? '');
   const s = await store(lz);
-  if (!vorschauBerechtigung(await s.load(), firmaId)) return json(res, 404, { fehler: 'Diese Firma gibt es nicht (mehr).' });
+  if (!vorschauBerechtigung(await s.load(), firmaId, email)) return json(res, 404, { fehler: 'Diese Firma gibt es nicht (mehr).' });
   console.log(JSON.stringify({ vorschau: firmaId, von: email }));
   json(res, 200, erstelleVorschau(lz.siegel, firmaId, email, Date.now()));
 }
@@ -245,8 +245,8 @@ function eingabe(req: Request): Record<string, unknown> {
 async function schreibend(req: Request, lz: Laufzeit, s: Store): Promise<{ berechtigung: Berechtigung; db: Awaited<ReturnType<Store['load']>> }> {
   const anmeldung = await angemeldet(req, lz, s);
   if (!anmeldung) throw new PortalFehler(401, NICHT_ANGEMELDET);
-  if (anmeldung.sitzung.v) throw new PortalFehler(403, 'In der Vorschau kannst du nichts ändern. Das geht nur mit dem Login des Kunden.');
-  if (!schreibenProKontakt.erlaubt(anmeldung.berechtigung.kontakt.id)) throw new PortalFehler(429, 'Das waren gerade sehr viele Änderungen. Bitte warte ein paar Minuten.');
+  // Team access acts too, under the team member's own address (see vorschauBerechtigung).
+  if (!schreibenProKontakt.erlaubt(anmeldung.sitzung.v ?? anmeldung.berechtigung.kontakt.id)) throw new PortalFehler(429, 'Das waren gerade sehr viele Änderungen. Bitte warte ein paar Minuten.');
   return anmeldung;
 }
 
