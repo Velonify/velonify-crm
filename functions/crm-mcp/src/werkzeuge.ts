@@ -75,6 +75,11 @@ import {
   aufgabeZeile,
   type Kontext,
 } from './hilfen';
+import { registriereAngebote } from './gruppen/angebote';
+import { registriereAudit } from './gruppen/audit';
+import { registriereEingang } from './gruppen/eingang';
+import { registriereKunden } from './gruppen/kunden';
+import { registriereSocial } from './gruppen/social';
 
 export { leseTeamZuordnung };
 export type { Kontext };
@@ -960,4 +965,10 @@ export function registriereWerkzeuge(server: McpServer, kontext: Kontext): void 
       return antwort({ angelegt: true, kunde: firma?.name ?? 'alle Kunden', titel: news.titel, datum: news.datum, sichtbar_kunde: news.sichtbar_kunde, hub: firma ? `${HUB}/#/kunden/${firma.id}/news` : undefined });
     }),
   );
+
+  registriereEingang(kasten);
+  registriereKunden(kasten);
+  registriereAngebote(kasten);
+  registriereAudit(kasten);
+  registriereSocial(kasten);
 }

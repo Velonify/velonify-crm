@@ -9,11 +9,16 @@ import { SheetsClient } from '../../../src/data/sheets/sheetsClient';
 import { SheetStore } from '../../../src/data/sheets/sheetStore';
 import { PostgresStore } from '../../../src/data/postgres/postgresStore';
 import { slackBenachrichtiger } from '../../../src/data/slack';
+import { CloudGenerator } from '../../../src/data/contactGenerator';
+import { CloudLeadFinder } from '../../../src/data/leadFinder';
+import { CloudLinkedin } from '../../../src/data/linkedin';
+import { CloudShopAudit } from '../../../src/data/shopAudit';
 import { verbinde, type Verbindung } from '../../../db/verbindung';
 import { GoogleAbgelaufen, googleAnmeldeUrl, GoogleTokens, tauscheGoogleCode, ZugriffVerweigert, type GoogleKonfig } from './google';
 import { AuthServer, OAuthFehler, ressourceUrl, schutzMetadaten, SCOPE, serverMetadaten, type OAuthKonfig } from './oauth';
 import { fehlerSeite, freigabeSeite } from './seiten';
 import { Siegel } from './siegel';
+import type { Dienste } from './hilfen';
 import { ANLEITUNG, leseTeamZuordnung, registriereWerkzeuge } from './werkzeuge';
 
 const VERSION = '0.3.0';
@@ -24,6 +29,21 @@ const TEAM_ZUORDNUNG = leseTeamZuordnung(process.env.TEAM_ZUORDNUNG ?? '');
 const SLACK = process.env.SLACK_BOT_TOKEN?.trim()
   ? slackBenachrichtiger({ token: process.env.SLACK_BOT_TOKEN.trim(), hub: process.env.HUB_URL || 'https://crm.velonify.de', teamZuordnung: TEAM_ZUORDNUNG })
   : undefined;
+
+/**
+ * The hub's Cloud Functions, called with the person's Google token like the hub does. They accept it once the
+ * MCP's OAuth client is listed in their GOOGLE_CLIENT_ID.
+ */
+function dienste(getToken: () => Promise<string>): Dienste {
+  const generator = process.env.CONTACT_GENERATOR_URL?.trim();
+  const audit = process.env.SHOP_AUDIT_URL?.trim();
+  return {
+    generator: generator ? new CloudGenerator(generator, getToken) : undefined,
+    shopAudit: audit ? new CloudShopAudit(audit, getToken) : undefined,
+    leadFinder: audit ? new CloudLeadFinder(audit, getToken) : undefined,
+    linkedin: audit ? new CloudLinkedin(audit, getToken) : undefined,
+  };
+}
 
 interface Laufzeit {
   konfig: OAuthKonfig;
@@ -130,6 +150,7 @@ async function mcp(req: Request, res: Response, lz: Laufzeit): Promise<void> {
     person: { email: zugang.email, name: zugang.name },
     teamName: TEAM_ZUORDNUNG.get(zugang.email),
     heute: () => isoDate(new Date()),
+    dienste: dienste(getToken),
   });
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on('close', () => {

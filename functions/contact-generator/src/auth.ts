@@ -18,6 +18,7 @@ interface TokenInfo {
 }
 
 interface Optionen {
+  /** One or more OAuth client ids, comma-separated: the hub's and the CRM MCP server's. */
   clientId: string;
   domain: string;
   fetch?: typeof fetch;
@@ -28,7 +29,7 @@ const MAX_CACHE_MS = 5 * 60 * 1000;
 const cache = new Map<string, { email: string; bis: number }>();
 
 /**
- * Checks the Google access token the app already holds for Sheets and Drive: it must belong to our OAuth client
+ * Checks the Google access token the app already holds for Sheets and Drive: it must belong to one of our OAuth clients
  * and to a verified @velonify.de address. Results are cached briefly so a regenerate does not ask Google again.
  */
 export async function pruefeGoogleToken(token: string, optionen: Optionen): Promise<string> {
@@ -43,7 +44,8 @@ export async function pruefeGoogleToken(token: string, optionen: Optionen): Prom
   if (!antwort.ok) throw new ZugriffsFehler(401, 'Die Anmeldung ist abgelaufen. Bitte neu anmelden.');
   const info = (await antwort.json()) as TokenInfo;
 
-  if (info.aud !== optionen.clientId && info.azp !== optionen.clientId) {
+  const clients = optionen.clientId.split(',').map((id) => id.trim()).filter(Boolean);
+  if (!clients.some((id) => info.aud === id || info.azp === id)) {
     throw new ZugriffsFehler(401, 'Das Token gehört nicht zur Velonify-App.');
   }
   const email = (info.email ?? '').toLowerCase();
