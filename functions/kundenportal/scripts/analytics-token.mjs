@@ -1,5 +1,6 @@
 // One-time: fetches a refresh token that lets the portal read GA4 and Search Console as analytics@velonify.de (read only).
 // Usage: GMAIL_CLIENT_ID=… GMAIL_CLIENT_SECRET=… node scripts/analytics-token.mjs
+// The CRM's OAuth client is a web client: add http://127.0.0.1:53682 once under „Autorisierte Weiterleitungs-URIs“.
 // Open the printed link, sign in as analytics@velonify.de, allow – the token is printed here.
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
@@ -33,8 +34,10 @@ const server = createServer(async (req, res) => {
 });
 
 let redirectUri = '';
-server.listen(0, '127.0.0.1', () => {
-  redirectUri = `http://127.0.0.1:${server.address().port}`;
+// Fixed port, because a web client only accepts redirect addresses registered in advance.
+const PORT = Number(process.env.PORT || 53682);
+server.listen(PORT, '127.0.0.1', () => {
+  redirectUri = `http://127.0.0.1:${PORT}`;
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
