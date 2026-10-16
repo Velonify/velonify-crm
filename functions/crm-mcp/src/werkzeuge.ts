@@ -1,38 +1,27 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+
 import { z } from 'zod';
 import {
   AKTIVITAET_TYPEN,
-  EOL,
   isAbgeschlossen,
   istErstkontakt,
   KONTAKT_WEGE,
   kontaktVermerk,
   PHASEN,
   phaseLabel,
-  STATUS,
-  TIERS,
 } from '../../../src/data/constants';
-import type { CrmService } from '../../../src/data/crm';
+
 import { findeDubletten, dublettenText } from '../../../src/data/dubletten';
-import { DuplicateError } from '../../../src/data/errors';
+
 import {
-  dmLink,
   dmText,
-  herkunftLabel,
-  istNewsletterAbonnent,
   istOffenerLead,
   leadFirmenname,
   magnetZahlen,
-  RESSOURCEN_BASIS,
-  shopsystemLabel,
   sortiereLeads,
 } from '../../../src/data/magnete';
-import { roastPlaetze } from '../../../src/data/roast';
+
 import {
-  boardVon,
-  checklisteVon,
-  faelligkeit,
   INTERNES_BOARD_TITEL,
   istErledigt,
   kartenNachSpalte,
@@ -40,35 +29,55 @@ import {
   sortiereBoards,
   spaltenVon,
 } from '../../../src/data/todos';
-import { istZustaendig, personen, zustaendigWert } from '../../../src/data/zustaendig';
+import { istZustaendig, zustaendigWert } from '../../../src/data/zustaendig';
 import { erwaehnteNamen } from '../../../src/data/erwaehnungen';
 import { kontaktName, suggestKuerzel } from '../../../src/data/rules';
-import { driveKonfiguration, findeTeamMitglied, indexById, kennzahlen, leseTeamZuordnung, meinTag, offeneDeals, type Aufgabe } from '../../../src/data/selectors';
+import { driveKonfiguration, indexById, kennzahlen, leseTeamZuordnung, meinTag, offeneDeals } from '../../../src/data/selectors';
 
-export { leseTeamZuordnung };
 import { suche } from '../../../src/data/suche';
 import {
   type Aufgabe as Karte,
-  type Board,
   EMPTY_DEAL_INPUT,
   EMPTY_FIRMA_INPUT,
   EMPTY_KONTAKT_INPUT,
-  type Database,
-  type Deal,
-  type Firma,
-  type Kontakt,
-  type KontaktInput,
-  type Magnet,
   type MagnetInput,
-  type MagnetLead,
-  type Spalte,
-  type TodoDaten,
 } from '../../../src/data/types';
-import type { Person } from './google';
 
-const HUB = 'https://crm.velonify.de';
-const firmaLink = (id: string) => `${HUB}/#/crm/firmen/${id}`;
-const driveLink = (id: string) => (id ? `https://drive.google.com/drive/folders/${id}` : undefined);
+import {
+  antwort,
+  baueKasten,
+  boardLink,
+  dealFelder,
+  dealZeile,
+  datum,
+  driveLink,
+  fehler,
+  fehlerText,
+  finde,
+  findeBoard,
+  findeKarte,
+  findeSpalte,
+  firmaFelder,
+  firmaLink,
+  HUB,
+  karteZeile,
+  klein,
+  kompakt,
+  kontaktFelder,
+  kontaktInput,
+  leadZeile,
+  magnetInput,
+  magnetLink,
+  magnetZeile,
+  ohneUndefined,
+  pruefeTeam,
+  spalteZeile,
+  aufgabeZeile,
+  type Kontext,
+} from './hilfen';
+
+export { leseTeamZuordnung };
+export type { Kontext };
 
 export const ANLEITUNG = `Velonify-CRM (Google Sheet hinter crm.velonify.de). Schreibende Werkzeuge laufen über dieselben Regeln wie der Hub: Verlauf, Zuständigkeit, Kundenordner.
 - IDs immer über \`suchen\` oder \`firma_anzeigen\` holen, nie raten.
@@ -82,291 +91,9 @@ export const ANLEITUNG = `Velonify-CRM (Google Sheet hinter crm.velonify.de). Sc
 - Aus Slack: Bei To-dos aus Nachrichten \`karte_anlegen\` mit \`aus_slack: true\` und dem Permalink als \`link\` – pro Nachricht entsteht nur eine Karte. "meine To-dos" heißt: zustaendig ist die Person, die schreibt. Neuigkeiten für einen Kunden mit \`kunden_news_anlegen\`; für den Kunden sichtbar nur, wenn ausdrücklich gewünscht.
 - Lead-Magnete (Downloads gegen E-Mail auf velonify.de/ressourcen/<adresse>/): \`magnete\`, \`magnet_speichern\`, \`magnet_leads\`, \`magnet_lead_uebernehmen\`, \`magnet_lead_verwerfen\`. Ein aktiver Magnet hat sofort seine Landingpage; aktiv geht nur mit Untertitel und beim Typ „datei“ mit Datei-Link (Google Drive, per Link freigegeben). Typ „audit“ ist der Shop-Roast: kein Download, das Team prüft den Shop und schickt einen Report; \`plaetze\` begrenzt die Zahl, danach Warteliste. Wer nur den Download wollte, bekommt keine Werbe-Mails – Kontakt danach über LinkedIn.`;
 
-// ─── Ausgabe ────────────────────────────────────────────────────────────────
-
-const META = new Set(['erstellt_von', 'geaendert_von', 'archiviert']);
-
-/** Drops empty fields and bookkeeping, so Claude reads what matters. */
-function kompakt<T extends object>(eintrag: T): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(eintrag).filter(([schluessel, wert]) => !META.has(schluessel) && wert !== '' && wert !== null && wert !== undefined),
-  );
-}
-
-const antwort = (daten: unknown): CallToolResult => ({ content: [{ type: 'text', text: JSON.stringify(daten, null, 1) }] });
-const fehler = (text: string): CallToolResult => ({ content: [{ type: 'text', text }], isError: true });
-
-function fehlerText(err: unknown): string {
-  if (err instanceof DuplicateError) return `${err.message} (firma_id ${err.existingId}). Nichts angelegt.`;
-  if (err instanceof Error) {
-    if (err.name === 'ConflictError') return `${err.message} Bitte neu laden und noch einmal versuchen.`;
-    return err.message || err.name;
-  }
-  return String(err);
-}
-
-function dealZeile(deal: Deal, firmen: Map<string, Firma>, kontakte?: Map<string, Kontakt>) {
-  const kontakt = kontakte?.get(deal.kontakt_id);
-  return kompakt({
-    deal_id: deal.id,
-    titel: deal.titel,
-    firma: firmen.get(deal.firma_id)?.name,
-    firma_id: deal.firma_id,
-    phase: deal.phase,
-    zustaendig: deal.zustaendig,
-    kontakt: kontakt ? kontaktName(kontakt) : '',
-    wert_eur: deal.wert_eur,
-    naechster_schritt: deal.naechster_schritt,
-    naechster_schritt_am: deal.naechster_schritt_am,
-    verlustgrund: deal.verlustgrund,
-    abgeschlossen_am: deal.abgeschlossen_am,
-    geaendert_am: deal.geaendert_am.slice(0, 10),
-  });
-}
-
-function aufgabeZeile(a: Aufgabe) {
-  return kompakt({
-    art: a.art,
-    titel: a.titel,
-    faellig: a.faellig,
-    zustaendig: a.zustaendig,
-    firma: a.firma?.name,
-    firma_id: a.firma?.id,
-    deal_id: a.deal?.id,
-    deal: a.deal?.titel,
-    wiedervorlage_id: a.wiedervorlage?.id,
-  });
-}
-
-function finde<T extends { id: string }>(liste: readonly T[], id: string, was: string, woher = 'suchen'): T {
-  const treffer = liste.find((e) => e.id === id);
-  if (!treffer) throw new Error(`${was} „${id}“ nicht gefunden. IDs über \`${woher}\` holen.`);
-  return treffer;
-}
-
-const magnetLink = () => `${HUB}/#/magnete/liste`;
-
-function magnetZeile(m: Magnet, leads: readonly MagnetLead[], mitTexten = false) {
-  const zahlen = magnetZahlen(leads.filter((l) => l.magnet === m.slug));
-  return kompakt({
-    adresse: m.slug,
-    titel: m.titel,
-    aktiv: m.aktiv,
-    archiviert: m.archiviert || '',
-    typ: m.typ === 'audit' ? 'audit (Shop-Roast)' : 'datei',
-    plaetze: m.plaetze !== null ? `${roastPlaetze(m, leads.filter((l) => l.magnet === m.slug)).frei} von ${m.plaetze} frei` : '',
-    stichwort: m.stichwort,
-    landingpage: `${RESSOURCEN_BASIS}${m.slug}/`,
-    dm_link: m.aktiv ? dmLink(m.slug) : '',
-    datei_url: m.datei_url,
-    eintraege: zahlen.eintraege,
-    download_geoeffnet: zahlen.geladen,
-    newsletter: zahlen.newsletter,
-    im_crm: zahlen.uebernommen,
-    offen: zahlen.offen,
-    ...(mitTexten
-      ? { untertitel: m.untertitel, inhalt: m.inhalt, knopf: m.knopf, mail_betreff: m.mail_betreff, mail_text: m.mail_text, beschreibung: m.beschreibung }
-      : {}),
-  });
-}
-
-function leadZeile(l: MagnetLead) {
-  return kompakt({
-    lead_id: l.id,
-    magnet: l.magnet,
-    eingegangen_am: l.eingegangen_am.slice(0, 16).replace('T', ' '),
-    vorname: l.vorname,
-    email: l.email,
-    shop: l.shop,
-    shopsystem: l.shopsystem ? shopsystemLabel(l.shopsystem) : '',
-    herkunft: herkunftLabel(l),
-    download_geoeffnet: l.download_am ? l.download_am.slice(0, 10) : 'nein',
-    newsletter: istNewsletterAbonnent(l) ? 'bestätigt' : l.newsletter_abgemeldet_am ? 'abgemeldet' : l.newsletter_einwilligung ? 'angehakt, nicht bestätigt' : '',
-    warteliste: l.warteliste ? 'ja' : '',
-    report: l.report_gesendet_am ? `gesendet ${l.report_gesendet_am.slice(0, 10)}` : l.report_freigegeben_am ? 'freigegeben' : l.audit_id ? 'geprüft, nicht freigegeben' : '',
-    status: l.status,
-    firma_id: l.firma_id,
-  });
-}
-
-/** The editable fields of a magnet, so a partial change keeps the rest. */
-const magnetInput = (m: Magnet): MagnetInput => ({
-  slug: m.slug, titel: m.titel, beschreibung: m.beschreibung, stichwort: m.stichwort, datei_url: m.datei_url, mail_betreff: m.mail_betreff,
-  mail_text: m.mail_text, aktiv: m.aktiv, untertitel: m.untertitel, inhalt: m.inhalt, knopf: m.knopf, typ: m.typ, plaetze: m.plaetze,
-});
-
-const boardLink = (id: string) => `${HUB}/#/todo/${id}`;
-const klein = (text: string) => text.trim().toLocaleLowerCase('de');
-
-const spalteZeile = (s: Spalte) => kompakt({ spalte_id: s.id, titel: s.titel, erledigt: s.erledigt ? true : '' });
-
-function karteZeile(k: Karte, board: Board | undefined, daten: TodoDaten, heute: string) {
-  const spalten = board ? spaltenVon(board) : [];
-  const punkte = checklisteVon(k);
-  const kommentare = daten.kommentare.filter((c) => c.aufgabe_id === k.id).length;
-  return kompakt({
-    karte_id: k.id,
-    titel: k.titel,
-    board: board?.titel,
-    spalte: (spalten.find((s) => s.id === k.spalte_id) ?? spalten[0])?.titel,
-    zustaendig: k.zustaendig,
-    faellig: k.faellig_am,
-    ueberfaellig: faelligkeit(k, heute) === 'ueberfaellig' ? true : '',
-    labels: k.labels,
-    beschreibung: k.beschreibung,
-    checkliste: punkte.length > 0 ? punkte.map((p) => `${p.erledigt ? '[x]' : '[ ]'} ${p.text}`) : '',
-    erledigt_am: k.erledigt_am.slice(0, 10),
-    sichtbar_kunde: k.sichtbar_kunde ? true : '',
-    freigabe: k.freigabe,
-    kommentare: kommentare || '',
-    link: k.quelle_link,
-  });
-}
-
-/**
- * The board a name points to: "intern", a board id or title, or a client by firma_id, Kürzel or name.
- * Returns the firm id for `boardFuer` and the board when it already exists.
- */
-/** Prefixes of Velonify's own Slack channels; their to-dos go to the internal board. */
-const INTERNE_CHANNELS = /^(ops|dev|sales|intern|team|general|allgemein|random)(-|$)/;
-
-/**
- * The firm of a Slack channel: the channel stored on the firm (`slack_channel`), else the naming rule
- * client-<kürzel>-… / ext-<kürzel>-…; Velonify's own channels mean the internal board. Undefined when unknown.
- */
-function firmaAusChannel(db: Database, channel: string): { firmaId: string } | undefined {
-  const name = klein(channel).replace(/^#/, '');
-  const firmen = db.firmen.filter((f) => !f.archiviert);
-  const gespeichert = firmen.find((f) => f.slack_channel && klein(f.slack_channel).replace(/^#/, '') === name);
-  if (gespeichert) return { firmaId: gespeichert.id };
-  const kuerzel = /^(?:client|ext)-([a-z0-9]+)(?:-|$)/.exec(name)?.[1];
-  const firma = kuerzel ? firmen.find((f) => klein(f.kuerzel) === kuerzel) : undefined;
-  if (firma) return { firmaId: firma.id };
-  if (INTERNE_CHANNELS.test(name)) return { firmaId: '' };
-  return undefined;
-}
-
-function findeBoard(db: Database, boards: readonly Board[], angabe: string): { firmaId: string; board?: Board } {
-  const wert = klein(angabe);
-  if (!wert || wert === 'intern' || wert === klein(INTERNES_BOARD_TITEL)) return { firmaId: '', board: boardVon(boards, '') };
-  if (wert.startsWith('#')) {
-    const ausChannel = firmaAusChannel(db, wert);
-    if (!ausChannel) throw new Error(`Zum Channel „${angabe}“ gehört kein Kunde (weder als Slack-Channel der Firma eingetragen noch client-<kürzel>-…). Board "intern" oder den Kunden angeben.`);
-    return { firmaId: ausChannel.firmaId, board: boardVon(boards, ausChannel.firmaId) };
-  }
-  const direkt = boards.find((b) => !b.archiviert && (b.id === angabe.trim() || klein(b.titel) === wert));
-  if (direkt) return { firmaId: direkt.firma_id, board: direkt };
-  const firmen = db.firmen.filter((f) => !f.archiviert);
-  const genau = firmen.filter((f) => f.id === angabe.trim() || klein(f.kuerzel) === wert || klein(f.name) === wert);
-  const treffer = genau.length > 0 ? genau : firmen.filter((f) => klein(f.name).includes(wert));
-  if (treffer.length === 0) throw new Error(`Kein Board und keine Firma zu „${angabe}“. Boards über \`boards\` holen.`);
-  if (treffer.length > 1) throw new Error(`„${angabe}“ ist nicht eindeutig: ${treffer.map((f) => (f.kuerzel ? `${f.name} (${f.kuerzel})` : f.name)).join(', ')}. Kürzel oder firma_id angeben.`);
-  return { firmaId: treffer[0].id, board: boardVon(boards, treffer[0].id) };
-}
-
-/** A column of the board by id or title. */
-function findeSpalte(board: Board, angabe: string): Spalte {
-  const spalten = spaltenVon(board);
-  const spalte = spalten.find((s) => s.id === angabe.trim()) ?? spalten.find((s) => klein(s.titel) === klein(angabe));
-  if (!spalte) throw new Error(`Spalte „${angabe}“ gibt es auf „${board.titel}“ nicht. Möglich: ${spalten.map((s) => s.titel).join(', ')}.`);
-  return spalte;
-}
-
-function findeKarte(daten: TodoDaten, karteId: string): { karte: Karte; board: Board } {
-  const karte = finde(daten.aufgaben, karteId, 'Karte', 'karten');
-  if (karte.archiviert) throw new Error(`Die Karte „${karte.titel}“ ist archiviert.`);
-  return { karte, board: finde(daten.boards, karte.board_id, 'Board', 'boards') };
-}
-
-// ─── Eingaben ───────────────────────────────────────────────────────────────
-
-const datum = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Datum als JJJJ-MM-TT');
-
-const firmaFelder = {
-  name: z.string().optional(),
-  domain: z.string().optional().describe('Shop-Domain, z. B. beispiel.de'),
-  status: z.enum(STATUS).optional(),
-  tier: z.enum(TIERS).optional(),
-  plattform: z.string().optional().describe('z. B. Magento, Shopware, WooCommerce'),
-  version: z.string().optional(),
-  eol: z.enum(EOL).optional(),
-  ort: z.string().optional(),
-  email_allgemein: z.string().optional(),
-  telefon_allgemein: z.string().optional(),
-  tech_info: z.string().optional(),
-  quelle: z.string().optional().describe('Woher der Lead kommt, z. B. LinkedIn, Empfehlung, Website'),
-  zustaendig: z.string().optional(),
-  register: z.string().optional(),
-  ust_id: z.string().optional(),
-  notiz: z.string().optional(),
-};
-
-const kontaktFelder = {
-  vorname: z.string().optional(),
-  nachname: z.string().optional(),
-  rolle: z.string().optional(),
-  email: z.string().optional(),
-  telefon: z.string().optional(),
-  linkedin: z.string().optional().describe('Profil-URL'),
-  hauptkontakt: z.boolean().optional(),
-  notiz: z.string().optional(),
-};
-
-const dealFelder = {
-  titel: z.string().optional(),
-  kontakt_id: z.string().optional(),
-  wert_eur: z.number().nonnegative().nullable().optional(),
-  wahrscheinlichkeit: z.number().min(0).max(100).nullable().optional(),
-  zustaendig: z.string().optional(),
-  naechster_schritt: z.string().optional(),
-  naechster_schritt_am: z.union([datum, z.literal('')]).optional(),
-};
-
-/** The editable fields of an existing contact, so a partial change keeps the rest. */
-const kontaktInput = (k: Kontakt): KontaktInput =>
-  Object.fromEntries(Object.keys(EMPTY_KONTAKT_INPUT).map((feld) => [feld, k[feld as keyof KontaktInput]])) as unknown as KontaktInput;
-
-const ohneUndefined = <T extends object>(eintrag: T) =>
-  Object.fromEntries(Object.entries(eintrag).filter(([, wert]) => wert !== undefined)) as { [K in keyof T]?: Exclude<T[K], undefined> };
-
-// ─── Werkzeuge ──────────────────────────────────────────────────────────────
-
-export interface Kontext {
-  service: CrmService;
-  person: Person;
-  /** Fixed team name for the person (TEAM_ZUORDNUNG), when name and address do not give it away ("lukas" → "Lugge"). */
-  teamName?: string;
-  heute: () => string;
-}
-
-/** The team name of the signed-in person: the fixed one if it is in the team, else found like the hub's useIch does. */
-function ichAus(db: Database, person: Person, teamName?: string): string | null {
-  const team = db.listen.team ?? [];
-  if (teamName && team.includes(teamName)) return teamName;
-  return findeTeamMitglied(team, person.name, person.email);
-}
-
-function pruefeTeam(db: Database, name: string | undefined): void {
-  const team = db.listen.team ?? [];
-  const fremd = personen(name).filter((n) => !team.includes(n));
-  if (team.length > 0 && fremd.length > 0) throw new Error(`„${fremd.join(', ')}“ ist nicht im Team. Möglich: ${team.join(', ')}.`);
-}
-
-export function registriereWerkzeuge(server: McpServer, { service, person, teamName, heute }: Kontext): void {
-  const meinName = (db: Database) => ichAus(db, person, teamName);
-
-  const lesen = { readOnlyHint: true, openWorldHint: false } as const;
-  const schreiben = { readOnlyHint: false, destructiveHint: false, openWorldHint: false } as const;
-
-  const sicher =
-    <A>(fn: (args: A) => Promise<CallToolResult>) =>
-    async (args: A): Promise<CallToolResult> => {
-      try {
-        return await fn(args);
-      } catch (err) {
-        return fehler(fehlerText(err));
-      }
-    };
+export function registriereWerkzeuge(server: McpServer, kontext: Kontext): void {
+  const kasten = baueKasten(server, kontext);
+  const { service, person, heute, meinName, sicher, lesen, schreiben } = kasten;
 
   server.registerTool(
     'ueberblick',
