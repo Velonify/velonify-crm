@@ -28,7 +28,6 @@ export interface Firma extends Meta {
   zustaendig: string;
   drive_ordner_id: string;
   slack_channel: string;
-  trello_url: string;
   notiz: string;
   archiviert: boolean;
   /** Industry id from BRANCHEN (src/data/branchen.ts), empty when unknown. */
@@ -809,7 +808,7 @@ export interface Database {
 export const EMPTY_FIRMA_INPUT: FirmaInput = {
   name: '', domain: '', kuerzel: '', status: 'lead', tier: '', score: null, plattform: '', version: '', eol: '',
   ort: '', register: '', ust_id: '', email_allgemein: '', telefon_allgemein: '', tech_info: '', quelle: '',
-  zustaendig: '', drive_ordner_id: '', slack_channel: '', trello_url: '', notiz: '', branche: '',
+  zustaendig: '', drive_ordner_id: '', slack_channel: '', notiz: '', branche: '',
 };
 
 export const EMPTY_KONTAKT_INPUT: KontaktInput = {

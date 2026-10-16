@@ -101,7 +101,7 @@ export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel, al
         <div className="grid">
           {field('name', 'Name *', text('name', { required: true, placeholder: 'Firmenname' }), undefined, true)}
           {field('domain', 'Domain', text('domain', { placeholder: 'shop.de' }), 'Eindeutig – daran erkennt der Import Dubletten.')}
-          {field('kuerzel', 'Kürzel', text('kuerzel', { placeholder: 'ABC' }), 'Neue Kürzel: 3 Buchstaben. Wie in Drive, Slack, Trello.')}
+          {field('kuerzel', 'Kürzel', text('kuerzel', { placeholder: 'ABC' }), 'Neue Kürzel: 3 Buchstaben. Wie in Drive und Slack.')}
           {field('status', 'Status', select('status', [...STATUS], statusLabel))}
           {field('zustaendig', 'Zuständig', <PersonenAuswahl team={listen.team ?? []} wert={values.zustaendig} onChange={(zustaendig) => setValues((v) => ({ ...v, zustaendig }))} />)}
         </div>
@@ -141,7 +141,6 @@ export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel, al
         <div className="grid">
           {field('drive_ordner_id', 'Drive-Ordner', text('drive_ordner_id', { placeholder: 'Link oder Ordner-ID' }), 'Den Link aus der Adresszeile einfügen reicht.')}
           {field('slack_channel', 'Slack-Channel', text('slack_channel', { placeholder: 'client-abc-general' }))}
-          {field('trello_url', 'Trello-Board', text('trello_url', { type: 'url', placeholder: 'https://trello.com/b/…' }))}
         </div>
       </fieldset>
 

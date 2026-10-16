@@ -17,7 +17,7 @@ export const SCHEMA = {
     columns: [
       'id', 'name', 'domain', 'kuerzel', 'status', 'tier', 'score', 'plattform', 'version', 'eol',
       'ort', 'register', 'ust_id', 'email_allgemein', 'telefon_allgemein', 'tech_info', 'quelle',
-      'zustaendig', 'drive_ordner_id', 'slack_channel', 'trello_url', 'notiz', 'archiviert', 'branche', ...META,
+      'zustaendig', 'drive_ordner_id', 'slack_channel', 'notiz', 'archiviert', 'branche', ...META,
     ],
     numeric: ['score'],
     boolean: ['archiviert'],
@@ -276,7 +276,7 @@ export const MAGNET_TABS = ['magnete', 'magnet_leads'] as const;
  * client portal may show later. Loaded only when the tool is opened.
  */
 export const KUNDEN_TABS = ['kunden_links', 'kunden_news'] as const;
-/** Tabs of the to-do boards that replace Trello: one board per client plus an internal one. Loaded only when needed. */
+/** Tabs of the to-do boards: one board per client plus an internal one. Loaded only when needed. */
 export const TODO_TABS = ['boards', 'aufgaben', 'aufgaben_kommentare'] as const;
 /**
  * Tabs of the client portal settings: which contacts may log in, which client tools are switched on and the milestones

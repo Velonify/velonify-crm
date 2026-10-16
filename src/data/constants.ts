@@ -110,7 +110,6 @@ export const FIRMEN_LINKS = [
   { einstellung: 'link_drive', label: 'Google Drive', hinweis: 'Shared Drive „Velonify“' },
   { einstellung: 'link_helpcenter', label: 'Helpcenter', hinweis: 'Google Doc „00_Helpcenter – Wo gehört was hin“' },
   { einstellung: 'link_slack', label: 'Slack', hinweis: `Leer lassen für ${SLACK_STANDARD_URL}` },
-  { einstellung: 'link_trello', label: 'Trello', hinweis: 'Workspace mit allen Boards' },
   { einstellung: 'link_notion', label: 'Notion', hinweis: 'Velonify-Workspace' },
 ] as const;
 
