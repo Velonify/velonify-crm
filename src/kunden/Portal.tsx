@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Schalter } from '../components/Schalter';
 import { useToast } from '../components/Toasts';
-import { Card, ErrorBox, Loading } from '../components/ui';
+import { Card, ErrorBox, Field, Loading } from '../components/ui';
 import type { CrmService } from '../data/crm';
 import { CLIENT_SHARE_ORDNER } from '../data/kunden';
 import { fahrplanStand, kannPortalZugang, KUNDEN_WERKZEUGE, MEILENSTEIN_STATUS_LABEL, meilensteineVon, portalSicht, werkzeugAktiv, zugangVon } from '../data/portal';
@@ -13,6 +13,7 @@ import { errorMessage } from '../lib/errors';
 import { formatDate, formatDateTime } from '../lib/format';
 import { MeilensteinDialog, type Aendern } from './Dialoge';
 import { usePortalDaten } from './usePortalDaten';
+import { hatQuelle, liesDaten, prepareTracking, trackingVon, veraenderung, type TrackingEingabe } from '../data/tracking';
 import { einstellungenVon, KANAELE, KANAL_LABEL, RHYTHMUS_LABEL, UPDATE_RHYTHMEN, type PortalEinstellungen } from '../data/portalBenachrichtigung';
 import { useAuth } from '../auth/AuthContext';
 import { config, isDemo } from '../config';
@@ -29,6 +30,7 @@ export function Portal({ firma, db, kunden, todos }: { firma: Firma; db: Databas
         <Fahrplan firma={firma} portal={portal.data} aendern={portal.aendern} />
       </div>
       <div className="akte-side">
+        <Tracking firma={firma} portal={portal.data} aendern={portal.aendern} reload={portal.reload} />
         <Werkzeuge firma={firma} portal={portal.data} aendern={portal.aendern} />
         <Sichtbar firma={firma} kunden={kunden} todos={todos} portal={portal.data} />
       </div>
@@ -208,6 +210,111 @@ function Fahrplan({ firma, portal, aendern }: { firma: Firma; portal: PortalDate
         </label>
       )}
       {dialog && <MeilensteinDialog firma={firma} meilenstein={dialog.meilenstein} aendern={aendern} onClose={() => setDialog(null)} />}
+    </Card>
+  );
+}
+
+const tausend = (n: number) => n.toLocaleString('de-DE', { maximumFractionDigits: 0 });
+const mitVeraenderung = (jetzt: number, vorher: number) => {
+  const v = veraenderung(jetzt, vorher);
+  return v === null ? '' : ` (${v > 0 ? '+' : ''}${v.toLocaleString('de-DE')} %)`;
+};
+
+/**
+ * Tracking hub of the client: GA4 property, Search Console property and the page for PageSpeed. The portal function
+ * fetches the numbers every morning with analytics@velonify.de; "Jetzt abrufen" does it right away.
+ */
+function Tracking({ firma, portal, aendern, reload }: { firma: Firma; portal: PortalDaten; aendern: Aendern; reload: () => void }) {
+  const { getToken } = useAuth();
+  const toast = useToast();
+  const t = trackingVon(portal.tracking ?? [], firma.id);
+  const [werte, setWerte] = useState<TrackingEingabe>(() => ({
+    ga4_property: t?.ga4_property ?? '',
+    gsc_site: t?.gsc_site ?? (firma.domain ? `sc-domain:${firma.domain.replace(/^www\./, '')}` : ''),
+    pagespeed_url: t?.pagespeed_url ?? (firma.domain ? `https://${firma.domain}/` : ''),
+    sichtbar_kunde: t?.sichtbar_kunde ?? false,
+  }));
+  const [laeuft, setLaeuft] = useState<'' | 'speichern' | 'abrufen'>('');
+  const [fehler, setFehler] = useState('');
+  const daten = liesDaten(t);
+  const geaendert = !t || werte.ga4_property !== t.ga4_property || werte.gsc_site !== t.gsc_site || werte.pagespeed_url !== t.pagespeed_url || werte.sichtbar_kunde !== t.sichtbar_kunde;
+
+  const speichern = async () => {
+    setFehler('');
+    setLaeuft('speichern');
+    try {
+      const clean = prepareTracking(werte);
+      await aendern((s) => s.saveTracking(firma.id, clean));
+      setWerte(clean);
+      toast.show('Tracking gespeichert');
+    } catch (err) {
+      setFehler(errorMessage(err));
+    } finally {
+      setLaeuft('');
+    }
+  };
+
+  const abrufen = async () => {
+    setFehler('');
+    setLaeuft('abrufen');
+    try {
+      const antwort = await fetch(`${config.kundenportalApiUrl}/kennzahlen`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${await getToken()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firma_id: firma.id }),
+      });
+      const ergebnis = (await antwort.json().catch(() => ({}))) as { fehler?: string | number };
+      if (!antwort.ok) throw new Error(typeof ergebnis.fehler === 'string' ? ergebnis.fehler : 'Abruf fehlgeschlagen.');
+      reload();
+      toast.show(ergebnis.fehler ? 'Abgerufen, mit Hinweisen' : 'Zahlen abgerufen');
+    } catch (err) {
+      setFehler(errorMessage(err));
+    } finally {
+      setLaeuft('');
+    }
+  };
+
+  return (
+    <Card title="Tracking">
+      <p className="muted small">
+        Damit wir die Zahlen lesen dürfen, muss <strong>analytics@velonify.de</strong> in Google Analytics (Property-Zugriff, Rolle „Betrachter“) und in der Search
+        Console (Nutzer, „Eingeschränkt“) eingetragen sein – vom Kunden oder von uns.
+      </p>
+      <div className="grid">
+        <Field label="GA4-Property-ID" hint="Verwaltung → Property-Einstellungen, nur Ziffern">
+          <input value={werte.ga4_property} onChange={(e) => setWerte((w) => ({ ...w, ga4_property: e.target.value }))} placeholder="123456789" inputMode="numeric" />
+        </Field>
+        <Field label="Search Console" hint="Domain (beispiel.de) oder URL-Präfix">
+          <input value={werte.gsc_site} onChange={(e) => setWerte((w) => ({ ...w, gsc_site: e.target.value }))} placeholder="sc-domain:beispiel.de" />
+        </Field>
+        <Field label="Seite für PageSpeed" wide>
+          <input type="url" value={werte.pagespeed_url} onChange={(e) => setWerte((w) => ({ ...w, pagespeed_url: e.target.value }))} placeholder="https://www.beispiel.de/" />
+        </Field>
+        <label className="checkbox wide">
+          <input type="checkbox" checked={werte.sichtbar_kunde} onChange={(e) => setWerte((w) => ({ ...w, sichtbar_kunde: e.target.checked }))} />
+          Im Kundenportal unter „Zahlen“ zeigen
+        </label>
+      </div>
+      {fehler && <p className="alert error">{fehler}</p>}
+      <div className="form-actions">
+        <button type="button" className="button primary small" onClick={() => void speichern()} disabled={laeuft !== '' || !geaendert}>
+          {laeuft === 'speichern' ? 'Speichert …' : 'Speichern'}
+        </button>
+        {t && hatQuelle(t) && !isDemo && config.kundenportalApiUrl && (
+          <button type="button" className="button small" onClick={() => void abrufen()} disabled={laeuft !== '' || geaendert}>
+            {laeuft === 'abrufen' ? 'Ruft ab … (bis 1 Min.)' : 'Jetzt abrufen'}
+          </button>
+        )}
+      </div>
+      {t?.stand_am && (
+        <div className="tracking-stand">
+          <span className="row-sub">Stand {formatDateTime(t.stand_am)}</span>
+          {daten?.ga4 && <span>GA4: {tausend(daten.ga4.sitzungen)} Sitzungen{mitVeraenderung(daten.ga4.sitzungen, daten.ga4.vorher.sitzungen)}, {tausend(daten.ga4.umsatz)} € Umsatz{mitVeraenderung(daten.ga4.umsatz, daten.ga4.vorher.umsatz)}</span>}
+          {daten?.gsc && <span>Suche: {tausend(daten.gsc.klicks)} Klicks{mitVeraenderung(daten.gsc.klicks, daten.gsc.vorher.klicks)}, Position {daten.gsc.position.toLocaleString('de-DE')}</span>}
+          {daten?.pagespeed && <span>PageSpeed: mobil {daten.pagespeed.mobil?.score ?? '–'}, Desktop {daten.pagespeed.desktop?.score ?? '–'}</span>}
+          {t.fehler && t.fehler.split('\n').map((f) => <span key={f} className="hint-box warn">{f}</span>)}
+        </div>
+      )}
     </Card>
   );
 }

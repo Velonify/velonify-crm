@@ -620,6 +620,7 @@ export interface EntityMap {
   erwaehnungen: Erwaehnung;
   portal_zugaenge: PortalZugang;
   portal_werkzeuge: PortalWerkzeug;
+  kunden_tracking: KundenTracking;
   kunden_meilensteine: Meilenstein;
 }
 
@@ -789,6 +790,29 @@ export interface PortalWerkzeug extends Meta {
   aktiv: boolean;
 }
 
+/**
+ * Where a client's numbers come from (GA4 property, Search Console property, page for PageSpeed) and the last
+ * snapshot the portal function fetched with analytics@velonify.de. One row per client.
+ */
+export interface KundenTracking extends Meta {
+  id: string;
+  firma_id: string;
+  /** GA4 property id, e.g. "123456789" */
+  ga4_property: string;
+  /** Search Console property: "sc-domain:example.de" or "https://www.example.de/" */
+  gsc_site: string;
+  /** Page measured by PageSpeed (usually the start page) */
+  pagespeed_url: string;
+  /** Whether the client sees the numbers in the portal */
+  sichtbar_kunde: boolean;
+  /** When the snapshot was fetched (ISO) */
+  stand_am: string;
+  /** What went wrong at the last fetch, per source, for the team */
+  fehler: string;
+  /** The snapshot as JSON (see TrackingDaten in tracking.ts) */
+  daten: string;
+}
+
 export type MeilensteinStatus = 'offen' | 'aktiv' | 'erledigt';
 
 /** A stage of the client's roadmap, shown as progress in the portal. */
@@ -808,6 +832,7 @@ export interface PortalDaten {
   zugaenge: PortalZugang[];
   werkzeuge: PortalWerkzeug[];
   meilensteine: Meilenstein[];
+  tracking: KundenTracking[];
 }
 
 /** An inquiry from the website form, written into the sheet by the Apps Script behind the Netlify webhook. */

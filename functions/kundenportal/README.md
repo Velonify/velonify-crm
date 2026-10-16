@@ -60,6 +60,28 @@ gcloud scheduler jobs create http kundenportal-versand --project=velonify-crm --
   --headers=X-Versand-Schluessel=$(gcloud secrets versions access latest --secret=kundenportal-versand --project=velonify-crm)
 ```
 
+## Tracking-Hub (Zahlen)
+
+Je Kunde im Hub (Kundenseite → Portal → Tracking): GA4-Property-ID, Search-Console-Property, Seite für PageSpeed und ob der Kunde den Tab „Zahlen“ sieht (Tabelle `kunden_tracking`, Migration 008). `POST /kennzahlen` holt die letzten 28 Tage gegen die 28 davor (Search Console zwei Tage versetzt) und PageSpeed mobil + Desktop und speichert den Stand als JSON in `kunden_tracking.daten`. Aufruf vom Scheduler (Header `X-Versand-Schluessel`, alle Kunden) oder aus dem Hub („Jetzt abrufen“, Google-Token, `{ firma_id }`). Fällt eine Quelle aus, bleiben die Zahlen vom Vortag stehen, der Grund steht in `fehler` und im Hub.
+
+GA4 und Search Console liest das Konto **analytics@velonify.de**: Der Kunde (oder wir) trägt es in GA4 als Betrachter und in der Search Console als Nutzer ein.
+
+Einrichtung:
+```bash
+gcloud services enable analyticsdata.googleapis.com searchconsole.googleapis.com --project=velonify-crm
+# Token holen (OAuth-Client wie für die Mail), als analytics@velonify.de anmelden:
+GMAIL_CLIENT_ID=… GMAIL_CLIENT_SECRET=… node scripts/analytics-token.mjs
+printf %s '<REFRESH-TOKEN>' | gcloud secrets create kundenportal-analytics-token --data-file=- --project=velonify-crm
+for s in kundenportal-analytics-token pagespeed-api-key; do
+  gcloud secrets add-iam-policy-binding $s --member=serviceAccount:kundenportal@velonify-crm.iam.gserviceaccount.com --role=roles/secretmanager.secretAccessor --project=velonify-crm
+done
+# Deploy wie unten, zusätzlich: --timeout=300s --update-secrets=ANALYTICS_REFRESH_TOKEN=kundenportal-analytics-token:latest,PAGESPEED_API_KEY=pagespeed-api-key:latest
+gcloud scheduler jobs create http kundenportal-kennzahlen --project=velonify-crm --location=europe-west3 \
+  --schedule='0 6 * * *' --time-zone=Europe/Berlin --http-method=POST --attempt-deadline=300s \
+  --uri=https://europe-west3-velonify-crm.cloudfunctions.net/kundenportal/kennzahlen \
+  --headers=X-Versand-Schluessel=$(gcloud secrets versions access latest --secret=kundenportal-versand --project=velonify-crm)
+```
+
 ## Einrichtung (einmalig)
 
 1. **Dienstkonto**

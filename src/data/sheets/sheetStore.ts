@@ -268,7 +268,7 @@ export class SheetStore implements Store {
       this.headers.set(tab, table.header);
       return table;
     });
-    return { zugaenge: entityRows('portal_zugaenge', tables[0]), werkzeuge: entityRows('portal_werkzeuge', tables[1]), meilensteine: entityRows('kunden_meilensteine', tables[2]) };
+    return { zugaenge: entityRows('portal_zugaenge', tables[0]), werkzeuge: entityRows('portal_werkzeuge', tables[1]), meilensteine: entityRows('kunden_meilensteine', tables[2]), tracking: entityRows('kunden_tracking', tables[3]) };
   }
 
   /** Both games of the start page in a single request; a tab that is not set up yet comes back as null. */
