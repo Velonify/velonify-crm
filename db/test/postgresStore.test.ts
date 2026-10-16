@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
 import { ConflictError, NotFoundError } from '../../src/data/errors';
-import { schemaSql } from '../../src/data/postgres/ddl';
+import { TABELLEN } from '../../src/data/postgres/ddl';
 import { PostgresStore } from '../../src/data/postgres/postgresStore';
 import type { Firma } from '../../src/data/types';
 import { testDb } from './testDb';
@@ -15,8 +14,15 @@ async function store(person = 'test@velonify.de') {
 }
 
 describe('PostgresStore', () => {
-  it('matches the generated schema migration', () => {
-    expect(readFileSync(new URL('../migrationen/001_schema.sql', import.meta.url), 'utf8')).toBe(schemaSql());
+  it('has exactly the columns of SCHEMA after all migrations', async () => {
+    const { pg } = await testDb();
+    for (const schema of TABELLEN) {
+      const { rows } = await pg.query<{ column_name: string }>(
+        "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 ORDER BY ordinal_position",
+        [schema.name],
+      );
+      expect(rows.map((r) => r.column_name), schema.name).toEqual(['nr', ...schema.columns]);
+    }
   });
 
   it('returns empty text as "" like the sheet, keeps numbers and booleans typed and the insertion order', async () => {

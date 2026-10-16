@@ -183,13 +183,6 @@ export function FirmaAktePage() {
               <Item label="Register">{f.register}</Item>
               <Item label="USt-ID">{f.ust_id}</Item>
               <Item label="Slack">{f.slack_channel && `#${f.slack_channel}`}</Item>
-              <Item label="Trello">
-                {f.trello_url && (
-                  <a href={f.trello_url} target="_blank" rel="noreferrer noopener">
-                    Board öffnen ↗
-                  </a>
-                )}
-              </Item>
             </dl>
           </Card>
           <Card title="Einordnung">

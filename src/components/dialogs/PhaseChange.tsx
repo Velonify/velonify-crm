@@ -37,7 +37,7 @@ export function LeadOrdnerFelder({ firma, kuerzel, setKuerzel, name, setName, in
 }) {
   return (
     <div className="grid">
-      <Field label="Kürzel" invalid={invalid === 'kuerzel'} hint="3 Buchstaben, gilt für Drive, Slack und Trello">
+      <Field label="Kürzel" invalid={invalid === 'kuerzel'} hint="3 Buchstaben, gilt für Drive und Slack">
         <input value={kuerzel} onChange={(e) => setKuerzel(e.target.value.toUpperCase())} maxLength={3} disabled={Boolean(firma.kuerzel)} />
       </Field>
       <Field label="Ordnername" hint={ort === 'clients' ? 'Liegt dann in 01_Clients, mit Vorlage' : 'Liegt dann in 02_Sales/01_Leads'}>
