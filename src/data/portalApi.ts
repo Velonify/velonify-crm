@@ -93,18 +93,26 @@ export interface Berechtigung {
   firma: Firma;
 }
 
-/** Hours a team preview ("Als Kunde ansehen" in the hub) stays open. */
+/** Hours a team preview ("Portal öffnen" in the hub) stays open. */
 export const VORSCHAU_GUELTIG_MS = 8 * 60 * 60_000;
 
+/** First name of a team address (`lukas@…` → `Lukas`), as the portal shows team members. */
+export function teamVorname(email: string): string {
+  const name = normalisiereEmail(email).split('@')[0].split(/[._-]/)[0];
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
 /**
- * What a team member sees in the preview: the client's portal exactly as a contact of the firm would, without a
- * contact of their own (empty e-mail, so no comment counts as "Du"). Any firm that is not archived, so the team can
+ * The team access ("Portal öffnen" in the hub): the client's portal with every button a contact has. The team
+ * member acts as themselves – their address is the "contact", so approvals, comments and requests are stored with
+ * the team address and show up as Velonify, never as the client. Any firm that is not archived, so the team can
  * check the portal before switching on the first login.
  */
-export function vorschauBerechtigung(db: Pick<Database, 'firmen'>, firmaId: string): Berechtigung | null {
+export function vorschauBerechtigung(db: Pick<Database, 'firmen'>, firmaId: string, teamEmail: string): Berechtigung | null {
   const firma = db.firmen.find((f) => f.id === firmaId && !f.archiviert);
   if (!firma) return null;
-  const kontakt = { id: '', firma_id: firma.id, vorname: 'Vorschau', nachname: '', email: '' } as Kontakt;
+  const email = normalisiereEmail(teamEmail);
+  const kontakt = { id: '', firma_id: firma.id, vorname: teamVorname(email), nachname: '(Velonify)', email } as Kontakt;
   const zugang = { id: '', firma_id: firma.id, kontakt_id: '', aktiv: true, zuletzt_am: '' } as PortalZugang;
   return { zugang, kontakt, firma };
 }
@@ -149,10 +157,7 @@ const datumTeil = (zeitpunkt: string) => zeitpunkt.slice(0, 10);
 function absender(von: string, teamDomain: string, kontakte: readonly Kontakt[], ich: string): { von: string; team: boolean; ich: boolean } {
   const adresse = normalisiereEmail(von);
   const selbst = adresse !== '' && adresse === normalisiereEmail(ich);
-  if (adresse.endsWith(`@${teamDomain}`)) {
-    const name = adresse.split('@')[0].split(/[._-]/)[0];
-    return { von: name.charAt(0).toUpperCase() + name.slice(1), team: true, ich: selbst };
-  }
+  if (adresse.endsWith(`@${teamDomain}`)) return { von: teamVorname(adresse), team: true, ich: selbst };
   const kontakt = kontakte.find((k) => normalisiereEmail(k.email) === adresse);
   return { von: kontakt ? `${kontakt.vorname} ${kontakt.nachname}`.trim() : 'Kunde', team: false, ich: selbst };
 }

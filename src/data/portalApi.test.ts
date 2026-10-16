@@ -85,11 +85,14 @@ describe('portal API', () => {
     expect(sicht.kunde.name).toBe('Alpenglanz Kosmetik AG');
     expect(sicht.ich.vorname).toBe('Sophie');
     expect(sicht.vorschau).toBeNull();
-    const vorschau = kundensicht({ berechtigung: vorschauBerechtigung(db, firma.id)!, db, kunden, todos: await service.loadTodoDaten(), portal, dateien: [], teamDomain: 'velonify.de', vorschau: 'lukas@velonify.de' });
+    const team = vorschauBerechtigung(db, firma.id, 'Lukas@velonify.de')!;
+    expect(team.kontakt).toMatchObject({ email: 'lukas@velonify.de', vorname: 'Lukas', nachname: '(Velonify)' });
+    const vorschau = kundensicht({ berechtigung: team, db, kunden, todos: await service.loadTodoDaten(), portal, dateien: [], teamDomain: 'velonify.de', vorschau: 'lukas@velonify.de' });
     expect(vorschau.vorschau).toBe('lukas@velonify.de');
     expect(vorschau.karten.map((k) => k.id)).toEqual(sicht.karten.map((k) => k.id));
-    expect(vorschau.karten.flatMap((k) => k.kommentare).some((c) => c.ich)).toBe(false);
-    expect(vorschauBerechtigung(db, 'F-GIBTSNICHT')).toBeNull();
+    // Only the team member's own comments count as "Du", never the client's.
+    expect(vorschau.karten.flatMap((k) => k.kommentare).filter((c) => c.ich).every((c) => c.team)).toBe(true);
+    expect(vorschauBerechtigung(db, 'F-GIBTSNICHT', 'lukas@velonify.de')).toBeNull();
     expect(sicht.slack).toEqual({ channel: 'client-agk-general', url: expect.stringContaining('app_redirect?channel=client-agk-general') });
     const titel = sicht.karten.map((k) => k.titel);
     expect(titel).toContain('Black-Week-Banner einbauen');

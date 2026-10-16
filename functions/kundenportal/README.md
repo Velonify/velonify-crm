@@ -28,12 +28,12 @@ Die Function liest und schreibt seit dem Umzug in Postgres (Datenbank `crm` auf 
 
 Betreut eine Person mehrere Kunden, wird sie im Hub bei jedem Kunden als Kontakt mit derselben E-Mail-Adresse angelegt und bekommt dort jeweils einen Zugang. Der Anmeldelink öffnet den Kunden, der zuletzt benutzt wurde. `Kundensicht.firmen` listet alle Kunden mit aktivem Zugang. `POST /wechseln { firma_id }` gibt eine Sitzung für einen anderen Kunden derselben Adresse zurück und prüft dabei den Zugang dort. Ist ein Zugang im Hub ausgeschaltet, verschwindet der Kunde sofort aus der Liste.
 
-## Vorschau fürs Team
+## Team-Zugang
 
-Im Hub auf der Kundenseite → Reiter „Portal“ → **Als Kunde ansehen**. Der Hub schickt sein Google-Token an `POST /vorschau` `{ firma_id }`. Die Function prüft es wie crm-api (OAuth-Client des Hubs in `GOOGLE_CLIENT_ID`, nur verifizierte @velonify.de-Konten) und gibt eine Vorschau-Sitzung für 8 Stunden zurück. Das Portal öffnet sie über `#/vorschau/<sitzung>`. In der Vorschau:
-- sieht man alles wie ein Kontakt der Firma,
-- sind alle schreibenden Endpunkte gesperrt (403),
-- wird nichts als „Du“ markiert,
+Im Hub auf der Kundenseite → Reiter „Portal“ → **Portal öffnen**. Der Hub schickt sein Google-Token an `POST /vorschau` `{ firma_id }`. Die Function prüft es wie crm-api (OAuth-Client des Hubs in `GOOGLE_CLIENT_ID`, nur verifizierte @velonify.de-Konten) und gibt eine Team-Sitzung für 8 Stunden zurück. Das Portal öffnet sie über `#/vorschau/<sitzung>`. Im Team-Zugang:
+- sieht man alles wie ein Kontakt der Firma und hat dieselben Knöpfe (Anfrage, Freigabe, Kommentar, Hochladen),
+- wird alles unter der eigenen @velonify.de-Adresse gespeichert, erscheint also als Velonify (z. B. „Lukas“), nie als Kunde; Anfragen tragen im Hub-Hinweis „Lukas (Velonify)“,
+- gibt es keinen Kunden-Umschalter,
 - verlängert sich die Sitzung nicht.
 
 Der Hub braucht dafür die Repo-Variable `KUNDENPORTAL_API_URL`, die Function `GOOGLE_CLIENT_ID` (Client-ID des Hubs). `https://crm.velonify.de` ist als Origin immer erlaubt (`HUB_URL` ändert das).

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createDemoBackend } from './demo/seed';
 import { MemoryDrive } from './demo/memoryGoogle';
 import type { DriveFile } from './google/drive';
-import { findeBerechtigung, kartenKontext, kundensicht, portalKarte, type PortalDatei } from './portalApi';
+import { findeBerechtigung, kartenKontext, vorschauBerechtigung, kundensicht, portalKarte, type PortalDatei } from './portalApi';
 import {
   dateiErlaubt,
   heuteInBerlin,
@@ -162,6 +162,18 @@ describe('portal actions: requests', () => {
 
     const sicht = portalKarte(karte, kartenKontext({ berechtigung, db, todos, teamDomain: 'velonify.de' }));
     expect(sicht).toMatchObject({ anfrage: true, phase: 'geplant', freigabe: '', freigabe_am: '' });
+  });
+
+  it('stores what the team does in the team access under the team address, never as the client', async () => {
+    const { db, berechtigung, todos } = await demo();
+    const team = vorschauBerechtigung(db, berechtigung.firma.id, 'lukas@velonify.de')!;
+    const { karte, news } = portalAnfrage({ berechtigung: team, todos, eingabe: { titel: 'Banner tauschen' }, kundenDateien: [], jetzt: JETZT });
+    expect(karte).toMatchObject({ erstellt_von: 'lukas@velonify.de', quelle: 'kunde' });
+    expect(news.text).toBe('Lukas (Velonify) hat im Kundenportal eine Anfrage gestellt. Sie liegt als Karte auf dem Board.');
+    const sicht = portalKarte(karte, kartenKontext({ berechtigung: team, db, todos, teamDomain: 'velonify.de' }));
+    const kommentar = portalKommentar({ berechtigung: team, todos: { ...todos, aufgaben: [...todos.aufgaben, karte] }, eingabe: { karte_id: karte.id, text: 'Ist erledigt.' }, jetzt: JETZT });
+    expect(kommentar.von).toBe('lukas@velonify.de');
+    expect(sicht.anfrage).toBe(true);
   });
 
   it('accepts only files the client uploaded as attachments', async () => {

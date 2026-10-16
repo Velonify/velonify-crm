@@ -246,7 +246,7 @@ function AlsKundeAnsehen({ firma }: { firma: Firma }) {
         body: JSON.stringify({ firma_id: firma.id }),
       });
       const daten = (await antwort.json().catch(() => ({}))) as { sitzung?: string; fehler?: string };
-      if (!antwort.ok || !daten.sitzung) throw new Error(daten.fehler || 'Die Vorschau konnte nicht geöffnet werden.');
+      if (!antwort.ok || !daten.sitzung) throw new Error(daten.fehler || 'Das Portal konnte nicht geöffnet werden.');
       const ziel = `${config.kundenportalUrl}/#/vorschau/${daten.sitzung}`;
       if (fenster) fenster.location.href = ziel;
       else window.open(ziel, '_blank');
@@ -259,8 +259,8 @@ function AlsKundeAnsehen({ firma }: { firma: Firma }) {
   };
 
   return (
-    <button type="button" className="button small" onClick={() => void oeffnen()} disabled={laeuft} title="Öffnet das Kundenportal dieser Firma in einem neuen Tab, nur zum Ansehen">
-      {laeuft ? 'Öffnet …' : 'Als Kunde ansehen ↗'}
+    <button type="button" className="button small" onClick={() => void oeffnen()} disabled={laeuft} title="Öffnet das Kundenportal dieser Firma in einem neuen Tab, mit allen Funktionen. Was du dort tust, wird als Velonify gespeichert.">
+      {laeuft ? 'Öffnet …' : 'Portal öffnen ↗'}
     </button>
   );
 }
