@@ -101,6 +101,8 @@ export const EINSTELLUNG = {
   proposalsOrdner: 'drive_proposals_ordner_id',
   dealTitel: 'deal_titel_standard',
   socialZiel: 'social_ziel_url',
+  /** Google review link the portal offers at 5 stars ("Bewerte uns auf Google"). */
+  googleBewertung: 'google_bewertung_url',
 } as const;
 
 export const SLACK_STANDARD_URL = 'https://velonify.slack.com';

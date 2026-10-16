@@ -259,13 +259,14 @@ function TelefonKarte() {
   const { db, mutate } = useCrm();
   const toast = useToast();
   const team = db?.listen.team ?? [];
-  const schluessel = team.flatMap((n) => [teamTelefonSchluessel(n), teamTerminSchluessel(n)]);
+  const schluessel = [...team.flatMap((n) => [teamTelefonSchluessel(n), teamTerminSchluessel(n)]), EINSTELLUNG.googleBewertung];
   const [werte, setWerte] = useState<Record<string, string>>(() => Object.fromEntries(schluessel.map((k) => [k, db?.einstellungen[k] ?? ''])));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
   const wert = (k: string) => (werte[k] ?? '').trim();
   const telefonFalsch = team.filter((n) => wert(teamTelefonSchluessel(n)) && !/^\+?[\d\s/()-]{6,}$/.test(wert(teamTelefonSchluessel(n))));
   const linkFalsch = team.filter((n) => wert(teamTerminSchluessel(n)) && !istBuchungslink(wert(teamTerminSchluessel(n))));
+  const bewertungFalsch = !!wert(EINSTELLUNG.googleBewertung) && !istBuchungslink(wert(EINSTELLUNG.googleBewertung));
 
   const speichern = async () => {
     setBusy(true);
@@ -291,7 +292,7 @@ function TelefonKarte() {
   );
 
   return (
-    <Card title="4. Telefon und Termine im Kundenportal">
+    <Card title="4. Telefon, Termine und Bewertungen im Kundenportal">
       <p className="muted">
         Kunden sehen unter „Dein Team bei Velonify“ die Nummer jeder Person, die für sie zuständig ist, und einen Knopf „Termin buchen“. Calendly und
         Google-Terminbuchung öffnen sich direkt im Portal; bei Google dafür den langen Link nehmen (Buchungsseite → Teilen → „Website-Einbettung“, die Adresse aus
@@ -304,10 +305,12 @@ function TelefonKarte() {
             {feld(teamTerminSchluessel(n), `${n} · Buchungsseite`, 'url', linkFalsch.includes(n), 'Vollständige Adresse mit https://', 'https://calendly.com/… oder https://calendar.google.com/calendar/appointments/…')}
           </Fragment>
         ))}
+        {feld(EINSTELLUNG.googleBewertung, 'Google-Bewertungslink', 'url', bewertungFalsch, 'Vollständige Adresse mit https://', 'https://g.page/r/…/review')}
       </div>
+      <p className="hint">Den Google-Bewertungslink bieten wir Kunden an, die uns im Portal 5 Sterne geben (Google Unternehmensprofil → „Nach Rezensionen fragen“).</p>
       <FormError error={error} />
       <div className="form-actions">
-        <button type="button" className="button primary" onClick={speichern} disabled={busy || telefonFalsch.length + linkFalsch.length > 0}>
+        <button type="button" className="button primary" onClick={speichern} disabled={busy || telefonFalsch.length + linkFalsch.length > 0 || bewertungFalsch}>
           {busy ? 'Speichert …' : 'Speichern'}
         </button>
       </div>

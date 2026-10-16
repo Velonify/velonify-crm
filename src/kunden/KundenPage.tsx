@@ -11,11 +11,14 @@ import { websiteUrl } from '../lib/format';
 import { NewsDialog } from './Dialoge';
 import { TickerListe } from './Ticker';
 import { useKundenDaten } from './useKundenDaten';
+import { usePortalDaten } from './usePortalDaten';
+import { AMPEL_LABEL, zufriedenheit } from '../data/feedback';
 
 /** All clients as cards, plus the ticker across all of them. */
 export function KundenPage() {
   const { db, error: dbError, refresh } = useCrm();
   const { data, error, reload, aendern } = useKundenDaten();
+  const portal = usePortalDaten();
   const [dialog, setDialog] = useState<{ eintrag?: TickerEintrag } | null>(null);
   const kunden = useMemo(() => (db ? kundenListe(db) : []), [db]);
   const heute = isoDate(new Date());
@@ -59,6 +62,7 @@ export function KundenPage() {
               {kunden.map((k) => {
                 const neueste = data ? ticker(data.news, k.id, heute).find((e) => !e.alleKunden) : undefined;
                 const anzahl = data ? linksVon(data.links, k.id).length : null;
+                const stand = portal.data ? zufriedenheit(portal.data.feedback ?? [], k.id, addDays(heute, -90)) : null;
                 return (
                   <li key={k.id} className="kunden-karte">
                     <Link to={`/kunden/${k.id}`} className="kunden-karte-kopf">
@@ -69,6 +73,11 @@ export function KundenPage() {
                       {k.zustaendig ? `Zuständig: ${k.zustaendig}` : 'Niemand zuständig'}
                       {anzahl !== null && ` · ${anzahl} ${anzahl === 1 ? 'Link' : 'Links'}`}
                     </p>
+                    {stand && (
+                      <p className="row-sub zufriedenheit-stand" title={`${stand.anzahl} Bewertungen aus dem Portal in den letzten 90 Tagen`}>
+                        <span className={`ampel-punkt ${stand.ampel}`} aria-hidden="true" />★ {stand.schnitt.toLocaleString('de-DE', { minimumFractionDigits: 1 })} · {AMPEL_LABEL[stand.ampel]}
+                      </p>
+                    )}
                     <p className="kunden-karte-news">{neueste ? neueste.titel : <span className="muted">Noch keine News</span>}</p>
                     <div className="client-links">
                       {k.drive_ordner_id && (isDemo ? <span className="muted">Drive</span> : <a href={driveFolderUrl(k.drive_ordner_id)} target="_blank" rel="noreferrer noopener">Drive ↗</a>)}

@@ -13,6 +13,7 @@ import { personen } from './zustaendig';
 import type { PortalEinstellungen } from './portalBenachrichtigung';
 import { liesDaten, trackingVon, type TrackingDaten } from './tracking';
 import { berichteVon, liesBericht, monatName, type BerichtDaten } from './monatsbericht';
+import { feedbackSicht } from './feedback';
 import type { Aufgabe, AufgabenKommentar, Board, Database, Firma, Kontakt, KundenDaten, MeilensteinStatus, PortalDaten, PortalZugang, Spalte, TodoDaten } from './types';
 
 export { CLIENT_SHARE_ORDNER };
@@ -98,6 +99,11 @@ export interface Kundensicht {
   einstellungen: PortalEinstellungen | null;
   /** Numbers of the tracking hub when released for the client (always in the team access), else null. */
   zahlen: { stand_am: string; daten: TrackingDaten; sichtbar_kunde: boolean } | null;
+  /**
+   * Feedback: keys ("bericht:2026-10", "karte:T-1" …) the contact rated already, finished milestones still to rate and
+   * the Google review link offered at 5 stars. The team access shows the same questions but cannot send.
+   */
+  feedback: { gegeben: string[]; offen: { anlass: 'meilenstein'; bezug_id: string; titel: string }[]; bewertung_url: string };
   /** Monthly reports, newest first: released ones (drafts too in the team access). */
   berichte: PortalBericht[];
   fahrplan: { titel: string; datum: string; status: MeilensteinStatus }[];
@@ -265,6 +271,7 @@ export function kundensicht(args: {
   einstellungen?: PortalEinstellungen | null;
   /** All logins of the same e-mail (see `alleBerechtigungen`) */
   andere?: readonly Berechtigung[];
+  jetzt?: Date;
 }): Kundensicht {
   const { berechtigung, kunden, todos, portal, dateien } = args;
   const { firma, kontakt } = berechtigung;
@@ -308,6 +315,7 @@ export function kundensicht(args: {
         .map((n) => [KUNDEN_NAME[n] ?? n, (args.db.einstellungen?.[teamTerminSchluessel(n)] ?? '').trim()])
         .filter(([, link]) => istBuchungslink(link)),
     ),
+    feedback: feedbackSicht({ berechtigung, portal, einstellungen: args.db.einstellungen ?? {}, jetzt: args.jetzt ?? new Date() }),
     berichte: berichteVon(portal.berichte ?? [], firma.id)
       .filter((b) => b.status === 'freigegeben' || args.vorschau)
       .slice(0, MAX_BERICHTE)

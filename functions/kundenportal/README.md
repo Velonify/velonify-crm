@@ -88,6 +88,12 @@ Je Kunde im Hub einschalten (Karte „Tracking“ → „Monatsbericht“, Spalt
 
 Im Hub (Portal → Monatsberichte) schreibt das Team die Einschätzung und gibt frei; erst dann sieht der Kunde den Bericht unter „Zahlen“ und bekommt mit dem nächsten `/versand` einen Sofort-Hinweis. `POST /bericht` (Google-Token, `{ firma_id, monat? }`) erstellt einen Entwurf für einen abgeschlossenen Monat oder rechnet ihn neu; freigegebene Berichte bleiben unverändert. Das PDF entsteht im Portal über „Als PDF speichern“ (Druckansicht).
 
+## Zufriedenheit & Feedback
+
+`POST /feedback` (Sitzung des Kunden, `{ anlass, bezug_id, sterne, text, zitat_ok }`): 1–5 Sterne und optional Text zu einem freigegebenen Monatsbericht (`bezug_id` = Monat), einem abgeschlossenen Meilenstein, einer erledigten Karte oder frei (`anlass: 'frei'`, Text Pflicht, Sterne optional). Je Kontakt eine Bewertung pro Bericht, Meilenstein und Karte (Tabelle `kunden_feedback`, Migration 010). Der Team-Zugang zeigt die Fragen, sendet aber nicht.
+
+Bei 1–3 Sternen schickt die Function den Zuständigen des Kunden sofort eine Slack-Direktnachricht (App „Velonify Hub“, `SLACK_BOT_TOKEN`; Namen wie „Lugge“ über `TEAM_ZUORDNUNG` wie bei crm-api) und merkt sich `gemeldet_am`. Bei 5 Sternen bietet das Portal den Google-Bewertungslink aus der Hub-Einrichtung (Karte 4) an und fragt, ob wir den Kommentar als Zitat zeigen dürfen (`zitat_ok`).
+
 ## Einrichtung (einmalig)
 
 1. **Dienstkonto**
