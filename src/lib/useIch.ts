@@ -1,10 +1,13 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { findeTeamMitglied } from '../data/selectors';
 
 const KEY = 'velonify-crm.ich';
+/** Tells the other users of the hook (e.g. the bell) about a new choice. */
+const GEWECHSELT = 'velonify-ich';
 
-function read(): string | null {
+/** The team member picked in this browser, if any (the service uses it so nobody gets notified about their own mention). */
+export function read(): string | null {
   try {
     return localStorage.getItem(KEY);
   } catch {
@@ -21,6 +24,12 @@ export function useIch(team: readonly string[]): [string | null, (name: string) 
   const [gewaehlt, setGewaehlt] = useState<string | null>(read);
   const user = state.status === 'signedOut' ? null : state.user;
 
+  useEffect(() => {
+    const neu = (e: Event) => setGewaehlt((e as CustomEvent<string | null>).detail);
+    window.addEventListener(GEWECHSELT, neu);
+    return () => window.removeEventListener(GEWECHSELT, neu);
+  }, []);
+
   const ich = gewaehlt && team.includes(gewaehlt) ? gewaehlt : user ? findeTeamMitglied(team, user.name, user.email) : null;
 
   const setIch = useCallback((name: string) => {
@@ -31,6 +40,7 @@ export function useIch(team: readonly string[]): [string | null, (name: string) 
     } catch {
       // Storage blocked: the choice lasts until reload.
     }
+    window.dispatchEvent(new CustomEvent(GEWECHSELT, { detail: name || null }));
   }, []);
 
   return [ich, setIch];

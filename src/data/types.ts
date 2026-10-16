@@ -617,6 +617,7 @@ export interface EntityMap {
   boards: Board;
   aufgaben: Aufgabe;
   aufgaben_kommentare: AufgabenKommentar;
+  erwaehnungen: Erwaehnung;
   portal_zugaenge: PortalZugang;
   portal_werkzeuge: PortalWerkzeug;
   kunden_meilensteine: Meilenstein;
@@ -728,6 +729,31 @@ export interface AufgabenKommentar {
   text: string;
   von: string;
   datum: string;
+}
+
+/** Where a mention was written. */
+export type ErwaehnungsArt = 'kommentar' | 'karte' | 'verlauf' | 'firma' | 'kontakt' | 'news';
+
+/** One team member tagged with "@Name" somewhere in the hub; the bell shows the unread ones of the signed-in person. */
+export interface Erwaehnung {
+  id: string;
+  /** Team name of the tagged person, as in the list "team". */
+  person: string;
+  /** Address of the person who wrote it. */
+  von: string;
+  datum: string;
+  art: ErwaehnungsArt;
+  /** Row the text lives in: comment, card, activity, firm, contact or news. */
+  quelle_id: string;
+  aufgabe_id: string;
+  firma_id: string;
+  /** What it is about, e.g. the card title or the firm name. */
+  titel: string;
+  /** The text around the mention, shortened. */
+  auszug: string;
+  /** Hub path that opens the place, e.g. "/todo/B-1?karte=T-1". */
+  link: string;
+  gelesen_am: string;
 }
 
 export interface TodoDaten {

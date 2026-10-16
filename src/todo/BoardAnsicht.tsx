@@ -1,4 +1,5 @@
-import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useToast } from '../components/Toasts';
 import { isoDate } from '../data/ids';
 import { FREIGABE_LABEL, freigabeVon } from '../data/portal';
@@ -128,8 +129,25 @@ export function BoardAnsicht({
   const [ich] = useIch(team);
   const [filter, setFilter] = useState<KartenFilter>('alle');
   const [label, setLabel] = useState('');
-  const [dialog, setDialog] = useState<{ aufgabe?: Aufgabe; spalteId?: string } | null>(null);
+  const [dialog, setDialog] = useState<{ aufgabe?: Aufgabe; spalteId?: string; kommentarId?: string } | null>(null);
   const [spaltenDialog, setSpaltenDialog] = useState(false);
+  // "?karte=<id>&kommentar=<id>" (from the bell or a shared link) opens that card once, scrolled to the comment.
+  const [suchParameter, setSuchParameter] = useSearchParams();
+  const karteAusLink = suchParameter.get('karte');
+  const kommentarAusLink = suchParameter.get('kommentar') ?? undefined;
+  useEffect(() => {
+    if (!karteAusLink) return;
+    const aufgabe = daten.aufgaben.find((a) => a.id === karteAusLink && a.board_id === board.id);
+    if (aufgabe) setDialog({ aufgabe, kommentarId: kommentarAusLink });
+    setSuchParameter(
+      (p) => {
+        p.delete('karte');
+        p.delete('kommentar');
+        return p;
+      },
+      { replace: true },
+    );
+  }, [karteAusLink, kommentarAusLink, daten.aufgaben, board.id, setSuchParameter]);
   const heute = isoDate(new Date());
   const spalten = spaltenVon(board);
   const gruppen = useMemo(() => kartenNachSpalte(daten.aufgaben, board), [daten.aufgaben, board]);
@@ -251,6 +269,7 @@ export function BoardAnsicht({
           board={board}
           aufgabe={dialog.aufgabe}
           spalteId={dialog.spalteId}
+          kommentarId={dialog.kommentarId}
           kommentare={daten.kommentare}
           team={team}
           istKundenBoard={Boolean(board.firma_id)}

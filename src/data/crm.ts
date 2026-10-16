@@ -56,7 +56,8 @@ import {
   prepareKontakt,
   prepareWiedervorlage,
 } from './rules';
-import { driveKonfiguration, tageSeitVernetzung } from './selectors';
+import { driveKonfiguration, findeTeamMitglied, tageSeitVernetzung } from './selectors';
+import { auszug, firmenLink, kartenLink, kundenLink, neuErwaehnt } from './erwaehnungen';
 import { OUTREACH_STARTLISTE } from './outreachStart';
 import {
   findeWert,
@@ -88,6 +89,7 @@ import type {
   Deal,
   DealInput,
   Einstellungen,
+  Erwaehnung,
   Firma,
   FirmaInput,
   Kontakt,
@@ -149,6 +151,10 @@ export interface CrmDeps {
   now?: () => Date;
   /** Sheets access to another spreadsheet than the CRM database, e.g. an offer's calculation sheet. */
   tabelle?: (spreadsheetId: string) => SheetsApi;
+  /** Team name of the signed-in person when the address does not give it away ("lukas@" → "Lugge"); nobody tags themself. */
+  ich?: () => string | null | undefined;
+  /** Called with new @-mentions after they are saved, e.g. to send them to Slack (crm-mcp). Errors are only logged. */
+  erwaehnt?: (erwaehnungen: Erwaehnung[]) => Promise<void>;
 }
 
 export interface KalkulationsErgebnis {
@@ -230,6 +236,8 @@ export class CrmService {
   private readonly currentUser: () => string;
   private readonly now: () => Date;
   private readonly tabelle?: (spreadsheetId: string) => SheetsApi;
+  private readonly ich?: () => string | null | undefined;
+  private readonly erwaehnt?: (erwaehnungen: Erwaehnung[]) => Promise<void>;
 
   constructor(deps: CrmDeps) {
     this.store = deps.store;
@@ -238,6 +246,8 @@ export class CrmService {
     this.currentUser = deps.currentUser;
     this.now = deps.now ?? (() => new Date());
     this.tabelle = deps.tabelle;
+    this.ich = deps.ich;
+    this.erwaehnt = deps.erwaehnt;
   }
 
   load(): Promise<Database> {
@@ -276,6 +286,47 @@ export class CrmService {
     };
   }
 
+  /**
+   * Saves a mention for every team member newly tagged with "@Name" in `neu` (compared to `alt`), except the writer.
+   * Runs after the text itself is saved; a failure here only gets logged, so the text is never lost over a notification.
+   */
+  private async erwaehne(
+    alt: string,
+    neu: string,
+    ort: Pick<Erwaehnung, 'art' | 'quelle_id' | 'titel' | 'link'> & Partial<Pick<Erwaehnung, 'aufgabe_id' | 'firma_id'>>,
+    team?: readonly string[],
+  ): Promise<Erwaehnung[]> {
+    if (!neu.includes('@')) return [];
+    try {
+      const liste = team ?? (await this.store.load()).listen.team ?? [];
+      const von = this.currentUser();
+      const ich = this.ich?.() || findeTeamMitglied(liste, '', von);
+      const namen = neuErwaehnt(alt, neu, liste).filter((n) => n !== ich);
+      if (namen.length === 0) return [];
+      const datum = this.timestamp();
+      const erwaehnungen: Erwaehnung[] = namen.map((person) => ({
+        id: newId(ID_PREFIX.erwaehnungen), person, von, datum, aufgabe_id: '', firma_id: '', ...ort, auszug: auszug(neu, person), gelesen_am: '',
+      }));
+      await this.store.insert('erwaehnungen', erwaehnungen);
+      await this.erwaehnt?.(erwaehnungen).catch((err) => console.error('Erwähnungen nicht weitergegeben', err));
+      return erwaehnungen;
+    } catch (err) {
+      console.error('Erwähnungen nicht gespeichert', err);
+      return [];
+    }
+  }
+
+  loadErwaehnungen(): Promise<Erwaehnung[]> {
+    return this.store.loadErwaehnungen();
+  }
+
+  /** Marks mentions as read (only those still unread, so the first time stays). */
+  async markiereGelesen(ids: readonly string[]): Promise<Erwaehnung[]> {
+    const offen = (await this.store.loadErwaehnungen()).filter((e) => ids.includes(e.id) && !e.gelesen_am);
+    const jetzt = this.timestamp();
+    return this.store.update('erwaehnungen', offen.map((e) => ({ id: e.id, changes: { gelesen_am: jetzt } })));
+  }
+
   private async log(input: Omit<AktivitaetInput, 'datum'> & { kalender_termin_id?: string }): Promise<void> {
     await this.store.insert('aktivitaeten', [this.aktivitaet(input)]);
   }
@@ -292,6 +343,7 @@ export class CrmService {
     const db = await this.store.load();
     const firma: Firma = { ...prepareFirma(input, db.firmen), id: newId(ID_PREFIX.firmen), archiviert: false, ...this.created() };
     await this.store.insert('firmen', [firma]);
+    await this.erwaehne('', firma.notiz, { art: 'firma', quelle_id: firma.id, firma_id: firma.id, titel: firma.name, link: firmenLink(firma.id) }, db.listen.team);
     return firma;
   }
 
@@ -300,6 +352,8 @@ export class CrmService {
     const [firma] = await this.store.update('firmen', [
       { id, changes: { ...prepareFirma(changes, db.firmen, id), ...this.changed() }, expectedGeaendertAm },
     ]);
+    const alt = db.firmen.find((f) => f.id === id)?.notiz ?? '';
+    await this.erwaehne(alt, firma.notiz, { art: 'firma', quelle_id: firma.id, firma_id: firma.id, titel: firma.name, link: firmenLink(firma.id) }, db.listen.team);
     return firma;
   }
 
@@ -327,7 +381,8 @@ export class CrmService {
   async saveKontakt(firmaId: string, input: KontaktInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<Kontakt> {
     const clean = prepareKontakt(input);
     const db = await this.store.load();
-    CrmService.find(db.firmen, firmaId);
+    const firma = CrmService.find(db.firmen, firmaId);
+    const altNotiz = existing ? (db.kontakte.find((k) => k.id === existing.id)?.notiz ?? '') : '';
 
     let kontakt: Kontakt;
     if (existing) {
@@ -345,6 +400,8 @@ export class CrmService {
       const andere = db.kontakte.filter((k) => k.firma_id === firmaId && k.id !== kontakt.id && k.hauptkontakt);
       await this.store.update('kontakte', andere.map((k) => ({ id: k.id, changes: { hauptkontakt: false } })));
     }
+    const name = `${kontakt.vorname} ${kontakt.nachname}`.trim();
+    await this.erwaehne(altNotiz, kontakt.notiz, { art: 'kontakt', quelle_id: kontakt.id, firma_id: firmaId, titel: name ? `${name} · ${firma.name}` : firma.name, link: firmenLink(firmaId) }, db.listen.team);
     return kontakt;
   }
 
@@ -528,6 +585,11 @@ export class CrmService {
     if (!input.text.trim()) throw new ValidationError('text', 'Bitte etwas eintragen.');
     const aktivitaet = this.aktivitaet({ ...input, text: input.text.trim() });
     await this.store.insert('aktivitaeten', [aktivitaet]);
+    if (aktivitaet.text.includes('@')) {
+      const db = await this.store.load();
+      const firma = db.firmen.find((f) => f.id === aktivitaet.firma_id);
+      await this.erwaehne('', aktivitaet.text, { art: 'verlauf', quelle_id: aktivitaet.id, firma_id: aktivitaet.firma_id, titel: firma?.name ?? 'Verlauf', link: firmenLink(aktivitaet.firma_id) }, db.listen.team);
+    }
     return aktivitaet;
   }
 
@@ -1057,12 +1119,16 @@ export class CrmService {
   async saveKundenNews(input: KundenNewsInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<KundenNews> {
     const clean = prepareKundenNews(input, this.today());
     if (clean.firma_id) CrmService.find((await this.store.load()).firmen, clean.firma_id);
+    const ort = (news: KundenNews) => ({ art: 'news' as const, quelle_id: news.id, firma_id: news.firma_id, titel: news.titel || 'Kunden-News', link: kundenLink(news.firma_id) });
     if (existing) {
+      const alt = clean.text.includes('@') ? ((await this.store.loadKundenDaten()).news.find((n) => n.id === existing.id)?.text ?? '') : '';
       const [news] = await this.store.update('kunden_news', [{ id: existing.id, changes: { ...clean, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm }]);
+      await this.erwaehne(alt, news.text, ort(news));
       return news;
     }
     const news: KundenNews = { ...clean, id: newId(ID_PREFIX.kunden_news), archiviert: false, ...this.created() };
     await this.store.insert('kunden_news', [news]);
+    await this.erwaehne('', news.text, ort(news));
     return news;
   }
 
@@ -1139,6 +1205,7 @@ export class CrmService {
         ...(wechsel ? { sortierung: sortierungFuerPosition(kartenNachSpalte(aufgaben, board).get(spalte_id) ?? [], alt.id, Infinity), ...this.erledigtFelder(alt, spalte_id === erledigtSpalte(spalten)?.id) } : {}),
       };
       const [aufgabe] = await this.store.update('aufgaben', [{ id: existing.id, changes: { ...changes, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm }]);
+      await this.erwaehne(alt.beschreibung, aufgabe.beschreibung, this.kartenOrt(aufgabe, board));
       return aufgabe;
     }
     const spalte_id = clean.spalte_id && spalten.some((s) => s.id === clean.spalte_id) ? clean.spalte_id : spalten[0].id;
@@ -1167,6 +1234,7 @@ export class CrmService {
     };
     if (spalte_id === erledigtSpalte(spalten)?.id) Object.assign(aufgabe, this.erledigtFelder(aufgabe, true));
     await this.store.insert('aufgaben', [aufgabe]);
+    await this.erwaehne('', aufgabe.beschreibung, this.kartenOrt(aufgabe, board));
     return aufgabe;
   }
 
@@ -1204,10 +1272,18 @@ export class CrmService {
   async kommentiereKarte(aufgabeId: string, text: string): Promise<AufgabenKommentar> {
     const clean = text.trim();
     if (!clean) throw new ValidationError('text', 'Bitte einen Kommentar schreiben.');
-    CrmService.find((await this.store.loadTodoDaten()).aufgaben, aufgabeId);
+    const { boards, aufgaben } = await this.store.loadTodoDaten();
+    const aufgabe = CrmService.find(aufgaben, aufgabeId);
     const kommentar: AufgabenKommentar = { id: newId(ID_PREFIX.aufgaben_kommentare), aufgabe_id: aufgabeId, text: clean, von: this.currentUser(), datum: this.timestamp() };
     await this.store.insert('aufgaben_kommentare', [kommentar]);
+    const board = boards.find((b) => b.id === aufgabe.board_id);
+    await this.erwaehne('', clean, { ...this.kartenOrt(aufgabe, board), art: 'kommentar', quelle_id: kommentar.id, link: kartenLink(aufgabe.board_id, aufgabe.id, kommentar.id) });
     return kommentar;
+  }
+
+  /** Where a mention on a card points: the card, opened on its board. */
+  private kartenOrt(aufgabe: Aufgabe, board: Board | undefined) {
+    return { art: 'karte' as const, quelle_id: aufgabe.id, aufgabe_id: aufgabe.id, firma_id: board?.firma_id ?? '', titel: aufgabe.titel, link: kartenLink(aufgabe.board_id, aufgabe.id) };
   }
 
   /** Puts a card of a client board under "Für dich zu tun" in the portal; the card becomes visible to the client. */

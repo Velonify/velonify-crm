@@ -10,6 +10,8 @@ import { behandleMagnet, type MagnetKonfig } from './extern/magnete';
 import { schreibeSpiegel } from './extern/spiegel';
 import { dienstkontoToken } from '../../kundenportal/src/google';
 import { SheetsClient } from '../../../src/data/sheets/sheetsClient';
+import { slackBenachrichtiger } from '../../../src/data/slack';
+import { leseTeamZuordnung } from '../../../src/data/selectors';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 const DOMAIN = process.env.ALLOWED_DOMAIN ?? 'velonify.de';
@@ -44,6 +46,15 @@ function passt(gegeben: unknown, erwartet: string | undefined): boolean {
   const b = Buffer.from(erwartet.trim());
   return a.length === b.length && timingSafeEqual(a, b);
 }
+
+/** @-mentions also go to Slack as direct messages when the Slack app's token is set (secret SLACK_BOT_TOKEN). */
+const slack = process.env.SLACK_BOT_TOKEN?.trim()
+  ? slackBenachrichtiger({
+      token: process.env.SLACK_BOT_TOKEN.trim(),
+      hub: process.env.HUB_URL || 'https://crm.velonify.de',
+      teamZuordnung: leseTeamZuordnung(process.env.TEAM_ZUORDNUNG ?? ''),
+    })
+  : undefined;
 
 /** Sheets access of the function's own service account (metadata server), only for the read-only copy. */
 const spiegelToken = dienstkontoToken();
@@ -159,7 +170,7 @@ functions.http('crmApi', async (req, res) => {
   try {
     const { pool } = await datenbank();
     const store = new PostgresStore(pool, () => email);
-    const antwort = (await behandleDaten(req.method, pfad, req.body, store)) ?? (await behandle(req.method, pfad, req.body, store));
+    const antwort = (await behandleDaten(req.method, pfad, req.body, store)) ?? (await behandle(req.method, pfad, req.body, store, { erwaehnt: slack }));
     if (req.method !== 'GET') console.log(JSON.stringify({ email, pfad, tab: (req.body as { tab?: string })?.tab, status: antwort.status, dauer_ms: Date.now() - start }));
     res.status(antwort.status).json(antwort.daten);
   } catch (err) {

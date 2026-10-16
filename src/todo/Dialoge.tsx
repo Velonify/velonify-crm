@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog } from '../components/Dialog';
 import { useToast } from '../components/Toasts';
 import { Field, FormError } from '../components/ui';
@@ -10,6 +10,7 @@ import { fieldOf } from '../lib/errors';
 import { formatDateTime, shortUser } from '../lib/format';
 import { config } from '../config';
 import { PersonenAuswahl } from '../components/PersonenAuswahl';
+import { ErwaehnungsFeld, MitErwaehnungen } from '../components/Erwaehnungen';
 
 /** Comments from outside the team domain come from the client portal. */
 const istTeam = (von: string) => von.trim().toLowerCase().endsWith(`@${config.allowedDomain}`);
@@ -45,9 +46,12 @@ export function KarteDialog({
   istKundenBoard,
   aendern,
   onClose,
+  kommentarId,
 }: {
   board: Board;
   aufgabe?: Aufgabe;
+  /** Comment to scroll to and mark, e.g. when opened from a mention. */
+  kommentarId?: string;
   /** Column of a new card. */
   spalteId?: string;
   kommentare: AufgabenKommentar[];
@@ -70,6 +74,9 @@ export function KarteDialog({
   const [kommentar, setKommentar] = useState('');
   const { busy, error, run } = useSpeichern(aendern, onClose);
   const eigene = aufgabe ? kommentare.filter((k) => k.aufgabe_id === aufgabe.id).sort((a, b) => a.datum.localeCompare(b.datum)) : [];
+  useEffect(() => {
+    if (kommentarId) document.getElementById(`kommentar-${kommentarId}`)?.scrollIntoView({ block: 'center' });
+  }, [kommentarId]);
 
   const punktHinzu = () => {
     if (!neuerPunkt.trim()) return;
@@ -126,7 +133,7 @@ export function KarteDialog({
           <input value={werte.titel} onChange={(e) => setWerte((w) => ({ ...w, titel: e.target.value }))} maxLength={200} autoComplete="off" autoFocus />
         </Field>
         <Field label="Beschreibung" wide>
-          <textarea rows={4} value={werte.beschreibung} onChange={(e) => setWerte((w) => ({ ...w, beschreibung: e.target.value }))} />
+          <ErwaehnungsFeld rows={4} value={werte.beschreibung} onChange={(beschreibung) => setWerte((w) => ({ ...w, beschreibung }))} team={team} />
         </Field>
         <Field label="Spalte">
           <select value={werte.spalte_id} onChange={(e) => setWerte((w) => ({ ...w, spalte_id: e.target.value }))}>
@@ -224,7 +231,7 @@ export function KarteDialog({
           {eigene.length === 0 && <p className="muted small">Noch keine Kommentare.</p>}
           <ul className="kommentar-liste">
             {eigene.map((k) => (
-              <li key={k.id}>
+              <li key={k.id} id={`kommentar-${k.id}`} className={k.id === kommentarId ? 'is-markiert' : undefined}>
                 <div className="timeline-meta">
                   <strong>{shortUser(k.von)}</strong>
                   {!istTeam(k.von) && (
@@ -235,12 +242,27 @@ export function KarteDialog({
                   )}{' '}
                   · {formatDateTime(k.datum)}
                 </div>
-                <p className="timeline-text">{k.text}</p>
+                <p className="timeline-text">
+                  <MitErwaehnungen text={k.text} team={team} />
+                </p>
               </li>
             ))}
           </ul>
           <div className="inline-form">
-            <textarea rows={2} value={kommentar} onChange={(e) => setKommentar(e.target.value)} placeholder="Kommentar schreiben" />
+            <ErwaehnungsFeld
+              rows={2}
+              value={kommentar}
+              onChange={setKommentar}
+              team={team}
+              placeholder="Kommentar schreiben – mit @ jemanden markieren"
+              aria-label="Kommentar"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  kommentieren();
+                }
+              }}
+            />
             <button type="button" className="button small" onClick={kommentieren} disabled={busy || !kommentar.trim()}>
               Kommentieren
             </button>

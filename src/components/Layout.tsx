@@ -5,6 +5,7 @@ import { isDemo } from '../config';
 import { useCrm } from '../data/CrmContext';
 import { useTheme } from '../lib/useTheme';
 import { WERKZEUGE, seitentitel, werkzeugFuerPfad } from '../werkzeuge';
+import { Glocke } from './Glocke';
 import { Suche } from './Suche';
 import { WerkzeugIcon } from './Icons';
 
@@ -55,6 +56,7 @@ export function Layout() {
           <h2 className="sidebar-titel">{werkzeug.name}</h2>
           {loading && db && <span className="sync-dot" title="Wird aktualisiert …" aria-label="Wird aktualisiert" />}
         </div>
+        <Glocke />
         <Suche />
         <nav className="nav" aria-label={werkzeug.name}>
           {werkzeug.navigation.map((n) => (

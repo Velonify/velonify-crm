@@ -1,7 +1,7 @@
 import { ConflictError, NotFoundError } from '../errors';
 import { ANGEBOTS_TABS, CONTACT_TABS, ENTITY_TABS, KUNDEN_TABS, LISTEN_DEFAULTS, MAGNET_TABS, PORTAL_TABS, SCHEMA, SOCIAL_TABS, TODO_TABS, type EntityTab, type TabName, type TabSchema } from '../schema';
 import type { RecordUpdate, Store } from '../store';
-import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, KundenDaten, Listen, MagnetDaten, MonsteraEintrag, PortalDaten, SocialDaten, SpieleDaten, TodoDaten, WordleErgebnis } from '../types';
+import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Erwaehnung, KundenDaten, Listen, MagnetDaten, MonsteraEintrag, PortalDaten, SocialDaten, SpieleDaten, TodoDaten, WordleErgebnis } from '../types';
 
 /** The little of a Postgres client the store needs: node-postgres in the functions, PGlite in the tests. */
 export interface Db {
@@ -153,6 +153,10 @@ export class PostgresStore implements Store {
   async loadTodoDaten(): Promise<TodoDaten> {
     const [boards, aufgaben, kommentare] = await Promise.all(TODO_TABS.map((tab) => this.tabelle(tab)));
     return { boards, aufgaben, kommentare } as TodoDaten;
+  }
+
+  loadErwaehnungen(): Promise<Erwaehnung[]> {
+    return this.tabelle('erwaehnungen');
   }
 
   async loadPortalDaten(): Promise<PortalDaten> {

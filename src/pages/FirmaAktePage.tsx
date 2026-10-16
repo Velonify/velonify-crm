@@ -16,6 +16,7 @@ import { faelligText, formatDateTime, formatEuro, relativeDays, shortUser, websi
 import { isoDate } from '../data/ids';
 import { offeneDeals } from '../data/selectors';
 import { useIch } from '../lib/useIch';
+import { MitErwaehnungen } from '../components/Erwaehnungen';
 
 function toInput({ id: _id, archiviert: _a, erstellt_am: _ea, erstellt_von: _ev, geaendert_am: _ga, geaendert_von: _gv, ...input }: Firma): FirmaInput {
   return input;
@@ -197,7 +198,9 @@ export function FirmaAktePage() {
           </Card>
           {f.notiz && (
             <Card title="Notiz">
-              <p className="notiz">{f.notiz}</p>
+              <p className="notiz">
+                <MitErwaehnungen text={f.notiz} team={db.listen.team ?? []} />
+              </p>
             </Card>
           )}
         </div>

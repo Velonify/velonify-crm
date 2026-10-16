@@ -1072,6 +1072,40 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
   .stufe { grid-template-columns: 92px minmax(0, 1fr) 72px; }
 }
 
+/* ─── @-Erwähnungen ──────────────────────────────────────────────────────── */
+.kommentar-liste li.is-markiert { box-shadow: inset var(--border-accent) 0 0 var(--accent); padding-left: 10px; background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.erwaehnung { font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); padding: 0 3px; }
+.erwaehnungs-feld { position: relative; width: 100%; }
+.erwaehnungs-feld textarea { width: 100%; }
+.erwaehnungs-liste { position: fixed; z-index: 120; list-style: none; margin: 0; padding: 4px 0; min-width: 200px; max-height: 240px; overflow-y: auto; background: var(--raised); border: var(--border-rule) solid var(--rule); box-shadow: var(--off-s) var(--off-s) 0 var(--shadow); }
+.erwaehnungs-liste li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; font-weight: 600; font-size: 14px; border-left: var(--border-accent) solid transparent; }
+.erwaehnungs-liste li.is-active { background: var(--hover); border-left-color: var(--accent); }
+.erwaehnungs-avatar { width: 22px; height: 22px; display: grid; place-items: center; background: var(--highlight); color: var(--on-highlight); font-size: 11px; font-weight: 800; flex: none; }
+
+.glocke { position: absolute; top: var(--space-4); right: var(--space-2); z-index: 20; }
+.sidebar:has(.glocke) .brand { padding-right: 40px; }
+/* The open list reaches over the page, so the sidebar stacks above the content. */
+.sidebar:has(.glocke-panel) { z-index: 25; }
+.sidebar:has(.glocke) .sync-dot { right: 40px; }
+.glocke-knopf { position: relative; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; background: transparent; border: 1px solid transparent; color: var(--ink-muted); cursor: pointer; }
+.glocke-knopf svg { width: 20px; height: 20px; }
+.glocke-knopf:hover, .glocke-knopf[aria-expanded='true'] { color: var(--ink); border-color: var(--line-strong); }
+.glocke-knopf.hat-neue { color: var(--ink); }
+.glocke-zahl { position: absolute; top: -4px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px; display: grid; place-items: center; background: var(--danger); color: #fff; font-size: 10.5px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.glocke-panel { position: absolute; top: calc(100% + 6px); left: 0; width: min(380px, calc(100vw - 32px)); color: var(--ink); background: var(--raised); border: var(--border-rule) solid var(--rule); box-shadow: var(--off-l) var(--off-l) 0 var(--shadow); }
+.glocke-kopf { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); padding: 12px 14px; border-bottom: var(--border-rule) solid var(--rule); }
+.glocke-kopf .link-button { font-size: 12.5px; }
+.glocke-leer { margin: 0; padding: 14px; color: var(--ink-muted); font-size: 13.5px; }
+.glocke-liste { list-style: none; margin: 0; padding: 0; max-height: min(60vh, 460px); overflow-y: auto; }
+.glocke-liste li + li { border-top: 1px solid var(--line); }
+.glocke-eintrag { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 11px 14px 11px 11px; font: inherit; text-align: left; color: var(--ink); background: transparent; border: 0; border-left: var(--border-accent) solid transparent; cursor: pointer; }
+.glocke-eintrag:hover, .glocke-eintrag:focus-visible { background: var(--hover); }
+.glocke-eintrag.is-neu { border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.glocke-meta { font-size: 12px; color: var(--ink-muted); }
+.glocke-titel { font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.glocke-auszug { font-size: 13px; color: var(--ink-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.glocke-eintrag:not(.is-neu) .glocke-titel { font-weight: 600; }
+
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .page { padding: var(--space-5) var(--space-5) var(--space-6); }
@@ -1100,6 +1134,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
   .brand { padding: 0; flex-direction: row; align-items: baseline; gap: var(--space-2); min-width: 0; flex: 0 1 auto; }
   .theme-switch { display: none; }
   .sync-dot { right: -12px; top: 0; }
+  .glocke { position: static; order: 2; margin-left: auto; }
+  .sidebar:has(.glocke) .brand { padding-right: 0; }
+  .sidebar:has(.glocke) .sync-dot { right: -12px; }
+  .glocke-panel { position: fixed; top: 56px; left: 16px; right: 16px; width: auto; }
   .nav { flex-direction: row; flex-wrap: nowrap; overflow-x: auto; order: 4; width: calc(100% + 32px); margin: 0 -16px; padding: 0 12px; scrollbar-width: none; }
   .nav-item { border-left: 0; border-bottom: var(--border-accent) solid transparent; padding: 10px 10px 8px; white-space: nowrap; font-size: 13.5px; }
   .nav-item.is-active { border-bottom-color: var(--accent); background: none; }

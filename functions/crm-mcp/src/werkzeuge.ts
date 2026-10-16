@@ -41,8 +41,11 @@ import {
   spaltenVon,
 } from '../../../src/data/todos';
 import { istZustaendig, personen, zustaendigWert } from '../../../src/data/zustaendig';
+import { erwaehnteNamen } from '../../../src/data/erwaehnungen';
 import { kontaktName, suggestKuerzel } from '../../../src/data/rules';
-import { driveKonfiguration, findeTeamMitglied, indexById, kennzahlen, meinTag, offeneDeals, type Aufgabe } from '../../../src/data/selectors';
+import { driveKonfiguration, findeTeamMitglied, indexById, kennzahlen, leseTeamZuordnung, meinTag, offeneDeals, type Aufgabe } from '../../../src/data/selectors';
+
+export { leseTeamZuordnung };
 import { suche } from '../../../src/data/suche';
 import {
   type Aufgabe as Karte,
@@ -75,6 +78,7 @@ export const ANLEITUNG = `Velonify-CRM (Google Sheet hinter crm.velonify.de). Sc
 - Daten im Format JJJJ-MM-TT. Die Zeitzone ist Europe/Berlin.
 - Nichts wird gelöscht. \`archivieren\` blendet Firmen, Deals, Kontakte oder Lead-Magnete aus und lässt sich rückgängig machen; vorher nachfragen.
 - To-dos (Karten auf den Boards unter crm.velonify.de/#/todo): \`boards\`, \`karten\`, \`karte_anlegen\`, \`karte_verschieben\`, \`karte_erledigt\`, \`karte_kommentieren\`. Board "intern" ist „${INTERNES_BOARD_TITEL}“, Kunden-Boards über Firmenname, Kürzel oder den Slack-Channel mit # davor. Karten-IDs über \`karten\` holen. \`freigabe_anfragen\` legt eine Karte dem Kunden im Kundenportal zur Freigabe vor.
+- Erwähnungen: „@Name“ mit einem Teamnamen in Kommentaren, Kartenbeschreibungen und Notizen markiert die Person (Glocke im Hub, Slack-Nachricht). Nur gezielt markieren, wenn jemand etwas tun oder wissen soll.
 - Aus Slack: Bei To-dos aus Nachrichten \`karte_anlegen\` mit \`aus_slack: true\` und dem Permalink als \`link\` – pro Nachricht entsteht nur eine Karte. "meine To-dos" heißt: zustaendig ist die Person, die schreibt. Neuigkeiten für einen Kunden mit \`kunden_news_anlegen\`; für den Kunden sichtbar nur, wenn ausdrücklich gewünscht.
 - Lead-Magnete (Downloads gegen E-Mail auf velonify.de/ressourcen/<adresse>/): \`magnete\`, \`magnet_speichern\`, \`magnet_leads\`, \`magnet_lead_uebernehmen\`, \`magnet_lead_verwerfen\`. Ein aktiver Magnet hat sofort seine Landingpage; aktiv geht nur mit Untertitel und beim Typ „datei“ mit Datei-Link (Google Drive, per Link freigegeben). Typ „audit“ ist der Shop-Roast: kein Download, das Team prüft den Shop und schickt einen Report; \`plaetze\` begrenzt die Zahl, danach Warteliste. Wer nur den Download wollte, bekommt keine Werbe-Mails – Kontakt danach über LinkedIn.`;
 
@@ -340,16 +344,6 @@ function ichAus(db: Database, person: Person, teamName?: string): string | null 
   const team = db.listen.team ?? [];
   if (teamName && team.includes(teamName)) return teamName;
   return findeTeamMitglied(team, person.name, person.email);
-}
-
-/** "lukas@velonify.de=Lugge; julian@velonify.de=Julian" → address → team name. */
-export function leseTeamZuordnung(wert: string): Map<string, string> {
-  const zuordnung = new Map<string, string>();
-  for (const eintrag of wert.split(/[;,]/)) {
-    const [email, name] = eintrag.split('=').map((t) => t.trim());
-    if (email && name) zuordnung.set(email.toLowerCase(), name);
-  }
-  return zuordnung;
 }
 
 function pruefeTeam(db: Database, name: string | undefined): void {
@@ -1182,14 +1176,17 @@ export function registriereWerkzeuge(server: McpServer, { service, person, teamN
     'karte_kommentieren',
     {
       title: 'To-do-Karte kommentieren',
-      description: 'Schreibt einen Kommentar unter eine Karte, mit der angemeldeten Person als Absender.',
+      description:
+        'Schreibt einen Kommentar unter eine Karte, mit der angemeldeten Person als Absender. „@Name“ mit einem Teamnamen (Liste team, z. B. @Julian) markiert die Person: Sie bekommt eine Benachrichtigung unter der Glocke im Hub und, wenn eingerichtet, eine Slack-Nachricht.',
       inputSchema: { karte_id: z.string(), text: z.string().min(1) },
       annotations: schreiben,
     },
     sicher(async ({ karte_id, text }) => {
-      const { karte } = findeKarte(await service.loadTodoDaten(), karte_id);
+      const [db, daten] = await Promise.all([service.load(), service.loadTodoDaten()]);
+      const { karte } = findeKarte(daten, karte_id);
       const kommentar = await service.kommentiereKarte(karte_id, text);
-      return antwort({ kommentiert: true, karte: karte.titel, kommentar: kompakt({ ...kommentar, aufgabe_id: undefined }) });
+      const erwaehnt = erwaehnteNamen(kommentar.text, db.listen.team ?? []).filter((n) => n !== meinName(db));
+      return antwort({ kommentiert: true, karte: karte.titel, kommentar: kompakt({ ...kommentar, aufgabe_id: undefined }), ...(erwaehnt.length ? { benachrichtigt: erwaehnt } : {}) });
     }),
   );
 

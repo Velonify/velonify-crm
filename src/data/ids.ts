@@ -30,6 +30,7 @@ export const ID_PREFIX = {
   boards: 'B',
   aufgaben: 'T',
   aufgaben_kommentare: 'TK',
+  erwaehnungen: 'ER',
   portal_zugaenge: 'PZ',
   portal_werkzeuge: 'PW',
   kunden_meilensteine: 'KM',

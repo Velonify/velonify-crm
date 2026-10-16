@@ -6,6 +6,7 @@ import { fieldOf } from '../../lib/errors';
 import { Dialog } from '../Dialog';
 import { useToast } from '../Toasts';
 import { Field, FormError } from '../ui';
+import { ErwaehnungsFeld } from '../Erwaehnungen';
 
 interface Props {
   firmaId: string;
@@ -16,7 +17,7 @@ interface Props {
 }
 
 export function KontaktDialog({ firmaId, kontakt, onClose, onSaved }: Props) {
-  const { mutate } = useCrm();
+  const { mutate, db } = useCrm();
   const toast = useToast();
   const [values, setValues] = useState<KontaktInput>(() => {
     if (!kontakt) return EMPTY_KONTAKT_INPUT;
@@ -94,7 +95,7 @@ export function KontaktDialog({ firmaId, kontakt, onClose, onSaved }: Props) {
           <input type="tel" value={values.telefon} onChange={set('telefon')} autoComplete="off" />
         </Field>
         <Field label="Notiz" wide>
-          <textarea rows={2} value={values.notiz} onChange={set('notiz')} />
+          <ErwaehnungsFeld rows={2} value={values.notiz} onChange={(notiz) => setValues((v) => ({ ...v, notiz }))} team={db?.listen.team ?? []} />
         </Field>
       </div>
       <label className="checkbox">

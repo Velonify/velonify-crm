@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AKTIVITAET_LABEL, AKTIVITAET_TYPEN, isAbgeschlossen, PHASEN, phaseLabel } from '../../data/constants';
 import { useCrm } from '../../data/CrmContext';
+import { ErwaehnungsFeld, MitErwaehnungen } from '../Erwaehnungen';
 import { isoDate } from '../../data/ids';
 import { kontaktName } from '../../data/rules';
 import { wahrscheinlichkeit } from '../../data/selectors';
@@ -254,7 +255,7 @@ export function VerlaufKarte({ firma, db }: { firma: Firma; db: Database }) {
               </button>
             ))}
           </div>
-          <textarea rows={2} value={text} onChange={(e) => setText(e.target.value)} placeholder="Was ist passiert? Was wurde besprochen?" aria-label="Eintrag" />
+          <ErwaehnungsFeld rows={2} value={text} onChange={setText} team={db.listen.team ?? []} placeholder="Was ist passiert? Was wurde besprochen? Mit @ jemanden markieren" aria-label="Eintrag" />
           <div className="activity-options">
             {kontakte.length > 0 && (
               <select value={kontaktId} onChange={(e) => setKontaktId(e.target.value)} aria-label="Mit wem">
@@ -295,7 +296,9 @@ export function VerlaufKarte({ firma, db }: { firma: Firma; db: Database }) {
                 {a.kontakt_id && kontaktNamen.get(a.kontakt_id) && ` · mit ${kontaktNamen.get(a.kontakt_id)}`}
                 {a.deal_id && dealTitel.get(a.deal_id) && a.typ !== 'phasenwechsel' && ` · ${dealTitel.get(a.deal_id)}`}
               </div>
-              <p className="timeline-text">{linkify(a.text)}</p>
+              <p className="timeline-text">
+                <MitErwaehnungen text={a.text} team={db.listen.team ?? []} darstellen={linkify} />
+              </p>
             </div>
           </li>
         ))}

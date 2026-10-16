@@ -1,5 +1,7 @@
 import { NEWS_ART_LABEL, type TickerEintrag } from '../data/kunden';
 import { formatDate } from '../lib/format';
+import { MitErwaehnungen } from '../components/Erwaehnungen';
+import { useCrm } from '../data/CrmContext';
 
 const artLabel = (e: TickerEintrag) => (e.art === 'datei' ? 'Datei' : e.art === 'erledigt' ? 'Erledigt' : NEWS_ART_LABEL[e.art]);
 
@@ -44,6 +46,7 @@ export function TickerBand({ eintraege }: { eintraege: TickerEintrag[] }) {
 
 /** The same entries as a plain list, for cards and the news page. */
 export function TickerListe({ eintraege, onBearbeiten, zeigeKunde }: { eintraege: TickerEintrag[]; onBearbeiten?: (e: TickerEintrag) => void; zeigeKunde?: (e: TickerEintrag) => string }) {
+  const { db } = useCrm();
   return (
     <ul className="news-liste">
       {eintraege.map((e) => (
@@ -67,7 +70,11 @@ export function TickerListe({ eintraege, onBearbeiten, zeigeKunde }: { eintraege
           ) : (
             <span className="news-titel">{e.titel}</span>
           )}
-          {e.text && <p className="news-text">{e.text}</p>}
+          {e.text && (
+            <p className="news-text">
+              <MitErwaehnungen text={e.text} team={db?.listen.team ?? []} />
+            </p>
+          )}
         </li>
       ))}
     </ul>

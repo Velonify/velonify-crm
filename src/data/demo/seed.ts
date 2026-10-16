@@ -288,9 +288,13 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   await karte(kundenBoard.id, 'backlog', 'Core Web Vitals der Kategorieseiten prüfen', { labels: 'Performance' });
   await karte(kundenBoard.id, 'erledigt', 'Neue Produktseiten live', { zustaendig: 'Johannes', sichtbar_kunde: true });
   await karte(intern.id, 'woche', 'Angebot Nordlicht nachfassen', { zustaendig: 'Lugge', faellig_am: heute, labels: 'Sales' });
-  await karte(intern.id, 'backlog', 'Slack-App für den To-Do-Agenten anlegen', { zustaendig: 'Lugge', labels: 'Intern' });
+  const slackApp = await karte(intern.id, 'backlog', 'Slack-App für den To-Do-Agenten anlegen', { zustaendig: 'Lugge', labels: 'Intern' });
   const hero = await karte(kundenBoard.id, 'wartet', 'Startseiten-Hero Winterkollektion', { zustaendig: 'Julian', labels: 'Design', beschreibung: 'Entwurf liegt in 07_Client-Share.', faellig_am: addDays(heute, 2) });
   await service.freigabeAnfragen(hero.id, hero.geaendert_am);
+  // @-mentions from the demo user, so the bell has something to show once you pick who you are (To-dos → Meine).
+  seeding = true;
+  await service.kommentiereKarte(slackApp.id, '@Lugge die App braucht chat:write und users:read.email. @Julian schaust du dir die Benachrichtigungen an?');
+  seeding = false;
 
   // Client portal: one login, the UTM generator and a roadmap.
   await service.setPortalZugang(alpenglanz.id, ak.id, true);
