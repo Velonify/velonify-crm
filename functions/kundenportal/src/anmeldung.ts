@@ -54,7 +54,7 @@ export function verlaengerteSitzung(siegel: Siegel, inhalt: SitzungInhalt, jetzt
 
 const VERLAENGERN_NACH_MS = 24 * 60 * 60_000;
 
-/** A short session for a team member, started from the hub ("Als Kunde ansehen"). */
+/** A short session for a team member, started from the hub ("Portal öffnen"). */
 export function erstelleVorschau(siegel: Siegel, firmaId: string, email: string, jetzt: number): { sitzung: string; gueltig_bis: string } {
   const exp = jetzt + VORSCHAU_GUELTIG_MS;
   return { sitzung: siegel.versiegle('sitzung', { k: '', f: firmaId, exp, v: email } satisfies SitzungInhalt), gueltig_bis: new Date(exp).toISOString() };
