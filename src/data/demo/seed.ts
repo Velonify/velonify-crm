@@ -3,6 +3,7 @@ import { DemoShopAudit } from '../shopAudit';
 import { EINSTELLUNG } from '../constants';
 import { addDays, isoDate } from '../ids';
 import { SheetStore } from '../sheets/sheetStore';
+import { berichtInhalt, berichtsMonat, monatsZeitraum, type BerichtDaten } from '../monatsbericht';
 import { runSetup } from '../sheets/setup';
 import { EMPTY_DEAL_INPUT, EMPTY_FIRMA_INPUT, EMPTY_KONTAKT_INPUT } from '../types';
 import { MemoryCalendar, MemoryDrive } from './memoryGoogle';
@@ -306,6 +307,49 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   await etappe('Design & Inhalte', 'aktiv', 17);
   await etappe('Black Week', 'offen', 37);
   await etappe('Go-live Phase 2', 'offen', 45);
+
+  // Monthly report: switched on, last month's draft waiting for the team's comment.
+  await service.saveTracking(alpenglanz.id, { ga4_property: '', gsc_site: '', pagespeed_url: '', sichtbar_kunde: false, monatsbericht: true });
+  const monat = berichtsMonat(new Date());
+  const z = monatsZeitraum(monat);
+  const tage = Number(z.bis.slice(8, 10));
+  const verlauf = Array.from({ length: tage }, (_, i) => ({ tag: `${monat}-${String(i + 1).padStart(2, '0')}`, welle: 1 + 0.25 * Math.sin(i / 2.2) + (i % 7 === 5 ? -0.2 : 0) + i / 90 }));
+  const store = new SheetStore(sheets);
+  const [portal, todos] = await Promise.all([store.loadPortalDaten(), store.loadTodoDaten()]);
+  const daten: BerichtDaten = {
+    zahlen: {
+      ga4: {
+        nutzer: 9840, sitzungen: 13120, umsatz: 48210, transaktionen: 312, conversion_rate: 312 / 13120,
+        vorher: { nutzer: 8910, sitzungen: 12030, umsatz: 41980, transaktionen: 268, conversion_rate: 268 / 12030 },
+        zeitraum: z, waehrung: 'EUR',
+        kanaele: [
+          { name: 'Organic Search', sitzungen: 4980, umsatz: 17400 }, { name: 'Paid Social', sitzungen: 3120, umsatz: 11900 }, { name: 'Direct', sitzungen: 2210, umsatz: 9800 },
+          { name: 'Email', sitzungen: 1490, umsatz: 6700 }, { name: 'Referral', sitzungen: 1320, umsatz: 2410 },
+        ],
+        verlauf: verlauf.map((v) => ({ tag: v.tag, sitzungen: Math.round(420 * v.welle), umsatz: Math.round(1550 * v.welle) })),
+      },
+      gsc: {
+        klicks: 5210, impressionen: 184300, ctr: 5210 / 184300, position: 14.2,
+        vorher: { klicks: 4620, impressionen: 171900, ctr: 4620 / 171900, position: 15.8 },
+        zeitraum: z,
+        suchanfragen: [
+          { suchanfrage: 'naturkosmetik set', klicks: 410, impressionen: 9800, position: 3.4 }, { suchanfrage: 'alpenglanz', klicks: 380, impressionen: 1200, position: 1.1 },
+          { suchanfrage: 'gesichtsöl bio', klicks: 205, impressionen: 12400, position: 8.7 },
+        ],
+        seiten: [{ seite: 'https://alpenglanz.example/', klicks: 1820, impressionen: 40100 }],
+        verlauf: verlauf.map((v) => ({ tag: v.tag, klicks: Math.round(165 * v.welle), impressionen: Math.round(5900 * v.welle) })),
+      },
+      pagespeed: { url: 'https://alpenglanz.example/', mobil: { score: 64, lcp_ms: 3100, cls: 0.04, inp_ms: 210, quelle: 'feld' }, desktop: { score: 92, lcp_ms: 1400, cls: 0.01, inp_ms: 90, quelle: 'feld' } },
+    },
+    ...berichtInhalt({ firmaId: alpenglanz.id, monat, todos, portal }),
+    stand_am: new Date().toISOString(),
+  };
+  if (daten.erledigt.length === 0) daten.erledigt = [{ titel: 'Neue Produktseiten live', datum: `${monat}-14` }, { titel: 'Tracking auf GA4 umgestellt', datum: `${monat}-22` }];
+  if (daten.meilensteine.length === 0) daten.meilensteine = [{ titel: 'Migration', datum: `${monat}-09` }];
+  const jetzt = new Date().toISOString();
+  await store.insert('kunden_berichte', [
+    { id: 'MB-DEMO1', firma_id: alpenglanz.id, monat, status: 'entwurf', kommentar: '', daten: JSON.stringify(daten), freigegeben_am: '', freigegeben_von: '', erstellt_am: jetzt, erstellt_von: 'kundenportal', geaendert_am: jetzt, geaendert_von: 'kundenportal' },
+  ]);
 
   return { service, sheets };
 }

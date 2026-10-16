@@ -1,5 +1,6 @@
 import { pruefeEinstellungen, type PortalEinstellungen } from './portalBenachrichtigung';
 import { prepareTracking, trackingVon, type TrackingEingabe } from './tracking';
+import { istMonat } from './monatsbericht';
 import { istZustaendig, mitPerson } from './zustaendig';
 import {
   DEFAULT_DEAL_TITEL,
@@ -144,6 +145,7 @@ import type {
   WiedervorlageInput,
   WordleErgebnis,
   KundenTracking,
+  KundenBericht,
 } from './types';
 
 export interface CrmDeps {
@@ -1341,6 +1343,27 @@ export class CrmService {
     const t: KundenTracking = { id: newId(ID_PREFIX.kunden_tracking), firma_id: firmaId, ...clean, stand_am: '', fehler: '', daten: '', ...this.created() };
     await this.store.insert('kunden_tracking', [t]);
     return t;
+  }
+
+  /** The team's comment on a monthly report ("Einschätzung von Velonify"); released reports can be corrected too. */
+  async saveBerichtKommentar(berichtId: string, kommentar: string): Promise<KundenBericht> {
+    CrmService.find((await this.store.loadPortalDaten()).berichte, berichtId);
+    const [b] = await this.store.update('kunden_berichte', [{ id: berichtId, changes: { kommentar: kommentar.trim(), ...this.changed() } }]);
+    return b;
+  }
+
+  /**
+   * Releases a monthly report: the client sees it in the portal and is notified with the next run of the sender.
+   * `false` takes it back to a draft (the client no longer sees it; releasing it again notifies again).
+   */
+  async freigebenBericht(berichtId: string, freigeben: boolean): Promise<KundenBericht> {
+    const bericht = CrmService.find((await this.store.loadPortalDaten()).berichte, berichtId);
+    if (!istMonat(bericht.monat)) throw new ValidationError('monat', 'Dieser Bericht hat keinen gültigen Monat.');
+    const changes: Partial<KundenBericht> = freigeben
+      ? { status: 'freigegeben', freigegeben_am: this.timestamp(), freigegeben_von: this.currentUser() }
+      : { status: 'entwurf', freigegeben_am: '', freigegeben_von: '' };
+    const [b] = await this.store.update('kunden_berichte', [{ id: berichtId, changes: { ...changes, ...this.changed() } }]);
+    return b;
   }
 
   /** Updates and notifications of one portal login, changed by the team (the client changes them in the portal). */

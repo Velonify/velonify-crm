@@ -621,6 +621,7 @@ export interface EntityMap {
   portal_zugaenge: PortalZugang;
   portal_werkzeuge: PortalWerkzeug;
   kunden_tracking: KundenTracking;
+  kunden_berichte: KundenBericht;
   kunden_meilensteine: Meilenstein;
 }
 
@@ -811,6 +812,28 @@ export interface KundenTracking extends Meta {
   fehler: string;
   /** The snapshot as JSON (see TrackingDaten in tracking.ts) */
   daten: string;
+  /** A monthly report is drafted for this client on the 1st (see monatsbericht.ts) */
+  monatsbericht: boolean;
+}
+
+export type BerichtStatus = 'entwurf' | 'freigegeben';
+
+/**
+ * The monthly report of one client: drafted by the portal function at the start of the next month, completed with a
+ * comment by the team and released in the hub. Only released reports reach the client (and notify them).
+ */
+export interface KundenBericht extends Meta {
+  id: string;
+  firma_id: string;
+  /** YYYY-MM */
+  monat: string;
+  status: BerichtStatus;
+  /** "Einschätzung von Velonify", written by the team */
+  kommentar: string;
+  /** The content as JSON (see BerichtDaten in monatsbericht.ts) */
+  daten: string;
+  freigegeben_am: string;
+  freigegeben_von: string;
 }
 
 export type MeilensteinStatus = 'offen' | 'aktiv' | 'erledigt';
@@ -833,6 +856,7 @@ export interface PortalDaten {
   werkzeuge: PortalWerkzeug[];
   meilensteine: Meilenstein[];
   tracking: KundenTracking[];
+  berichte: KundenBericht[];
 }
 
 /** An inquiry from the website form, written into the sheet by the Apps Script behind the Netlify webhook. */

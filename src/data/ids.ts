@@ -35,6 +35,7 @@ export const ID_PREFIX = {
   portal_werkzeuge: 'PW',
   kunden_meilensteine: 'KM',
   kunden_tracking: 'TR',
+  kunden_berichte: 'MB',
 } as const;
 
 export function newId(prefix: string, length = 8): string {

@@ -82,6 +82,12 @@ gcloud scheduler jobs create http kundenportal-kennzahlen --project=velonify-crm
   --headers=X-Versand-Schluessel=$(gcloud secrets versions access latest --secret=kundenportal-versand --project=velonify-crm)
 ```
 
+## Monatsbericht
+
+Je Kunde im Hub einschalten (Karte „Tracking“ → „Monatsbericht“, Spalte `kunden_tracking.monatsbericht`, Migration 009). Der tägliche Lauf von `POST /kennzahlen` legt in den ersten sieben Tagen eines Monats den Entwurf für den Vormonat an (Tabelle `kunden_berichte`) und rechnet ihn bis dahin jeden Morgen neu, damit die Search Console (rund zwei Tage Verzug) vollständig ist. Inhalt: GA4 und Search Console für den Kalendermonat gegen den Vormonat, die letzte PageSpeed-Messung, die im Monat erledigten freigegebenen Karten, erreichte Meilensteine und was als Nächstes ansteht.
+
+Im Hub (Portal → Monatsberichte) schreibt das Team die Einschätzung und gibt frei; erst dann sieht der Kunde den Bericht unter „Zahlen“ und bekommt mit dem nächsten `/versand` einen Sofort-Hinweis. `POST /bericht` (Google-Token, `{ firma_id, monat? }`) erstellt einen Entwurf für einen abgeschlossenen Monat oder rechnet ihn neu; freigegebene Berichte bleiben unverändert. Das PDF entsteht im Portal über „Als PDF speichern“ (Druckansicht).
+
 ## Einrichtung (einmalig)
 
 1. **Dienstkonto**

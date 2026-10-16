@@ -4,15 +4,16 @@ import { ValidationError } from './errors';
 import { findeBerechtigung, kundensicht, vorschauBerechtigung } from './portalApi';
 import { prepareTracking, veraenderung, zeitraum, type TrackingDaten } from './tracking';
 
-const leer = { ga4_property: '', gsc_site: '', pagespeed_url: '', sichtbar_kunde: false };
+const leer = { ga4_property: '', gsc_site: '', pagespeed_url: '', sichtbar_kunde: false, monatsbericht: false };
 
 describe('prepareTracking', () => {
   it('cleans GA4, Search Console and PageSpeed input', () => {
-    expect(prepareTracking({ ga4_property: ' properties/123456789 ', gsc_site: 'Shop.Example.de', pagespeed_url: 'shop.example.de', sichtbar_kunde: true })).toEqual({
+    expect(prepareTracking({ ga4_property: ' properties/123456789 ', gsc_site: 'Shop.Example.de', pagespeed_url: 'shop.example.de', sichtbar_kunde: true, monatsbericht: true })).toEqual({
       ga4_property: '123456789',
       gsc_site: 'sc-domain:shop.example.de',
       pagespeed_url: 'https://shop.example.de',
       sichtbar_kunde: true,
+      monatsbericht: true,
     });
     expect(prepareTracking({ ...leer, gsc_site: 'https://www.shop.example' }).gsc_site).toBe('https://www.shop.example/');
     expect(() => prepareTracking({ ...leer, ga4_property: 'G-ABC123' })).toThrow(ValidationError);

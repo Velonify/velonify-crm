@@ -12,6 +12,7 @@ import { slackChannelUrl } from './start';
 import { personen } from './zustaendig';
 import type { PortalEinstellungen } from './portalBenachrichtigung';
 import { liesDaten, trackingVon, type TrackingDaten } from './tracking';
+import { berichteVon, liesBericht, monatName, type BerichtDaten } from './monatsbericht';
 import type { Aufgabe, AufgabenKommentar, Board, Database, Firma, Kontakt, KundenDaten, MeilensteinStatus, PortalDaten, PortalZugang, Spalte, TodoDaten } from './types';
 
 export { CLIENT_SHARE_ORDNER };
@@ -62,6 +63,23 @@ export interface PortalDatei {
   von: 'velonify' | 'kunde';
 }
 
+export interface PortalBericht {
+  /** YYYY-MM */
+  monat: string;
+  /** e.g. "Oktober 2026" */
+  titel: string;
+  status: 'entwurf' | 'freigegeben';
+  /** "Einschätzung von Velonify" */
+  kommentar: string;
+  /** First name of the team member who released it. */
+  von: string;
+  freigegeben_am: string;
+  daten: Omit<BerichtDaten, 'fehler'>;
+}
+
+/** Reports kept in the portal. */
+export const MAX_BERICHTE = 24;
+
 export interface Kundensicht {
   kunde: { name: string; kuerzel: string };
   /** The client's Slack channel (from the firm in the hub); the preferred way to reach the team. Null without one. */
@@ -78,6 +96,8 @@ export interface Kundensicht {
   einstellungen: PortalEinstellungen | null;
   /** Numbers of the tracking hub when released for the client (always in the team access), else null. */
   zahlen: { stand_am: string; daten: TrackingDaten; sichtbar_kunde: boolean } | null;
+  /** Monthly reports, newest first: released ones (drafts too in the team access). */
+  berichte: PortalBericht[];
   fahrplan: { titel: string; datum: string; status: MeilensteinStatus }[];
   karten: PortalKarte[];
   news: { id: string; art: string; titel: string; text: string; datum: string }[];
@@ -87,7 +107,7 @@ export interface Kundensicht {
 }
 
 /** Columns that mean "the team is on it" on the standard board. */
-const ARBEIT_SPALTEN = new Set(['woche', 'arbeit', 'wartet']);
+export const ARBEIT_SPALTEN = new Set(['woche', 'arbeit', 'wartet']);
 
 /** Internal nicknames in `zustaendig` and the name clients see instead. */
 export const KUNDEN_NAME: Record<string, string> = { Lugge: 'Lukas' };
@@ -281,6 +301,15 @@ export function kundensicht(args: {
         .map((n) => [KUNDEN_NAME[n] ?? n, (args.db.einstellungen?.[teamTelefonSchluessel(n)] ?? '').trim()])
         .filter(([, nummer]) => nummer),
     ),
+    berichte: berichteVon(portal.berichte ?? [], firma.id)
+      .filter((b) => b.status === 'freigegeben' || args.vorschau)
+      .slice(0, MAX_BERICHTE)
+      .flatMap((b): PortalBericht[] => {
+        const daten = liesBericht(b);
+        if (!daten) return [];
+        const { fehler: _intern, ...fuerKunde } = daten;
+        return [{ monat: b.monat, titel: monatName(b.monat), status: b.status === 'freigegeben' ? 'freigegeben' : 'entwurf', kommentar: b.kommentar, von: b.freigegeben_von ? teamVorname(b.freigegeben_von) : '', freigegeben_am: b.freigegeben_am, daten: fuerKunde }];
+      }),
     fahrplan: meilensteineVon(portal.meilensteine, firma.id).map((m) => ({ titel: m.titel, datum: m.datum, status: m.status })),
     karten: [...offen, ...erledigt].map((a) => portalKarte(a, kontext)),
     news: kunden.news

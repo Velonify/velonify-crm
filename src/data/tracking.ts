@@ -109,6 +109,8 @@ export interface TrackingEingabe {
   gsc_site: string;
   pagespeed_url: string;
   sichtbar_kunde: boolean;
+  /** Draft a monthly report on the 1st (see monatsbericht.ts) */
+  monatsbericht: boolean;
 }
 
 /** Cleans the setup from the hub: "properties/123" or "123" for GA4, a domain or URL property for Search Console. */
@@ -130,7 +132,7 @@ export function prepareTracking(e: TrackingEingabe): TrackingEingabe {
       throw new ValidationError('pagespeed_url', 'Die Adresse für PageSpeed ist keine gültige URL.');
     }
   }
-  return { ga4_property: ga4, gsc_site: gsc, pagespeed_url: url, sichtbar_kunde: e.sichtbar_kunde };
+  return { ga4_property: ga4, gsc_site: gsc, pagespeed_url: url, sichtbar_kunde: e.sichtbar_kunde, monatsbericht: !!e.monatsbericht };
 }
 
 // ─── Reading the API answers ────────────────────────────────────────────────

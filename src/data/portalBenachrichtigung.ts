@@ -7,6 +7,7 @@
 import { ValidationError } from './errors';
 import { nachrichtMailHtml, type MailAbschnitt } from './portalMail';
 import { meilensteineVon } from './portal';
+import { monatName } from './monatsbericht';
 import { normalisiereEmail, sichtbareKarten, type Berechtigung, type Kundensicht, type PortalDatei } from './portalApi';
 import type { KundenDaten, PortalDaten, PortalZugang, TodoDaten } from './types';
 
@@ -59,7 +60,7 @@ export function wege(kanal: Kanal, hatSlack: boolean): { email: boolean; slack: 
 
 // ─── Instant notifications ──────────────────────────────────────────────────
 
-export type EreignisArt = 'freigabe' | 'meilenstein' | 'datei' | 'antwort' | 'neuigkeit';
+export type EreignisArt = 'freigabe' | 'bericht' | 'meilenstein' | 'datei' | 'antwort' | 'neuigkeit';
 
 export interface Ereignis {
   art: EreignisArt;
@@ -69,9 +70,10 @@ export interface Ereignis {
   datum: string;
 }
 
-const ART_REIHENFOLGE: EreignisArt[] = ['freigabe', 'antwort', 'meilenstein', 'datei', 'neuigkeit'];
+const ART_REIHENFOLGE: EreignisArt[] = ['freigabe', 'bericht', 'antwort', 'meilenstein', 'datei', 'neuigkeit'];
 const ART_UEBERSCHRIFT: Record<EreignisArt, string> = {
   freigabe: 'Wartet auf deine Freigabe',
+  bericht: 'Dein Monatsbericht ist da',
   antwort: 'Antworten vom Team',
   meilenstein: 'Meilenstein erreicht',
   datei: 'Neue Dateien von uns',
@@ -90,7 +92,7 @@ export function ereignisseSeit(args: {
   berechtigung: Berechtigung;
   kunden: Pick<KundenDaten, 'news'>;
   todos: Pick<TodoDaten, 'boards' | 'aufgaben' | 'kommentare'>;
-  portal: Pick<PortalDaten, 'meilensteine'>;
+  portal: Pick<PortalDaten, 'meilensteine'> & Partial<Pick<PortalDaten, 'berichte'>>;
   dateien: readonly PortalDatei[];
   teamDomain: string;
   seit: string;
@@ -110,6 +112,10 @@ export function ereignisseSeit(args: {
     if (m.status !== 'erledigt' || !imFenster(m.geaendert_am, seit, bis)) continue;
     if (liste.some((e) => e.art === 'meilenstein' && e.titel.includes(m.titel))) continue;
     liste.push({ art: 'meilenstein', titel: m.titel, text: '', datum: m.geaendert_am });
+  }
+  for (const b of portal.berichte ?? []) {
+    if (b.firma_id !== firma.id || b.status !== 'freigegeben' || !imFenster(b.freigegeben_am, seit, bis)) continue;
+    liste.push({ art: 'bericht', titel: `Monatsbericht ${monatName(b.monat)}`, text: auszug(b.kommentar || 'Zahlen, Erledigtes und was als Nächstes kommt – im Kundenportal unter „Zahlen“.'), datum: b.freigegeben_am });
   }
   const karten = sichtbareKarten(todos, firma.id);
   for (const k of karten) {
@@ -183,8 +189,10 @@ const FUSS = 'Wie oft und wo du von uns hörst, stellst du im Kundenportal unter
 export function hinweisNachricht(args: { ereignisse: readonly Ereignis[]; vorname: string; firmaName: string; portalUrl: string }): Nachricht {
   const { ereignisse, vorname, firmaName, portalUrl } = args;
   const einzeln = ereignisse.length === 1 ? ereignisse[0] : null;
-  const betreff = einzeln
-    ? `${{ freigabe: 'Bitte freigeben', antwort: 'Antwort vom Team', meilenstein: 'Meilenstein erreicht', datei: 'Neue Datei', neuigkeit: 'Neuigkeit' }[einzeln.art]}: ${einzeln.titel}`
+  const betreff = einzeln?.art === 'bericht'
+    ? `Dein ${einzeln.titel} ist da`
+    : einzeln
+    ? `${{ freigabe: 'Bitte freigeben', bericht: 'Monatsbericht', antwort: 'Antwort vom Team', meilenstein: 'Meilenstein erreicht', datei: 'Neue Datei', neuigkeit: 'Neuigkeit' }[einzeln.art]}: ${einzeln.titel}`
     : `${ereignisse.length} Neuigkeiten in eurem Projekt bei Velonify`;
   return baueNachricht({
     betreff,
