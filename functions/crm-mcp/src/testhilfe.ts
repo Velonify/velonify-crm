@@ -15,7 +15,7 @@ import { ANLEITUNG, registriereWerkzeuge } from './werkzeuge';
 export const demoDienste = (): Dienste => ({
   generator: new DemoGenerator(),
   shopAudit: new DemoShopAudit(0),
-  leadFinder: new DemoLeadFinder(),
+  leadFinder: new DemoLeadFinder(0),
   linkedin: new DemoLinkedin(0),
 });
 
@@ -30,7 +30,7 @@ export interface Verbunden {
 export async function verbinde(
   email = 'lugge@velonify.de',
   name = 'Lugge Muster',
-  optionen: { teamName?: string; dienste?: Dienste } = {},
+  optionen: { teamName?: string; dienste?: Dienste; setzeListe?: (liste: string, werte: string[]) => Promise<void> } = {},
 ): Promise<Verbunden> {
   const { service } = await createDemoBackend(() => email);
   const server = new McpServer({ name: 'velonify-crm', version: 'test' }, { instructions: ANLEITUNG });
@@ -40,6 +40,7 @@ export async function verbinde(
     teamName: optionen.teamName,
     heute: () => isoDate(new Date()),
     dienste: optionen.dienste ?? demoDienste(),
+    setzeListe: optionen.setzeListe,
   });
   const [a, b] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'test', version: '1' });

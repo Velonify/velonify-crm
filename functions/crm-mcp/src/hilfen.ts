@@ -56,12 +56,14 @@ export const driveLink = (id: string) => (id ? `https://drive.google.com/drive/f
 
 // ─── Ausgabe ────────────────────────────────────────────────────────────────
 
-const META = new Set(['erstellt_von', 'geaendert_von', 'archiviert']);
+const META = new Set(['erstellt_von', 'geaendert_von']);
 
-/** Drops empty fields and bookkeeping, so Claude reads what matters. */
+/** Drops empty fields and bookkeeping, so Claude reads what matters; `archiviert` only shows when set. */
 export function kompakt<T extends object>(eintrag: T): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(eintrag).filter(([schluessel, wert]) => !META.has(schluessel) && wert !== '' && wert !== null && wert !== undefined),
+    Object.entries(eintrag).filter(
+      ([schluessel, wert]) => !META.has(schluessel) && wert !== '' && wert !== null && wert !== undefined && !(schluessel === 'archiviert' && !wert),
+    ),
   );
 }
 
@@ -311,6 +313,8 @@ export interface Kontext {
   heute: () => string;
   /** Cloud Functions for generator, audit, lead finder and LinkedIn; tests pass demo versions. */
   dienste?: Dienste;
+  /** Replaces a select list (team, verlustgrund, …), like Einrichtung → Daten; only with the Postgres store. */
+  setzeListe?: (liste: string, werte: string[]) => Promise<void>;
 }
 
 /** The team name of the signed-in person: the fixed one if it is in the team, else found like the hub's useIch does. */
