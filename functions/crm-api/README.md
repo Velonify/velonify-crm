@@ -52,6 +52,25 @@ gcloud scheduler jobs create http crm-spiegel --location=europe-west3 --project=
 
 Beim Deploy zusätzlich `SPIEGEL_SHEET_ID=<ID aus der Sheet-URL>` in `--set-env-vars`.
 
+### Slack-Benachrichtigung für @-Erwähnungen (optional)
+
+Wer im Hub oder über den CRM-MCP mit „@Name“ markiert wird, bekommt immer einen Eintrag unter der Glocke. Mit dem Token einer eigenen Slack-App schicken crm-api und crm-mcp zusätzlich eine Direktnachricht.
+
+1. Unter api.slack.com/apps im Velonify-Workspace eine App „Velonify Hub“ anlegen (From scratch). Unter *OAuth & Permissions* die Bot-Scopes `chat:write`, `users:read` und `users:read.email` eintragen und *Install to Workspace* klicken. Unter *App Home* den Messages Tab einschalten, damit die Direktnachrichten dort lesbar sind.
+2. Den *Bot User OAuth Token* (`xoxb-…`) als Secret speichern und beiden Dienstkonten Lesezugriff geben:
+
+```bash
+printf %s 'xoxb-…' | gcloud secrets create velonify-slack-bot-token --data-file=- --project=velonify-crm
+for sa in crm-api crm-mcp; do
+  gcloud secrets add-iam-policy-binding velonify-slack-bot-token --project=velonify-crm \
+    --member=serviceAccount:$sa@velonify-crm.iam.gserviceaccount.com --role=roles/secretmanager.secretAccessor
+done
+```
+
+3. Beim Deploy von crm-api und crm-mcp `SLACK_BOT_TOKEN=velonify-slack-bot-token:latest` an `--set-secrets` anhängen. Bei crm-api zusätzlich `TEAM_ZUORDNUNG=lukas@velonify.de=Lugge` in `--set-env-vars`, wie beim MCP: Darüber findet die Function den Slack-Nutzer zum Teamnamen „Lugge“. Alle anderen werden über Vorname oder Adresse gefunden.
+
+Ohne `SLACK_BOT_TOKEN` bleibt es bei der Glocke. Kann Slack nicht zustellen, wird das nur geloggt, der Kommentar ist trotzdem gespeichert. `HUB_URL` (Standard https://crm.velonify.de) bestimmt den Link in der Nachricht.
+
 ## Deploy
 
 ```bash

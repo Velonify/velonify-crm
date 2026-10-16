@@ -71,6 +71,6 @@ describe('to-do logic', () => {
 
     expect(meineAufgaben(daten.aufgaben, daten.boards, 'Johannes').map((a) => a.titel)).toEqual(['Black-Week-Banner einbauen']);
     await service.kommentiereKarte(banner.id, 'Freigabe vom Kunden da');
-    expect((await service.loadTodoDaten()).kommentare).toHaveLength(1);
+    expect((await service.loadTodoDaten()).kommentare.filter((k) => k.aufgabe_id === banner.id)).toHaveLength(1);
   });
 });

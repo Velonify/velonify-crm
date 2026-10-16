@@ -43,6 +43,8 @@ gcloud run services update crm-mcp --region=europe-west3 --no-invoker-iam-check
 
 `TEAM_ZUORDNUNG` ordnet Adressen einem Teamnamen aus der Liste `team` zu, wenn Vorname und Adresse nicht passen (mehrere mit `;` getrennt). Ohne Eintrag sucht der Server wie `useIch` im Hub nach Vorname oder Adresse.
 
+**@-Erwähnungen:** „@Name“ in `karte_kommentieren` (und in allem, was über den Service geschrieben wird) legt Einträge für die Glocke im Hub an. Mit `SLACK_BOT_TOKEN=velonify-slack-bot-token:latest` in `--set-secrets` gehen sie zusätzlich als Slack-Direktnachricht raus; Einrichtung der Slack-App siehe `../crm-api/README.md`.
+
 Wird `crm-mcp-schluessel` gewechselt, müssen sich alle neu verbinden.
 
 ## In Slack (Claude Tag)

@@ -1,7 +1,7 @@
 import { ConflictError, NotFoundError, SchemaError } from '../errors';
-import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, EINGANG_TABS, KUNDEN_TABS, LISTEN_DEFAULTS, MAGNET_TABS, SCHEMA, MONSTERA_TABS, PORTAL_TABS, SOCIAL_TABS, TODO_TABS, WORDLE_TABS, type EntityTab, type TabSchema } from '../schema';
+import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, EINGANG_TABS, ERWAEHNUNGEN_TABS, KUNDEN_TABS, LISTEN_DEFAULTS, MAGNET_TABS, SCHEMA, MONSTERA_TABS, PORTAL_TABS, SOCIAL_TABS, TODO_TABS, WORDLE_TABS, type EntityTab, type TabSchema } from '../schema';
 import type { RecordUpdate, Store } from '../store';
-import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, KundenDaten, Listen, PortalDaten, TodoDaten, MagnetDaten, MonsteraEintrag, SocialDaten, SpieleDaten, WordleErgebnis } from '../types';
+import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Erwaehnung, KundenDaten, Listen, PortalDaten, TodoDaten, MagnetDaten, MonsteraEintrag, SocialDaten, SpieleDaten, WordleErgebnis } from '../types';
 import { columnLetter, recordToRow, rowToRecord } from './rows';
 import { quoteTab, type SheetsApi, type SpreadsheetInfo, type ValueWrite } from './sheetsClient';
 
@@ -137,6 +137,17 @@ export class SheetStore implements Store {
     assertColumns(SCHEMA.audits, table.header);
     this.headers.set('audits', table.header);
     return entityRows('audits', table);
+  }
+
+  async loadErwaehnungen(): Promise<Erwaehnung[]> {
+    const info = await this.info();
+    if (!info.sheets?.some((sheet) => sheet.properties.title === ERWAEHNUNGEN_TABS[0])) {
+      throw new SchemaError('Die Erwähnungen sind noch nicht eingerichtet. Bitte unter „Einrichtung“ auf „Einrichten“ klicken.');
+    }
+    const table = splitHeader(await this.api.getValues(fullRange('erwaehnungen')));
+    assertColumns(SCHEMA.erwaehnungen, table.header);
+    this.headers.set('erwaehnungen', table.header);
+    return entityRows('erwaehnungen', table);
   }
 
   async loadWordle(): Promise<WordleErgebnis[]> {

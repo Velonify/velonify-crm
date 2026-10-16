@@ -6,6 +6,7 @@ import { findeDubletten, type DublettenTreffer } from '../data/dubletten';
 import { DuplicateError, ValidationError } from '../data/errors';
 import type { Firma, FirmaInput, Listen } from '../data/types';
 import { errorMessage } from '../lib/errors';
+import { ErwaehnungsFeld } from './Erwaehnungen';
 import { PersonenAuswahl } from './PersonenAuswahl';
 
 interface Props {
@@ -146,7 +147,7 @@ export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel, al
 
       <fieldset>
         <legend>Notiz</legend>
-        <textarea aria-label="Notiz" rows={4} value={values.notiz} onChange={set('notiz')} />
+        <ErwaehnungsFeld aria-label="Notiz" rows={4} value={values.notiz} onChange={(notiz) => setValues((v) => ({ ...v, notiz }))} team={listen.team ?? []} />
       </fieldset>
 
       {error !== undefined && (

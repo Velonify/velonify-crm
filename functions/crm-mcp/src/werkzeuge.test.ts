@@ -431,4 +431,13 @@ describe('To-dos', () => {
     const board = await rufe('karten', { board: 'AGK' });
     expect(board.daten.karten.find((k: { karte_id: string }) => k.karte_id === karte.id).kommentare).toBe(1);
   });
+
+  it('benachrichtigt mit @Name markierte Teammitglieder, aber nicht die schreibende Person', async () => {
+    const karte = await karteVon('Black-Week-Banner einbauen');
+    const { daten } = await rufe('karte_kommentieren', { karte_id: karte.id, text: '@Julian @johannes bitte bis Freitag, @Lugge schaut drüber' });
+    expect(daten.benachrichtigt).toEqual(['Julian', 'Johannes']);
+    const neu = (await service.loadErwaehnungen()).filter((e) => e.von === 'lugge@velonify.de');
+    expect(neu.map((e) => [e.person, e.art, e.titel])).toEqual([['Julian', 'kommentar', karte.titel], ['Johannes', 'kommentar', karte.titel]]);
+    expect((await rufe('karte_kommentieren', { karte_id: karte.id, text: 'ohne Markierung' })).daten.benachrichtigt).toBeUndefined();
+  });
 });

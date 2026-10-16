@@ -107,6 +107,16 @@ export function findeTeamMitglied(team: readonly string[], name: string, email: 
   return team.find((mitglied) => kandidaten.includes(mitglied.toLowerCase())) ?? null;
 }
 
+/** "lukas@velonify.de=Lugge; julian@velonify.de=Julian" → address → team name. */
+export function leseTeamZuordnung(wert: string): Map<string, string> {
+  const zuordnung = new Map<string, string>();
+  for (const eintrag of wert.split(/[;,]/)) {
+    const [email, name] = eintrag.split('=').map((t) => t.trim());
+    if (email && name) zuordnung.set(email.toLowerCase(), name);
+  }
+  return zuordnung;
+}
+
 export interface DriveKonfiguration {
   leads: string;
   clients: string;

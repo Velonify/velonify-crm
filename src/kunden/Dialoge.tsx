@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Dialog } from '../components/Dialog';
+import { ErwaehnungsFeld } from '../components/Erwaehnungen';
+import { useCrm } from '../data/CrmContext';
 import { useToast } from '../components/Toasts';
 import { Field, FormError } from '../components/ui';
 import type { CrmService } from '../data/crm';
@@ -109,6 +111,7 @@ export function NewsDialog({
   aendern: Aendern;
   onClose(): void;
 }) {
+  const { db } = useCrm();
   const [werte, setWerte] = useState<KundenNewsInput>(() =>
     news
       ? { firma_id: news.firma_id, art: news.art, titel: news.titel, text: news.text, datum: news.datum, angeheftet: news.angeheftet, sichtbar_kunde: news.sichtbar_kunde }
@@ -159,7 +162,7 @@ export function NewsDialog({
           <input value={werte.titel} onChange={(e) => setWerte((w) => ({ ...w, titel: e.target.value }))} maxLength={140} autoComplete="off" />
         </Field>
         <Field label="Details" hint="Optional" wide>
-          <textarea rows={3} value={werte.text} onChange={(e) => setWerte((w) => ({ ...w, text: e.target.value }))} />
+          <ErwaehnungsFeld rows={3} value={werte.text} onChange={(text) => setWerte((w) => ({ ...w, text }))} team={db?.listen.team ?? []} />
         </Field>
         <Field label="Datum" hint="Leer: heute" invalid={fieldOf(error) === 'datum'}>
           <input type="date" value={werte.datum} onChange={(e) => setWerte((w) => ({ ...w, datum: e.target.value }))} />

@@ -1,6 +1,7 @@
 import { ConflictError, NotFoundError } from '../../../src/data/errors';
 import { SCHEMA, type EntityTab } from '../../../src/data/schema';
 import type { RecordUpdate, Store } from '../../../src/data/store';
+import type { Erwaehnung } from '../../../src/data/types';
 import type { DbPool, PostgresStore } from '../../../src/data/postgres/postgresStore';
 import { uebernimm, zaehle } from '../../../src/data/postgres/uebernahme';
 
@@ -18,6 +19,7 @@ const LADEN: Record<string, (store: Store) => Promise<unknown>> = {
   magnete: (s) => s.loadMagnetDaten(),
   kunden: (s) => s.loadKundenDaten(),
   todos: (s) => s.loadTodoDaten(),
+  erwaehnungen: (s) => s.loadErwaehnungen(),
   portal: (s) => s.loadPortalDaten(),
 };
 
@@ -33,13 +35,18 @@ function tabelle(wert: unknown): EntityTab | null {
   return typeof wert === 'string' && wert in SCHEMA && wert !== 'listen' && wert !== 'einstellungen' ? (wert as EntityTab) : null;
 }
 
+export interface RoutenOptionen {
+  /** Gets new @-mentions after they are saved, e.g. to send them to Slack. Errors are only logged. */
+  erwaehnt?: (erwaehnungen: Erwaehnung[]) => Promise<void>;
+}
+
 const fehler = (status: number, meldung: string, extra: Record<string, unknown> = {}): Antwort => ({ status, daten: { fehler: meldung, ...extra } });
 
 /**
  * The API behind the hub, a thin layer over the Store interface: GET /daten/<gruppe>, POST /einfuegen, POST /aendern,
  * POST /einstellungen. Table and column names only ever come from SCHEMA; the store ignores unknown fields.
  */
-export async function behandle(methode: string, pfad: string, body: unknown, store: Store): Promise<Antwort> {
+export async function behandle(methode: string, pfad: string, body: unknown, store: Store, optionen: RoutenOptionen = {}): Promise<Antwort> {
   try {
     const laden = /^\/daten\/([a-z]+)$/.exec(pfad);
     if (laden) {
@@ -56,6 +63,9 @@ export async function behandle(methode: string, pfad: string, body: unknown, sto
         return fehler(400, 'Tabelle oder Datensätze ungültig.');
       }
       await store.insert(tab, body.records as never[]);
+      if (tab === 'erwaehnungen' && optionen.erwaehnt) {
+        await optionen.erwaehnt(body.records as unknown as Erwaehnung[]).catch((err) => console.error('Erwähnungen nicht an Slack gesendet', err));
+      }
       return { status: 200, daten: { ok: true } };
     }
     if (pfad === '/aendern') {

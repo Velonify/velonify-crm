@@ -13,7 +13,7 @@ const deal = { id: 'D-1', firma_id: 'F-1', titel: 'Migration', phase: 'neu', gea
 describe('crm-api Routen', () => {
   it('loads every data group of the hub', async () => {
     const s = await store();
-    for (const gruppe of ['kern', 'angebote', 'contact', 'audits', 'wordle', 'monstera', 'eingang', 'spiele', 'social', 'magnete', 'kunden', 'todos', 'portal']) {
+    for (const gruppe of ['kern', 'angebote', 'contact', 'audits', 'wordle', 'monstera', 'eingang', 'spiele', 'social', 'magnete', 'kunden', 'todos', 'erwaehnungen', 'portal']) {
       expect((await behandle('GET', `/daten/${gruppe}`, undefined, s)).status, gruppe).toBe(200);
     }
     expect((await behandle('GET', '/daten/geheim', undefined, s)).status).toBe(404);
@@ -27,6 +27,21 @@ describe('crm-api Routen', () => {
     const konflikt = await behandle('POST', '/aendern', { tab: 'deals', updates: [{ id: 'D-1', changes: { phase: 'angebot' }, expectedGeaendertAm: 'alt' }] }, s);
     expect(konflikt).toMatchObject({ status: 409, daten: { geaendert_von: 'a@velonify.de', geaendert_am: deal.geaendert_am } });
     expect((await behandle('POST', '/aendern', { tab: 'deals', updates: [{ id: 'D-9', changes: {} }] }, s)).status).toBe(404);
+  });
+
+  it('hands inserted mentions to the Slack hook, and a failing hook does not fail the write', async () => {
+    const s = await store();
+    const erwaehnung = { id: 'ER-1', person: 'Julian', von: 'test@velonify.de', datum: '2026-10-16T10:00:00Z', art: 'kommentar', link: '/todo/B-1?karte=T-1', gelesen_am: '' };
+    const erhalten: unknown[][] = [];
+    const ok = await behandle('POST', '/einfuegen', { tab: 'erwaehnungen', records: [erwaehnung] }, s, { erwaehnt: async (e) => void erhalten.push(e) });
+    expect(ok.status).toBe(200);
+    expect(erhalten).toEqual([[erwaehnung]]);
+    await behandle('POST', '/einfuegen', { tab: 'deals', records: [deal] }, s, { erwaehnt: async (e) => void erhalten.push(e) });
+    expect(erhalten).toHaveLength(1);
+    const kaputt = await behandle('POST', '/einfuegen', { tab: 'erwaehnungen', records: [{ ...erwaehnung, id: 'ER-2' }] }, s, { erwaehnt: async () => { throw new Error('Slack down'); } });
+    expect(kaputt.status).toBe(200);
+    const gelesen = await behandle('POST', '/aendern', { tab: 'erwaehnungen', updates: [{ id: 'ER-1', changes: { gelesen_am: '2026-10-16T11:00:00Z' } }] }, s);
+    expect(gelesen).toMatchObject({ status: 200, daten: { records: [{ id: 'ER-1', gelesen_am: '2026-10-16T11:00:00Z' }] } });
   });
 
   it('refuses unknown tables, the settings tables and malformed bodies', async () => {

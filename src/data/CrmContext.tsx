@@ -12,6 +12,7 @@ import { ApiStore } from './api/apiStore';
 import { SheetsClient, type SheetsApi } from './sheets/sheetsClient';
 import { SheetStore } from './sheets/sheetStore';
 import type { Database } from './types';
+import { read as gemerktesIch } from '../lib/useIch';
 
 interface CrmContextValue {
   service: CrmService | null;
@@ -60,6 +61,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         calendar: new GoogleCalendar(getToken),
         currentUser: userEmail,
         tabelle: (spreadsheetId) => new SheetsClient(spreadsheetId, getToken),
+        ich: gemerktesIch,
       });
       setBackend({ service, sheets });
     }

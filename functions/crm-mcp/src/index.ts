@@ -8,6 +8,7 @@ import { isoDate } from '../../../src/data/ids';
 import { SheetsClient } from '../../../src/data/sheets/sheetsClient';
 import { SheetStore } from '../../../src/data/sheets/sheetStore';
 import { PostgresStore } from '../../../src/data/postgres/postgresStore';
+import { slackBenachrichtiger } from '../../../src/data/slack';
 import { verbinde, type Verbindung } from '../../../db/verbindung';
 import { GoogleAbgelaufen, googleAnmeldeUrl, GoogleTokens, tauscheGoogleCode, ZugriffVerweigert, type GoogleKonfig } from './google';
 import { AuthServer, OAuthFehler, ressourceUrl, schutzMetadaten, SCOPE, serverMetadaten, type OAuthKonfig } from './oauth';
@@ -19,6 +20,10 @@ const VERSION = '0.3.0';
 
 /** Team names for addresses the hub's name matching cannot place, e.g. TEAM_ZUORDNUNG="lukas@velonify.de=Lugge". */
 const TEAM_ZUORDNUNG = leseTeamZuordnung(process.env.TEAM_ZUORDNUNG ?? '');
+/** @-mentions also go to Slack as direct messages when the Slack app's token is set (secret SLACK_BOT_TOKEN). */
+const SLACK = process.env.SLACK_BOT_TOKEN?.trim()
+  ? slackBenachrichtiger({ token: process.env.SLACK_BOT_TOKEN.trim(), hub: process.env.HUB_URL || 'https://crm.velonify.de', teamZuordnung: TEAM_ZUORDNUNG })
+  : undefined;
 
 interface Laufzeit {
   konfig: OAuthKonfig;
@@ -115,6 +120,8 @@ async function mcp(req: Request, res: Response, lz: Laufzeit): Promise<void> {
     calendar: new GoogleCalendar(getToken),
     currentUser: () => zugang.email,
     tabelle: (spreadsheetId) => new SheetsClient(spreadsheetId, getToken),
+    ich: () => TEAM_ZUORDNUNG.get(zugang.email),
+    erwaehnt: SLACK,
   });
 
   const server = new McpServer({ name: 'velonify-crm', title: 'Velonify CRM', version: VERSION }, { instructions: ANLEITUNG });

@@ -222,6 +222,10 @@ export const SCHEMA = {
     name: 'aufgaben_kommentare',
     columns: ['id', 'aufgabe_id', 'text', 'von', 'datum'],
   },
+  erwaehnungen: {
+    name: 'erwaehnungen',
+    columns: ['id', 'person', 'von', 'datum', 'art', 'quelle_id', 'aufgabe_id', 'firma_id', 'titel', 'auszug', 'link', 'gelesen_am'],
+  },
   portal_zugaenge: {
     name: 'portal_zugaenge',
     columns: ['id', 'firma_id', 'kontakt_id', 'aktiv', 'zuletzt_am', ...META],
@@ -279,6 +283,11 @@ export const KUNDEN_TABS = ['kunden_links', 'kunden_news'] as const;
 /** Tabs of the to-do boards: one board per client plus an internal one. Loaded only when needed. */
 export const TODO_TABS = ['boards', 'aufgaben', 'aufgaben_kommentare'] as const;
 /**
+ * @-mentions of team members in comments, cards and notes: one row per tagged person, shown under the bell in the hub
+ * (and sent to Slack by crm-api and crm-mcp). Loaded on every page for the bell.
+ */
+export const ERWAEHNUNGEN_TABS = ['erwaehnungen'] as const;
+/**
  * Tabs of the client portal settings: which contacts may log in, which client tools are switched on and the milestones
  * shown as the client's roadmap. Loaded only on the "Portal" tab of a client page.
  */
@@ -295,6 +304,7 @@ export type EntityTab =
   | (typeof MAGNET_TABS)[number]
   | (typeof KUNDEN_TABS)[number]
   | (typeof TODO_TABS)[number]
+  | (typeof ERWAEHNUNGEN_TABS)[number]
   | (typeof PORTAL_TABS)[number];
 
 /** Editable select values, written to the "listen" tab on setup and maintained there afterwards. */
