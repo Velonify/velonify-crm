@@ -119,6 +119,7 @@ describe('Kunden-Werkzeuge', () => {
 
     const alle = await rufe('kunden_news_aendern', { news_id: meldung.news_id, kunde: 'alle' });
     expect(alle.daten.kunde).toBe('alle Kunden');
+    expect(alle.daten.meldung.sichtbar_kunde).toBe(false);
     expect((await rufe('kunden_news_aendern', { news_id: meldung.news_id, kunde: 'AGK' })).daten.kunde).toBe('Alpenglanz Kosmetik AG');
 
     expect((await rufe('kunden_eintrag_archivieren', { id: meldung.news_id })).daten).toMatchObject({ art: 'news', archiviert: true });
