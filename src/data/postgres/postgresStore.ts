@@ -160,8 +160,8 @@ export class PostgresStore implements Store {
   }
 
   async loadPortalDaten(): Promise<PortalDaten> {
-    const [zugaenge, werkzeuge, meilensteine, tracking, berichte] = await Promise.all(PORTAL_TABS.map((tab) => this.tabelle(tab)));
-    return { zugaenge, werkzeuge, meilensteine, tracking, berichte } as PortalDaten;
+    const [zugaenge, werkzeuge, meilensteine, tracking, berichte, feedback] = await Promise.all(PORTAL_TABS.map((tab) => this.tabelle(tab)));
+    return { zugaenge, werkzeuge, meilensteine, tracking, berichte, feedback } as PortalDaten;
   }
 
   /** Any table as the app sees it, for the data view (Einrichtung → Daten). */

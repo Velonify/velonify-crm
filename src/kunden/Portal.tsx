@@ -19,6 +19,8 @@ import { useAuth } from '../auth/AuthContext';
 import { config, isDemo } from '../config';
 import { berichteVon, berichtsMonat, liesBericht, monatName, naechsterMonat } from '../data/monatsbericht';
 import type { KundenBericht } from '../data/types';
+import { AMPEL_LABEL, ANLASS_LABEL, feedbackVon, sterneText, zufriedenheit } from '../data/feedback';
+import { addDays, isoDate } from '../data/ids';
 
 /** The "Portal" tab of a client page: who may log in, which client tools are on, the roadmap and what the client sees. */
 export function Portal({ firma, db, kunden, todos }: { firma: Firma; db: Database; kunden?: KundenDaten; todos?: TodoDaten }) {
@@ -33,6 +35,7 @@ export function Portal({ firma, db, kunden, todos }: { firma: Firma; db: Databas
         <Monatsberichte firma={firma} portal={portal.data} aendern={portal.aendern} reload={portal.reload} />
       </div>
       <div className="akte-side">
+        <Zufriedenheit firma={firma} db={db} portal={portal.data} />
         <Tracking firma={firma} portal={portal.data} aendern={portal.aendern} reload={portal.reload} />
         <Werkzeuge firma={firma} portal={portal.data} aendern={portal.aendern} />
         <Sichtbar firma={firma} kunden={kunden} todos={todos} portal={portal.data} />
@@ -479,6 +482,64 @@ function BerichtZeile({ bericht: b, firma, aendern, reload, offen, umschalten }:
         )}
       </div>
     </li>
+  );
+}
+
+const ZUFRIEDENHEIT_TAGE = 90;
+const MAX_FEEDBACK = 10;
+
+/** Stars and comments of the client from the portal: average of the last 90 days and the newest entries. */
+function Zufriedenheit({ firma, db, portal }: { firma: Firma; db: Database; portal: PortalDaten }) {
+  const [alle, setAlle] = useState(false);
+  const liste = feedbackVon(portal.feedback ?? [], firma.id);
+  const stand = zufriedenheit(portal.feedback ?? [], firma.id, addDays(isoDate(new Date()), -ZUFRIEDENHEIT_TAGE));
+  const name = (kontaktId: string, von: string) => {
+    const k = db.kontakte.find((x) => x.id === kontaktId);
+    return k ? kontaktName(k) : von;
+  };
+  return (
+    <Card
+      title={
+        <>
+          Zufriedenheit <span className="count">{liste.length}</span>
+        </>
+      }
+    >
+      {stand ? (
+        <p className="zufriedenheit-stand">
+          <span className={`ampel-punkt ${stand.ampel}`} aria-hidden="true" />
+          <strong>{stand.schnitt.toLocaleString('de-DE', { minimumFractionDigits: 1 })} von 5</strong> · {AMPEL_LABEL[stand.ampel]}
+          <span className="row-sub"> · {stand.anzahl} Bewertungen in {ZUFRIEDENHEIT_TAGE} Tagen</span>
+        </p>
+      ) : (
+        <p className="muted">
+          {liste.length ? `In den letzten ${ZUFRIEDENHEIT_TAGE} Tagen keine Sterne.` : 'Noch kein Feedback. Kunden bewerten im Portal Monatsberichte, Meilensteine und erledigte Aufgaben oder schreiben frei.'}
+        </p>
+      )}
+      <ul className="portal-liste feedback-liste">
+        {liste.slice(0, alle ? undefined : MAX_FEEDBACK).map((f) => (
+          <li key={f.id}>
+            <div>
+              <span className="row-title">
+                {f.sterne !== null && <span className={`sterne${f.sterne <= 3 ? ' kritisch' : ''}`} aria-label={`${f.sterne} von 5 Sternen`}>{sterneText(f.sterne)}</span>} {ANLASS_LABEL[f.anlass]}
+                {f.bezug_titel ? `: ${f.bezug_titel}` : ''}
+              </span>
+              {f.text && <p className="feedback-text">{f.text}</p>}
+              <div className="row-sub">
+                {name(f.kontakt_id, f.von)} · {formatDateTime(f.erstellt_am)}
+                {f.zitat_ok && <span className="badge ok">Zitat freigegeben</span>}
+                {f.gemeldet_am && <span className="badge subtle">in Slack gemeldet</span>}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {liste.length > MAX_FEEDBACK && (
+        <button type="button" className="link-button" onClick={() => setAlle(!alle)}>
+          {alle ? 'Weniger zeigen' : `Alle ${liste.length} zeigen`}
+        </button>
+      )}
+    </Card>
   );
 }
 

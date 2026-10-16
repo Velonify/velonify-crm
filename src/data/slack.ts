@@ -1,4 +1,4 @@
-// Node only (crm-api, crm-mcp): sends @-mentions as direct messages from the Velonify Slack app.
+// Node only (crm-api, crm-mcp, kundenportal): direct messages from the Velonify Slack app (@-mentions, client feedback).
 import { ART_LABEL } from './erwaehnungen';
 import { findeTeamMitglied } from './selectors';
 import type { Erwaehnung } from './types';
@@ -53,10 +53,9 @@ export function slackText(e: Erwaehnung, autor: string, hub: string): string {
   ].join('\n');
 }
 
-/** Returns the hook for CrmService/crm-api: one direct message per mention; people not found in Slack are skipped. */
-export function slackBenachrichtiger(konfig: SlackKonfig): (erwaehnungen: Erwaehnung[]) => Promise<void> {
+/** Calls the Slack API with the bot token and keeps the member list for half an hour. */
+function slackKlient(konfig: Pick<SlackKonfig, 'token' | 'fetch'>) {
   const holen = konfig.fetch ?? fetch;
-  const zuordnung = konfig.teamZuordnung ?? new Map<string, string>();
   let liste: { nutzer: SlackNutzer[]; am: number } | null = null;
 
   const slack = async <T>(methode: string, body?: Record<string, unknown>): Promise<T> => {
@@ -83,6 +82,14 @@ export function slackBenachrichtiger(konfig: SlackKonfig): (erwaehnungen: Erwaeh
     return alle;
   };
 
+  return { slack, nutzer };
+}
+
+/** Returns the hook for CrmService/crm-api: one direct message per mention; people not found in Slack are skipped. */
+export function slackBenachrichtiger(konfig: SlackKonfig): (erwaehnungen: Erwaehnung[]) => Promise<void> {
+  const zuordnung = konfig.teamZuordnung ?? new Map<string, string>();
+  const { slack, nutzer } = slackKlient(konfig);
+
   return async (erwaehnungen) => {
     const gueltig = erwaehnungen.filter((e) => e.person && e.link?.startsWith('/'));
     if (gueltig.length === 0) return;
@@ -99,5 +106,29 @@ export function slackBenachrichtiger(konfig: SlackKonfig): (erwaehnungen: Erwaeh
       const autor = autorNutzer?.profile?.first_name || autorNutzer?.profile?.real_name || zuordnung.get(von) || von.split('@')[0];
       await slack('chat.postMessage', { channel: ziel.id, text: slackText(e, autor, konfig.hub), unfurl_links: false, unfurl_media: false });
     }
+  };
+}
+
+/**
+ * A direct message from the Velonify Hub app to team members by their team name (e.g. client feedback). Returns the
+ * names that got it; people not found in Slack are skipped.
+ */
+export function slackDirekt(konfig: Omit<SlackKonfig, 'hub'>): (personen: readonly string[], text: string) => Promise<string[]> {
+  const zuordnung = konfig.teamZuordnung ?? new Map<string, string>();
+  const { slack, nutzer } = slackKlient(konfig);
+  return async (personen, text) => {
+    if (personen.length === 0) return [];
+    const alle = await nutzer();
+    const erreicht: string[] = [];
+    for (const person of personen) {
+      const ziel = slackNutzerFuer(person, alle, zuordnung);
+      if (!ziel) {
+        console.warn(`Slack: niemand für „${person}“ gefunden`);
+        continue;
+      }
+      await slack('chat.postMessage', { channel: ziel.id, text, unfurl_links: false, unfurl_media: false });
+      erreicht.push(person);
+    }
+    return erreicht;
   };
 }

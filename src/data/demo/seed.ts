@@ -3,6 +3,7 @@ import { DemoShopAudit } from '../shopAudit';
 import { EINSTELLUNG } from '../constants';
 import { addDays, isoDate } from '../ids';
 import { SheetStore } from '../sheets/sheetStore';
+import type { KundenFeedback } from '../types';
 import { berichtInhalt, berichtsMonat, monatsZeitraum, type BerichtDaten } from '../monatsbericht';
 import { runSetup } from '../sheets/setup';
 import { EMPTY_DEAL_INPUT, EMPTY_FIRMA_INPUT, EMPTY_KONTAKT_INPUT } from '../types';
@@ -349,6 +350,20 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   const jetzt = new Date().toISOString();
   await store.insert('kunden_berichte', [
     { id: 'MB-DEMO1', firma_id: alpenglanz.id, monat, status: 'entwurf', kommentar: '', daten: JSON.stringify(daten), freigegeben_am: '', freigegeben_von: '', erstellt_am: jetzt, erstellt_von: 'kundenportal', geaendert_am: jetzt, geaendert_von: 'kundenportal' },
+  ]);
+
+  // Feedback from the portal: praise with a quote, one criticism (reported in Slack), one free comment.
+  const meilensteine = (await store.loadPortalDaten()).meilensteine;
+  const fertigeKarte = (await store.loadTodoDaten()).aufgaben.find((a) => a.titel === 'Neue Produktseiten live');
+  const fb = (tage: number, felder: Partial<KundenFeedback>): KundenFeedback => {
+    const zeit = new Date(Date.now() - tage * 86_400_000).toISOString();
+    return { id: `FB-DEMO${tage}`, firma_id: alpenglanz.id, kontakt_id: '', von: 'jonas@alpenglanz.example', anlass: 'frei', bezug_id: '', bezug_titel: '', sterne: null, text: '', zitat_ok: false, gemeldet_am: '', erstellt_am: zeit, erstellt_von: 'jonas@alpenglanz.example', geaendert_am: zeit, geaendert_von: 'jonas@alpenglanz.example', ...felder };
+  };
+  const tracking = meilensteine.find((m) => m.titel === 'Tracking');
+  await store.insert('kunden_feedback', [
+    ...(tracking ? [fb(1, { anlass: 'meilenstein', bezug_id: tracking.id, bezug_titel: tracking.titel, sterne: 5, text: 'Super schnell umgesetzt, die Zahlen stimmen endlich. Danke!', zitat_ok: true })] : []),
+    ...(fertigeKarte ? [fb(6, { anlass: 'karte', bezug_id: fertigeKarte.id, bezug_titel: fertigeKarte.titel, sterne: 3, text: 'Ergebnis gut, hat aber eine Woche länger gedauert als geplant.', gemeldet_am: new Date(Date.now() - 6 * 86_400_000).toISOString() })] : []),
+    fb(12, { text: 'Könnt ihr im Monatsbericht auch die Newsletter-Zahlen zeigen?' }),
   ]);
 
   return { service, sheets };

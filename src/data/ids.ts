@@ -36,6 +36,7 @@ export const ID_PREFIX = {
   kunden_meilensteine: 'KM',
   kunden_tracking: 'TR',
   kunden_berichte: 'MB',
+  kunden_feedback: 'FB',
 } as const;
 
 export function newId(prefix: string, length = 8): string {

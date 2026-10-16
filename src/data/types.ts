@@ -622,6 +622,7 @@ export interface EntityMap {
   portal_werkzeuge: PortalWerkzeug;
   kunden_tracking: KundenTracking;
   kunden_berichte: KundenBericht;
+  kunden_feedback: KundenFeedback;
   kunden_meilensteine: Meilenstein;
 }
 
@@ -836,6 +837,29 @@ export interface KundenBericht extends Meta {
   freigegeben_von: string;
 }
 
+export type FeedbackAnlass = 'bericht' | 'meilenstein' | 'karte' | 'frei';
+
+/** A rating (1–5 stars) and/or comment of a client contact, given in the portal. */
+export interface KundenFeedback extends Meta {
+  id: string;
+  firma_id: string;
+  kontakt_id: string;
+  /** Address of the contact who gave it */
+  von: string;
+  anlass: FeedbackAnlass;
+  /** Month of the report, milestone id, card id; empty for free feedback */
+  bezug_id: string;
+  /** What it was about, as the client saw it */
+  bezug_titel: string;
+  /** 1–5; null for free feedback without stars */
+  sterne: number | null;
+  text: string;
+  /** The client allows us to quote the comment (asked at 5 stars) */
+  zitat_ok: boolean;
+  /** When the team was told in Slack (criticism only) */
+  gemeldet_am: string;
+}
+
 export type MeilensteinStatus = 'offen' | 'aktiv' | 'erledigt';
 
 /** A stage of the client's roadmap, shown as progress in the portal. */
@@ -857,6 +881,7 @@ export interface PortalDaten {
   meilensteine: Meilenstein[];
   tracking: KundenTracking[];
   berichte: KundenBericht[];
+  feedback: KundenFeedback[];
 }
 
 /** An inquiry from the website form, written into the sheet by the Apps Script behind the Netlify webhook. */

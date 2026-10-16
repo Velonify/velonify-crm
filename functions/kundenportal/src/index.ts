@@ -32,6 +32,10 @@ import { slackPoster, versende } from './versand';
 import { aktualisiereKennzahlen } from './kennzahlen';
 import { erstelleBerichte } from './bericht';
 import { berichtsMonat, istMonat } from '../../../src/data/monatsbericht';
+import { istKritik, kritikNachricht, pruefeFeedback } from '../../../src/data/feedback';
+import { leseTeamZuordnung } from '../../../src/data/selectors';
+import { slackDirekt } from '../../../src/data/slack';
+import { personen } from '../../../src/data/zustaendig';
 
 interface Laufzeit {
   siegel: Siegel;
@@ -52,6 +56,9 @@ interface Laufzeit {
   /** Access tokens of hallo@velonify.de for GA4 and Search Console; null without ANALYTICS_REFRESH_TOKEN. */
   analyticsToken: (() => Promise<string>) | null;
   pagespeedKey: string;
+  /** Direct messages to team members (criticism in feedback); null without SLACK_BOT_TOKEN. */
+  slackDm: ((personen: readonly string[], text: string) => Promise<string[]>) | null;
+  hubUrl: string;
 }
 
 let laufzeit: Laufzeit | null = null;
@@ -86,6 +93,8 @@ function holeLaufzeit(): Laufzeit {
       ? nutzerToken({ clientId: process.env.GMAIL_CLIENT_ID!, clientSecret: process.env.GMAIL_CLIENT_SECRET!.trim(), refreshToken: process.env.ANALYTICS_REFRESH_TOKEN.trim(), wofuer: 'Analytics' })
       : null,
     pagespeedKey: (process.env.PAGESPEED_API_KEY ?? '').trim(),
+    slackDm: process.env.SLACK_BOT_TOKEN?.trim() ? slackDirekt({ token: process.env.SLACK_BOT_TOKEN.trim(), teamZuordnung: leseTeamZuordnung(process.env.TEAM_ZUORDNUNG ?? '') }) : null,
+    hubUrl: process.env.HUB_URL || 'https://crm.velonify.de',
   };
   return laufzeit;
 }
@@ -323,7 +332,7 @@ function eingabe(req: Request): Record<string, unknown> {
 }
 
 /** Login and write limit for the endpoints where the client changes something. */
-async function schreibend(req: Request, lz: Laufzeit, s: Store): Promise<{ berechtigung: Berechtigung; db: Awaited<ReturnType<Store['load']>> }> {
+async function schreibend(req: Request, lz: Laufzeit, s: Store): Promise<{ berechtigung: Berechtigung; db: Awaited<ReturnType<Store['load']>>; sitzung: SitzungInhalt }> {
   const anmeldung = await angemeldet(req, lz, s);
   if (!anmeldung) throw new PortalFehler(401, NICHT_ANGEMELDET);
   // Team access acts too, under the team member's own address (see vorschauBerechtigung).
@@ -388,6 +397,32 @@ async function hochladen(req: Request, res: Response, lz: Laufzeit): Promise<voi
   json(res, 200, { id: datei.id, name: datei.name, mimeType: datei.mimeType, geaendert: datei.modifiedTime ?? new Date().toISOString(), von: 'kunde' });
 }
 
+/**
+ * `POST /feedback`: stars and/or a comment of the client. Criticism (1–3 stars) goes straight to the people looking
+ * after the client in Slack. Only clients give feedback; the team access shows the questions but cannot send.
+ */
+async function feedback(req: Request, res: Response, lz: Laufzeit): Promise<void> {
+  const s = await store(lz);
+  const { berechtigung, sitzung } = await schreibend(req, lz, s);
+  if (sitzung.v) throw new PortalFehler(403, 'Feedback gibt nur der Kunde – im Team-Zugang siehst du die Fragen nur.');
+  const [todos, portal] = await Promise.all([s.loadTodoDaten(), s.loadPortalDaten()]);
+  const neu = pruefeFeedback({ berechtigung, eingabe: eingabe(req), todos, portal, jetzt: new Date() });
+  await s.insert('kunden_feedback', [neu]);
+  if (istKritik(neu) && lz.slackDm) {
+    try {
+      const { firma, kontakt } = berechtigung;
+      const erreicht = await lz.slackDm(personen(firma.zustaendig), kritikNachricht(neu, { firmaName: firma.name, kontaktName: `${kontakt.vorname} ${kontakt.nachname}`.trim() || kontakt.email, hub: lz.hubUrl }));
+      if (erreicht.length) await s.update('kunden_feedback', [{ id: neu.id, changes: { gemeldet_am: new Date().toISOString() } }]);
+      else console.warn('Kritisches Feedback: niemand in Slack erreicht', firma.id);
+    } catch (err) {
+      // The feedback is stored and visible in the hub; Slack is only the alarm.
+      console.error('Kritisches Feedback: Slack fehlgeschlagen', err);
+    }
+  }
+  console.log(JSON.stringify({ feedback: neu.id, firma: neu.firma_id, anlass: neu.anlass, sterne: neu.sterne }));
+  json(res, 200, { ok: true, sterne: neu.sterne });
+}
+
 /** `POST /einstellungen`: the contact chooses how often and where they hear from us. */
 async function einstellungen(req: Request, res: Response, lz: Laufzeit): Promise<void> {
   const s = await store(lz);
@@ -450,6 +485,7 @@ http('kundenportal', async (req: Request, res: Response) => {
     if (req.method === 'POST' && pfad === '/versand') return await versand(req, res, lz);
     if (req.method === 'POST' && pfad === '/kennzahlen') return await kennzahlen(req, res, lz);
     if (req.method === 'POST' && pfad === '/bericht') return await monatsbericht(req, res, lz);
+    if (req.method === 'POST' && pfad === '/feedback') return await feedback(req, res, lz);
     const dateiPfad = /^\/datei\/([\w-]+)$/.exec(pfad);
     if (req.method === 'GET' && dateiPfad) return await datei(req, res, lz, dateiPfad[1]);
     if (req.method === 'GET' && pfad === '/') return json(res, 200, { dienst: 'velonify-kundenportal' });

@@ -241,6 +241,12 @@ export const SCHEMA = {
     columns: ['id', 'firma_id', 'ga4_property', 'gsc_site', 'pagespeed_url', 'sichtbar_kunde', 'stand_am', 'fehler', 'daten', ...META, 'monatsbericht'],
     boolean: ['sichtbar_kunde', 'monatsbericht'],
   },
+  kunden_feedback: {
+    name: 'kunden_feedback',
+    columns: ['id', 'firma_id', 'kontakt_id', 'von', 'anlass', 'bezug_id', 'bezug_titel', 'sterne', 'text', 'zitat_ok', 'gemeldet_am', ...META],
+    numeric: ['sterne'],
+    boolean: ['zitat_ok'],
+  },
   kunden_berichte: {
     name: 'kunden_berichte',
     columns: ['id', 'firma_id', 'monat', 'status', 'kommentar', 'daten', 'freigegeben_am', 'freigegeben_von', ...META],
@@ -300,7 +306,7 @@ export const ERWAEHNUNGEN_TABS = ['erwaehnungen'] as const;
  * Tabs of the client portal settings: which contacts may log in, which client tools are switched on and the milestones
  * shown as the client's roadmap. Loaded only on the "Portal" tab of a client page.
  */
-export const PORTAL_TABS = ['portal_zugaenge', 'portal_werkzeuge', 'kunden_meilensteine', 'kunden_tracking', 'kunden_berichte'] as const;
+export const PORTAL_TABS = ['portal_zugaenge', 'portal_werkzeuge', 'kunden_meilensteine', 'kunden_tracking', 'kunden_berichte', 'kunden_feedback'] as const;
 export type EntityTab =
   | (typeof ENTITY_TABS)[number]
   | (typeof ANGEBOTS_TABS)[number]

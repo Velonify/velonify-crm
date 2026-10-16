@@ -1373,3 +1373,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
 .bericht-details { display: grid; gap: 8px; margin-top: var(--space-2); }
 .bericht-details .hint-box { margin: 0; padding: 8px 12px; }
 .bericht-details textarea { width: 100%; }
+.zufriedenheit-stand { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 var(--space-2); }
+.ampel-punkt { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--ink-muted); }
+.ampel-punkt.gut { background: var(--ok); }
+.ampel-punkt.mittel { background: var(--warn); }
+.ampel-punkt.kritisch { background: var(--danger); }
+.sterne { color: var(--warn); letter-spacing: 1px; font-weight: 400; }
+.sterne.kritisch { color: var(--danger); }
+.feedback-text { margin: 4px 0; font-size: 13.5px; white-space: pre-line; }
+.feedback-liste .badge { margin-left: 6px; }
