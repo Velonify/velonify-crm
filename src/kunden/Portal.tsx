@@ -17,6 +17,8 @@ import { hatQuelle, liesDaten, prepareTracking, trackingVon, veraenderung, type 
 import { einstellungenVon, KANAELE, KANAL_LABEL, RHYTHMUS_LABEL, UPDATE_RHYTHMEN, type PortalEinstellungen } from '../data/portalBenachrichtigung';
 import { useAuth } from '../auth/AuthContext';
 import { config, isDemo } from '../config';
+import { berichteVon, berichtsMonat, liesBericht, monatName, naechsterMonat } from '../data/monatsbericht';
+import type { KundenBericht } from '../data/types';
 
 /** The "Portal" tab of a client page: who may log in, which client tools are on, the roadmap and what the client sees. */
 export function Portal({ firma, db, kunden, todos }: { firma: Firma; db: Database; kunden?: KundenDaten; todos?: TodoDaten }) {
@@ -28,6 +30,7 @@ export function Portal({ firma, db, kunden, todos }: { firma: Firma; db: Databas
       <div className="akte-main">
         <Zugaenge firma={firma} db={db} portal={portal.data} aendern={portal.aendern} />
         <Fahrplan firma={firma} portal={portal.data} aendern={portal.aendern} />
+        <Monatsberichte firma={firma} portal={portal.data} aendern={portal.aendern} reload={portal.reload} />
       </div>
       <div className="akte-side">
         <Tracking firma={firma} portal={portal.data} aendern={portal.aendern} reload={portal.reload} />
@@ -233,11 +236,13 @@ function Tracking({ firma, portal, aendern, reload }: { firma: Firma; portal: Po
     gsc_site: t?.gsc_site ?? (firma.domain ? `sc-domain:${firma.domain.replace(/^www\./, '')}` : ''),
     pagespeed_url: t?.pagespeed_url ?? (firma.domain ? `https://${firma.domain}/` : ''),
     sichtbar_kunde: t?.sichtbar_kunde ?? false,
+    monatsbericht: t?.monatsbericht ?? false,
   }));
   const [laeuft, setLaeuft] = useState<'' | 'speichern' | 'abrufen'>('');
   const [fehler, setFehler] = useState('');
   const daten = liesDaten(t);
-  const geaendert = !t || werte.ga4_property !== t.ga4_property || werte.gsc_site !== t.gsc_site || werte.pagespeed_url !== t.pagespeed_url || werte.sichtbar_kunde !== t.sichtbar_kunde;
+  const geaendert =
+    !t || werte.ga4_property !== t.ga4_property || werte.gsc_site !== t.gsc_site || werte.pagespeed_url !== t.pagespeed_url || werte.sichtbar_kunde !== t.sichtbar_kunde || werte.monatsbericht !== t.monatsbericht;
 
   const speichern = async () => {
     setFehler('');
@@ -294,6 +299,10 @@ function Tracking({ firma, portal, aendern, reload }: { firma: Firma; portal: Po
           <input type="checkbox" checked={werte.sichtbar_kunde} onChange={(e) => setWerte((w) => ({ ...w, sichtbar_kunde: e.target.checked }))} />
           Im Kundenportal unter „Zahlen“ zeigen
         </label>
+        <label className="checkbox wide">
+          <input type="checkbox" checked={werte.monatsbericht} onChange={(e) => setWerte((w) => ({ ...w, monatsbericht: e.target.checked }))} />
+          Monatsbericht: Entwurf am 1., ihr ergänzt und gebt frei
+        </label>
       </div>
       {fehler && <p className="alert error">{fehler}</p>}
       <div className="form-actions">
@@ -316,6 +325,160 @@ function Tracking({ firma, portal, aendern, reload }: { firma: Firma; portal: Po
         </div>
       )}
     </Card>
+  );
+}
+
+/** POST to the portal function with the hub's Google token; throws its error text. */
+function usePortalFunktion() {
+  const { getToken } = useAuth();
+  return async <T,>(pfad: string, body: unknown): Promise<T> => {
+    const antwort = await fetch(`${config.kundenportalApiUrl}${pfad}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${await getToken()}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const ergebnis = (await antwort.json().catch(() => ({}))) as T & { fehler?: unknown };
+    if (!antwort.ok) throw new Error(typeof ergebnis.fehler === 'string' ? ergebnis.fehler : 'Das hat nicht geklappt.');
+    return ergebnis;
+  };
+}
+
+/**
+ * Monthly reports of the client: the portal function drafts one on the 1st (numbers of the month, cards done,
+ * milestones, what comes next); the team adds its comment and releases it, which notifies the client.
+ */
+function Monatsberichte({ firma, portal, aendern, reload }: { firma: Firma; portal: PortalDaten; aendern: Aendern; reload: () => void }) {
+  const toast = useToast();
+  const funktion = usePortalFunktion();
+  const [erstellt, setErstellt] = useState(false);
+  const t = trackingVon(portal.tracking ?? [], firma.id);
+  const liste = berichteVon(portal.berichte ?? [], firma.id);
+  const [offen, setOffen] = useState(() => liste.find((b) => b.status === 'entwurf')?.id ?? '');
+  if (!t?.monatsbericht && liste.length === 0) return null;
+  const vormonat = berichtsMonat(new Date());
+  const kannErstellen = !!t?.monatsbericht && !liste.some((b) => b.monat === vormonat) && !isDemo && !!config.kundenportalApiUrl;
+
+  const erstellen = async () => {
+    setErstellt(true);
+    try {
+      await funktion('/bericht', { firma_id: firma.id, monat: vormonat });
+      reload();
+      toast.show(`Entwurf ${monatName(vormonat)} erstellt`);
+    } catch (err) {
+      toast.show(errorMessage(err), 'error');
+    } finally {
+      setErstellt(false);
+    }
+  };
+
+  return (
+    <Card
+      title={
+        <>
+          Monatsberichte <span className="count">{liste.length}</span>
+        </>
+      }
+      actions={
+        kannErstellen && (
+          <button type="button" className="button small" onClick={() => void erstellen()} disabled={erstellt}>
+            {erstellt ? 'Erstellt … (bis 1 Min.)' : `Entwurf ${monatName(vormonat)} erstellen`}
+          </button>
+        )
+      }
+    >
+      {liste.length === 0 && <p className="muted">Der erste Entwurf entsteht am 1. des nächsten Monats mit den Zahlen des ganzen Monats. Ihr ergänzt eure Einschätzung und gebt ihn frei, dann bekommt der Kunde Bescheid.</p>}
+      <ul className="portal-liste">
+        {liste.map((b) => (
+          <BerichtZeile key={b.id} bericht={b} firma={firma} aendern={aendern} reload={reload} offen={offen === b.id} umschalten={() => setOffen((o) => (o === b.id ? '' : b.id))} />
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+const anzahl = (n: number, eins: string, mehr: string) => `${n} ${n === 1 ? eins : mehr}`;
+
+function BerichtZeile({ bericht: b, firma, aendern, reload, offen, umschalten }: { bericht: KundenBericht; firma: Firma; aendern: Aendern; reload: () => void; offen: boolean; umschalten: () => void }) {
+  const toast = useToast();
+  const funktion = usePortalFunktion();
+  const [kommentar, setKommentar] = useState(b.kommentar);
+  const [laeuft, setLaeuft] = useState<'' | 'speichern' | 'rechnen' | 'freigeben'>('');
+  const daten = liesBericht(b);
+  const entwurf = b.status !== 'freigegeben';
+  const geaendert = kommentar.trim() !== b.kommentar;
+  const quellen = [daten?.zahlen.ga4 && 'Analytics', daten?.zahlen.gsc && 'Search Console', daten?.zahlen.pagespeed && 'PageSpeed'].filter(Boolean).join(', ');
+
+  const los = async (art: typeof laeuft, aktion: () => Promise<unknown>, meldung: string) => {
+    setLaeuft(art);
+    try {
+      await aktion();
+      toast.show(meldung);
+    } catch (err) {
+      toast.show(errorMessage(err), 'error');
+    } finally {
+      setLaeuft('');
+    }
+  };
+  const speichern = () => los('speichern', () => aendern((s) => s.saveBerichtKommentar(b.id, kommentar)), 'Einschätzung gespeichert');
+  const neuRechnen = () =>
+    los('rechnen', async () => {
+      await funktion('/bericht', { firma_id: firma.id, monat: b.monat });
+      reload();
+    }, 'Bericht neu berechnet');
+  const freigeben = (an: boolean) => {
+    if (an && !window.confirm(`Monatsbericht ${monatName(b.monat)} freigeben? ${firma.name} sieht ihn dann im Portal und bekommt eine Benachrichtigung.`)) return;
+    void los('freigeben', async () => {
+      if (an && geaendert) await aendern((s) => s.saveBerichtKommentar(b.id, kommentar));
+      await aendern((s) => s.freigebenBericht(b.id, an));
+    }, an ? 'Freigegeben – der Kunde wird benachrichtigt' : 'Zurückgezogen, wieder Entwurf');
+  };
+
+  return (
+    <li className="bericht-zeile">
+      <div>
+        <button type="button" className="link-button row-title" onClick={umschalten} aria-expanded={offen}>
+          {monatName(b.monat)}
+        </button>
+        <div className="row-sub">
+          <span className={`badge ${entwurf ? 'freigabe-offen' : 'freigabe-freigegeben'}`}>{entwurf ? 'Entwurf' : 'Freigegeben'}</span>
+          {entwurf ? (daten ? `Stand ${formatDateTime(daten.stand_am)}` : 'noch leer') : `am ${formatDateTime(b.freigegeben_am)} von ${b.freigegeben_von.split('@')[0]}`}
+        </div>
+        {offen && (
+          <div className="bericht-details">
+            {daten && (
+              <p className="row-sub">
+                {anzahl(daten.erledigt.length, 'Karte', 'Karten')} erledigt · {anzahl(daten.meilensteine.length, 'Meilenstein', 'Meilensteine')} · {daten.naechstes.length} als Nächstes · Zahlen: {quellen || 'keine'}
+              </p>
+            )}
+            {entwurf && daten?.fehler?.map((f) => <span key={f} className="hint-box warn">{f}</span>)}
+            <Field label="Einschätzung von Velonify" hint="Steht oben im Bericht: was im Monat wichtig war und was ihr empfehlt." wide>
+              <textarea rows={5} value={kommentar} onChange={(e) => setKommentar(e.target.value)} placeholder={`Im ${monatName(b.monat).split(' ')[0]} haben wir … Für ${monatName(naechsterMonat(b.monat)).split(' ')[0]} empfehlen wir …`} />
+            </Field>
+            <div className="form-actions">
+              {entwurf ? (
+                <button type="button" className="button primary small" onClick={() => freigeben(true)} disabled={laeuft !== ''}>
+                  {laeuft === 'freigeben' ? 'Gibt frei …' : 'Freigeben & benachrichtigen'}
+                </button>
+              ) : null}
+              <button type="button" className="button small" onClick={() => void speichern()} disabled={laeuft !== '' || !geaendert}>
+                {laeuft === 'speichern' ? 'Speichert …' : 'Einschätzung speichern'}
+              </button>
+              {entwurf && !isDemo && config.kundenportalApiUrl && (
+                <button type="button" className="button small" onClick={() => void neuRechnen()} disabled={laeuft !== ''}>
+                  {laeuft === 'rechnen' ? 'Rechnet … (bis 1 Min.)' : 'Neu berechnen'}
+                </button>
+              )}
+              <AlsKundeAnsehen firma={firma} ziel={`bericht/${b.monat}`} label="Im Portal ansehen ↗" />
+              {!entwurf && (
+                <button type="button" className="button small subtle" onClick={() => freigeben(false)} disabled={laeuft !== ''}>
+                  Zurückziehen
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </li>
   );
 }
 
@@ -377,7 +540,7 @@ function Sichtbar({ firma, kunden, todos, portal }: { firma: Firma; kunden?: Kun
  * Opens the client's portal in a new tab with every function (team access): the portal function checks the hub's
  * Google token and hands out an 8-hour team session, which goes to the portal in the address (#/vorschau/<session>).
  */
-function AlsKundeAnsehen({ firma }: { firma: Firma }) {
+function AlsKundeAnsehen({ firma, ziel = '', label = 'Portal öffnen ↗' }: { firma: Firma; ziel?: string; label?: string }) {
   const { getToken } = useAuth();
   const toast = useToast();
   const [laeuft, setLaeuft] = useState(false);
@@ -395,9 +558,9 @@ function AlsKundeAnsehen({ firma }: { firma: Firma }) {
       });
       const daten = (await antwort.json().catch(() => ({}))) as { sitzung?: string; fehler?: string };
       if (!antwort.ok || !daten.sitzung) throw new Error(daten.fehler || 'Das Portal konnte nicht geöffnet werden.');
-      const ziel = `${config.kundenportalUrl}/#/vorschau/${daten.sitzung}`;
-      if (fenster) fenster.location.href = ziel;
-      else window.open(ziel, '_blank');
+      const adresse = `${config.kundenportalUrl}/#/vorschau/${daten.sitzung}${ziel ? `/${ziel}` : ''}`;
+      if (fenster) fenster.location.href = adresse;
+      else window.open(adresse, '_blank');
     } catch (err) {
       fenster?.close();
       toast.show(errorMessage(err), 'error');
@@ -408,7 +571,7 @@ function AlsKundeAnsehen({ firma }: { firma: Firma }) {
 
   return (
     <button type="button" className="button small" onClick={() => void oeffnen()} disabled={laeuft} title="Öffnet das Kundenportal dieser Firma in einem neuen Tab, mit allen Funktionen. Was du dort tust, wird als Velonify gespeichert.">
-      {laeuft ? 'Öffnet …' : 'Portal öffnen ↗'}
+      {laeuft ? 'Öffnet …' : label}
     </button>
   );
 }

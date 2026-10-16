@@ -1,4 +1,4 @@
-import { gscAuswerten, gscZeitraum, ga4Auswerten, GA4_METRIKEN, hatQuelle, liesDaten, quellenFehler, zeitraum, type Ga4Antwort, type GscAntwort, type SpeedMessung, type TrackingDaten } from '../../../src/data/tracking';
+import { gscAuswerten, gscZeitraum, ga4Auswerten, GA4_METRIKEN, hatQuelle, liesDaten, quellenFehler, zeitraum, type Ga4Antwort, type GscAntwort, type SpeedMessung, type TrackingDaten, type Zeitraum } from '../../../src/data/tracking';
 import type { Store } from '../../../src/data/store';
 import type { KundenTracking } from '../../../src/data/types';
 import { pagespeed, type Strategie } from '../../shop-audit/src/pagespeed';
@@ -9,6 +9,8 @@ export interface KennzahlenAbhaengigkeiten {
   pagespeedKey: string;
   fetch?: typeof fetch;
   jetzt: Date;
+  /** A fixed range for GA4 and Search Console (the monthly report) instead of the last 28 days. */
+  zeitraum?: Zeitraum;
 }
 
 class QuellenFehler extends Error {}
@@ -42,7 +44,7 @@ export async function holeKennzahlen(t: Pick<KundenTracking, 'ga4_property' | 'g
   if ((t.ga4_property || t.gsc_site) && !d.googleToken) fehler.push('GA4/Search Console: Zugang von hallo@velonify.de ist nicht eingerichtet.');
 
   const ga4 = async () => {
-    const z = zeitraum(d.jetzt);
+    const z = d.zeitraum ?? zeitraum(d.jetzt);
     const url = `https://analyticsdata.googleapis.com/v1beta/properties/${encodeURIComponent(t.ga4_property)}:runReport`;
     const metriken = GA4_METRIKEN.map((name) => ({ name }));
     const bereich = [{ startDate: z.von, endDate: z.bis }];
@@ -55,7 +57,7 @@ export async function holeKennzahlen(t: Pick<KundenTracking, 'ga4_property' | 'g
   };
 
   const gsc = async () => {
-    const z = gscZeitraum(d.jetzt);
+    const z = d.zeitraum ?? gscZeitraum(d.jetzt);
     const url = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(t.gsc_site)}/searchAnalytics/query`;
     const abfrage = (extra: Record<string, unknown>, von = z.von, bis = z.bis) => holeJson<GscAntwort>(f, 'Search Console', url, token, { startDate: von, endDate: bis, ...extra });
     const [summe, vorher, suchanfragen, seiten, verlauf] = await Promise.all([

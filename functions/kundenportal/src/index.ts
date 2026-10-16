@@ -30,6 +30,8 @@ import { dienstkontoToken, Mailer, nutzerToken } from './google';
 import { Siegel } from './siegel';
 import { slackPoster, versende } from './versand';
 import { aktualisiereKennzahlen } from './kennzahlen';
+import { erstelleBerichte } from './bericht';
+import { berichtsMonat, istMonat } from '../../../src/data/monatsbericht';
 
 interface Laufzeit {
   siegel: Siegel;
@@ -182,9 +184,35 @@ async function kennzahlen(req: Request, res: Response, lz: Laufzeit): Promise<vo
     firmaId = String(eingabe(req).firma_id ?? '');
     if (!firmaId) return json(res, 400, { fehler: 'firma_id fehlt.' });
   }
-  const bericht = await aktualisiereKennzahlen(await store(lz), { googleToken: lz.analyticsToken, pagespeedKey: lz.pagespeedKey, jetzt: new Date() }, firmaId);
-  console.log(JSON.stringify({ kennzahlen: bericht, firma: firmaId ?? 'alle' }));
+  const s = await store(lz);
+  const d = { googleToken: lz.analyticsToken, pagespeedKey: lz.pagespeedKey, jetzt: new Date() };
+  const bericht = await aktualisiereKennzahlen(s, d, firmaId);
+  // The daily run also drafts the monthly reports in the first days of a month (after the fresh PageSpeed numbers).
+  const berichte = firmaId ? null : await erstelleBerichte(s, d).catch((err) => {
+    console.error('Monatsberichte fehlgeschlagen', err);
+    return null;
+  });
+  console.log(JSON.stringify({ kennzahlen: bericht, berichte, firma: firmaId ?? 'alle' }));
   json(res, 200, bericht);
+}
+
+/**
+ * `POST /bericht` from the hub (Google token of a team member, `{ firma_id, monat? }`): drafts the monthly report of a
+ * finished month or recalculates its draft. Defaults to the last month.
+ */
+async function monatsbericht(req: Request, res: Response, lz: Laufzeit): Promise<void> {
+  if (!(await teamMitglied(req, res, lz))) return;
+  const firmaId = String(eingabe(req).firma_id ?? '');
+  const jetzt = new Date();
+  const monat = String(eingabe(req).monat ?? '') || berichtsMonat(jetzt);
+  if (!firmaId) return json(res, 400, { fehler: 'firma_id fehlt.' });
+  if (!istMonat(monat) || monat > berichtsMonat(jetzt)) return json(res, 400, { fehler: 'Berichte gibt es nur für abgeschlossene Monate.' });
+  const s = await store(lz);
+  const t = (await s.loadPortalDaten()).tracking.find((x) => x.firma_id === firmaId);
+  if (!t?.monatsbericht) return json(res, 409, { fehler: 'Der Monatsbericht ist für diesen Kunden nicht eingeschaltet (Karte „Tracking“).' });
+  const ergebnis = await erstelleBerichte(s, { googleToken: lz.analyticsToken, pagespeedKey: lz.pagespeedKey, jetzt }, { firmaId, monat });
+  console.log(JSON.stringify({ monatsbericht: ergebnis, firma: firmaId, monat }));
+  json(res, 200, ergebnis);
 }
 
 /** "Portal öffnen" in the hub: a team member with their hub Google token gets a team session for the firm. */
@@ -421,6 +449,7 @@ http('kundenportal', async (req: Request, res: Response) => {
     if (req.method === 'POST' && pfad === '/einstellungen') return await einstellungen(req, res, lz);
     if (req.method === 'POST' && pfad === '/versand') return await versand(req, res, lz);
     if (req.method === 'POST' && pfad === '/kennzahlen') return await kennzahlen(req, res, lz);
+    if (req.method === 'POST' && pfad === '/bericht') return await monatsbericht(req, res, lz);
     const dateiPfad = /^\/datei\/([\w-]+)$/.exec(pfad);
     if (req.method === 'GET' && dateiPfad) return await datei(req, res, lz, dateiPfad[1]);
     if (req.method === 'GET' && pfad === '/') return json(res, 200, { dienst: 'velonify-kundenportal' });

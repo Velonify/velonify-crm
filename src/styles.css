@@ -1369,3 +1369,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
 .daten-verlauf { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--space-2); font-size: 13.5px; }
 .daten-verlauf li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; border-bottom: 1px solid var(--line); padding-bottom: var(--space-2); }
 .daten-verlauf .button { margin-left: auto; }
+.bericht-zeile .row-title.link-button { color: var(--ink); font-weight: 600; }
+.bericht-details { display: grid; gap: 8px; margin-top: var(--space-2); }
+.bericht-details .hint-box { margin: 0; padding: 8px 12px; }
+.bericht-details textarea { width: 100%; }

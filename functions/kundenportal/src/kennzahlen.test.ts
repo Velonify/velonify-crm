@@ -68,16 +68,17 @@ describe('aktualisiereKennzahlen', () => {
     const { sheets, service } = await createDemoBackend(() => 'lukas@velonify.de');
     const store = new SheetStore(sheets);
     const firma = (await service.load()).firmen.find((f) => f.status === 'kunde')!;
-    const zeile: KundenTracking = { id: 'TR-1', firma_id: firma.id, ...QUELLEN, sichtbar_kunde: true, stand_am: '', fehler: '', daten: '', erstellt_am: '', erstellt_von: '', geaendert_am: '', geaendert_von: '' };
+    const zeile: KundenTracking = { id: 'TR-1', firma_id: firma.id, ...QUELLEN, sichtbar_kunde: true, monatsbericht: false, stand_am: '', fehler: '', daten: '', erstellt_am: '', erstellt_von: '', geaendert_am: '', geaendert_von: '' };
     await store.insert('kunden_tracking', [zeile]);
 
     const d = { googleToken: async () => 'T', pagespeedKey: '', jetzt: JETZT };
     expect(await aktualisiereKennzahlen(store, { ...d, fetch: googleFetch() })).toEqual({ kunden: 1, fehler: 0 });
-    const erster = (await store.loadPortalDaten()).tracking[0];
+    // (the demo's own tracking row has no source and is skipped)
+    const erster = (await store.loadPortalDaten()).tracking.find((t) => t.id === 'TR-1')!;
     expect(liesDaten(erster)?.gsc?.klicks).toBe(400);
 
     await aktualisiereKennzahlen(store, { ...d, fetch: googleFetch({ gscStatus: 403 }) });
-    const zweiter = (await store.loadPortalDaten()).tracking[0];
+    const zweiter = (await store.loadPortalDaten()).tracking.find((t) => t.id === 'TR-1')!;
     expect(liesDaten(zweiter)?.gsc?.klicks).toBe(400);
     expect(zweiter.fehler).toContain('Search Console: kein Zugriff');
     expect(zweiter.stand_am).toBe(JETZT.toISOString());
