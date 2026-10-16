@@ -11,6 +11,7 @@ import { teamTelefonSchluessel } from './constants';
 import { slackChannelUrl } from './start';
 import { personen } from './zustaendig';
 import type { PortalEinstellungen } from './portalBenachrichtigung';
+import { liesDaten, trackingVon, type TrackingDaten } from './tracking';
 import type { Aufgabe, AufgabenKommentar, Board, Database, Firma, Kontakt, KundenDaten, MeilensteinStatus, PortalDaten, PortalZugang, Spalte, TodoDaten } from './types';
 
 export { CLIENT_SHARE_ORDNER };
@@ -75,6 +76,8 @@ export interface Kundensicht {
   telefone: Record<string, string>;
   /** Updates and notifications of the logged-in contact; null in the team access (they belong to a person). */
   einstellungen: PortalEinstellungen | null;
+  /** Numbers of the tracking hub when released for the client (always in the team access), else null. */
+  zahlen: { stand_am: string; daten: TrackingDaten; sichtbar_kunde: boolean } | null;
   fahrplan: { titel: string; datum: string; status: MeilensteinStatus }[];
   karten: PortalKarte[];
   news: { id: string; art: string; titel: string; text: string; datum: string }[];
@@ -264,6 +267,11 @@ export function kundensicht(args: {
     ich: { vorname: kontakt.vorname, nachname: kontakt.nachname, email: kontakt.email },
     vorschau: args.vorschau ?? null,
     einstellungen: args.einstellungen ?? null,
+    zahlen: (() => {
+      const t = trackingVon(portal.tracking ?? [], firma.id);
+      const daten = liesDaten(t);
+      return t && daten && (t.sichtbar_kunde || args.vorschau) ? { stand_am: t.stand_am, daten, sichtbar_kunde: t.sichtbar_kunde } : null;
+    })(),
     firmen: (args.andere?.length ? args.andere : [berechtigung])
       .map((b) => ({ id: b.firma.id, name: b.firma.name }))
       .sort((a, b) => a.name.localeCompare(b.name, 'de')),

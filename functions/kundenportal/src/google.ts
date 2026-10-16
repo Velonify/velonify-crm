@@ -67,6 +67,20 @@ export function rohMail(absender: string, an: string, betreff: string, text: str
   return Buffer.from(zeilen.join('\r\n'), 'utf8').toString('base64url');
 }
 
+/** Access tokens of a user account from its refresh token (OAuth client of the CRM), cached until shortly before expiry. */
+export function nutzerToken(konfig: { clientId: string; clientSecret: string; refreshToken: string; wofuer: string }, fetchFn: typeof fetch = fetch): () => Promise<string> {
+  return gecacht(async () => {
+    const antwort = await fetchFn(TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_id: konfig.clientId, client_secret: konfig.clientSecret, refresh_token: konfig.refreshToken, grant_type: 'refresh_token' }),
+    });
+    const daten = (await antwort.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; error?: string };
+    if (!antwort.ok || !daten.access_token) throw new Error(`${konfig.wofuer}-Token fehlgeschlagen (${antwort.status}): ${daten.error ?? 'unbekannt'}`);
+    return { access_token: daten.access_token, expires_in: daten.expires_in ?? 3600 };
+  });
+}
+
 export class Mailer {
   private readonly token: () => Promise<string>;
 
@@ -74,16 +88,7 @@ export class Mailer {
     private readonly konfig: MailKonfig,
     private readonly fetchFn: typeof fetch = fetch,
   ) {
-    this.token = gecacht(async () => {
-      const antwort = await this.fetchFn(TOKEN_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ client_id: konfig.clientId, client_secret: konfig.clientSecret, refresh_token: konfig.refreshToken, grant_type: 'refresh_token' }),
-      });
-      const daten = (await antwort.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; error?: string };
-      if (!antwort.ok || !daten.access_token) throw new Error(`Gmail-Token fehlgeschlagen (${antwort.status}): ${daten.error ?? 'unbekannt'}`);
-      return { access_token: daten.access_token, expires_in: daten.expires_in ?? 3600 };
-    });
+    this.token = nutzerToken({ ...konfig, wofuer: 'Gmail' }, fetchFn);
   }
 
   async sende(an: string, betreff: string, text: string, html?: string): Promise<void> {

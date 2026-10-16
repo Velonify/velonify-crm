@@ -1329,6 +1329,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
 .portal-liste li:first-child { border-top: 0; padding-top: 0; }
 .portal-liste li > div:first-child { min-width: 0; }
 .portal-liste li.is-archived { opacity: 0.55; }
+.tracking-stand { display: grid; gap: 4px; margin-top: var(--space-3); font-size: 13.5px; }
+.tracking-stand .hint-box { margin: 4px 0 0; padding: 8px 12px; }
 .portal-einstellungen { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 12.5px; color: var(--ink-muted); }
 .portal-einstellungen label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .portal-einstellungen select { font-size: 12.5px; padding: 3px 6px; }

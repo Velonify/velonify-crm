@@ -26,9 +26,10 @@ import { PostgresStore } from '../../../src/data/postgres/postgresStore';
 import type { Store } from '../../../src/data/store';
 import { verbinde, type Verbindung } from '../../../db/verbindung';
 import { Begrenzer, erstelleLink, erstelleSitzung, erstelleVorschau, linkNochGueltig, oeffneLink, oeffneSitzung, verlaengerteSitzung, type SitzungInhalt } from './anmeldung';
-import { dienstkontoToken, Mailer } from './google';
+import { dienstkontoToken, Mailer, nutzerToken } from './google';
 import { Siegel } from './siegel';
 import { slackPoster, versende } from './versand';
+import { aktualisiereKennzahlen } from './kennzahlen';
 
 interface Laufzeit {
   siegel: Siegel;
@@ -46,6 +47,9 @@ interface Laufzeit {
   versandSchluessel: string;
   /** Bot token of the Slack app "Velonify Hub" for posts into client channels. Empty = e-mail only. */
   slackToken: string;
+  /** Access tokens of analytics@velonify.de for GA4 and Search Console; null without ANALYTICS_REFRESH_TOKEN. */
+  analyticsToken: (() => Promise<string>) | null;
+  pagespeedKey: string;
 }
 
 let laufzeit: Laufzeit | null = null;
@@ -76,6 +80,10 @@ function holeLaufzeit(): Laufzeit {
     hubClientId: process.env.GOOGLE_CLIENT_ID ?? '',
     versandSchluessel: (process.env.VERSAND_SCHLUESSEL ?? '').trim(),
     slackToken: (process.env.SLACK_BOT_TOKEN ?? '').trim(),
+    analyticsToken: process.env.ANALYTICS_REFRESH_TOKEN
+      ? nutzerToken({ clientId: process.env.GMAIL_CLIENT_ID!, clientSecret: process.env.GMAIL_CLIENT_SECRET!.trim(), refreshToken: process.env.ANALYTICS_REFRESH_TOKEN.trim(), wofuer: 'Analytics' })
+      : null,
+    pagespeedKey: (process.env.PAGESPEED_API_KEY ?? '').trim(),
   };
   return laufzeit;
 }
@@ -136,18 +144,53 @@ async function wechseln(req: Request, res: Response, lz: Laufzeit): Promise<void
   json(res, 200, erstelleSitzung(lz.siegel, ziel, Date.now()));
 }
 
+/** The team member behind a hub Google token (Bearer); null after answering with an error. */
+async function teamMitglied(req: Request, res: Response, lz: Laufzeit): Promise<string | null> {
+  if (!lz.hubClientId) {
+    json(res, 503, { fehler: 'Der Team-Zugang ist nicht eingerichtet (GOOGLE_CLIENT_ID fehlt).' });
+    return null;
+  }
+  const token = /^Bearer (.+)$/i.exec(req.get('authorization') ?? '')?.[1] ?? '';
+  if (!token) {
+    json(res, 401, { fehler: 'Bitte im Hub neu anmelden.' });
+    return null;
+  }
+  try {
+    return await pruefeGoogleToken(token, { clientId: lz.hubClientId, domain: lz.teamDomain });
+  } catch (err) {
+    if (!(err instanceof ZugriffsFehler)) throw err;
+    json(res, err.status, { fehler: err.message });
+    return null;
+  }
+}
+
+/** Whether the request carries the scheduler's shared secret. */
+function vomScheduler(req: Request, lz: Laufzeit): boolean {
+  const gegeben = Buffer.from(req.get('x-versand-schluessel') ?? '');
+  const erwartet = Buffer.from(lz.versandSchluessel);
+  return erwartet.length > 0 && gegeben.length === erwartet.length && timingSafeEqual(gegeben, erwartet);
+}
+
+/**
+ * `POST /kennzahlen`: the scheduler (shared secret, every client, once a day) or the hub ("Jetzt abrufen", Google token
+ * of a team member, `{ firma_id }`) fetches GA4, Search Console and PageSpeed and stores the snapshot.
+ */
+async function kennzahlen(req: Request, res: Response, lz: Laufzeit): Promise<void> {
+  let firmaId: string | undefined;
+  if (!vomScheduler(req, lz)) {
+    if (!(await teamMitglied(req, res, lz))) return;
+    firmaId = String(eingabe(req).firma_id ?? '');
+    if (!firmaId) return json(res, 400, { fehler: 'firma_id fehlt.' });
+  }
+  const bericht = await aktualisiereKennzahlen(await store(lz), { googleToken: lz.analyticsToken, pagespeedKey: lz.pagespeedKey, jetzt: new Date() }, firmaId);
+  console.log(JSON.stringify({ kennzahlen: bericht, firma: firmaId ?? 'alle' }));
+  json(res, 200, bericht);
+}
+
 /** "Portal öffnen" in the hub: a team member with their hub Google token gets a team session for the firm. */
 async function vorschau(req: Request, res: Response, lz: Laufzeit): Promise<void> {
-  if (!lz.hubClientId) return json(res, 503, { fehler: 'Die Vorschau ist nicht eingerichtet (GOOGLE_CLIENT_ID fehlt).' });
-  const token = /^Bearer (.+)$/i.exec(req.get('authorization') ?? '')?.[1] ?? '';
-  if (!token) return json(res, 401, { fehler: 'Bitte im Hub neu anmelden.' });
-  let email: string;
-  try {
-    email = await pruefeGoogleToken(token, { clientId: lz.hubClientId, domain: lz.teamDomain });
-  } catch (err) {
-    if (err instanceof ZugriffsFehler) return json(res, err.status, { fehler: err.message });
-    throw err;
-  }
+  const email = await teamMitglied(req, res, lz);
+  if (!email) return;
   const firmaId = String(eingabe(req).firma_id ?? '');
   const s = await store(lz);
   if (!vorschauBerechtigung(await s.load(), firmaId, email)) return json(res, 404, { fehler: 'Diese Firma gibt es nicht (mehr).' });
@@ -333,9 +376,7 @@ async function einstellungen(req: Request, res: Response, lz: Laufzeit): Promise
 /** `POST /versand`: called by Cloud Scheduler every 15 minutes with the shared secret in `X-Versand-Schluessel`. */
 async function versand(req: Request, res: Response, lz: Laufzeit): Promise<void> {
   if (!lz.versandSchluessel) return json(res, 503, { fehler: 'Der Versand ist nicht eingerichtet (VERSAND_SCHLUESSEL fehlt).' });
-  const gegeben = Buffer.from(req.get('x-versand-schluessel') ?? '');
-  const erwartet = Buffer.from(lz.versandSchluessel);
-  if (gegeben.length !== erwartet.length || !timingSafeEqual(gegeben, erwartet)) return json(res, 403, { fehler: 'Nicht erlaubt.' });
+  if (!vomScheduler(req, lz)) return json(res, 403, { fehler: 'Nicht erlaubt.' });
   const drive = new GoogleDrive(lz.token);
   const bericht = await versende({
     store: await store(lz),
@@ -379,6 +420,7 @@ http('kundenportal', async (req: Request, res: Response) => {
     if (req.method === 'POST' && pfad === '/hochladen') return await hochladen(req, res, lz);
     if (req.method === 'POST' && pfad === '/einstellungen') return await einstellungen(req, res, lz);
     if (req.method === 'POST' && pfad === '/versand') return await versand(req, res, lz);
+    if (req.method === 'POST' && pfad === '/kennzahlen') return await kennzahlen(req, res, lz);
     const dateiPfad = /^\/datei\/([\w-]+)$/.exec(pfad);
     if (req.method === 'GET' && dateiPfad) return await datei(req, res, lz, dateiPfad[1]);
     if (req.method === 'GET' && pfad === '/') return json(res, 200, { dienst: 'velonify-kundenportal' });

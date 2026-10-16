@@ -1,4 +1,5 @@
 import { pruefeEinstellungen, type PortalEinstellungen } from './portalBenachrichtigung';
+import { prepareTracking, trackingVon, type TrackingEingabe } from './tracking';
 import { istZustaendig, mitPerson } from './zustaendig';
 import {
   DEFAULT_DEAL_TITEL,
@@ -142,6 +143,7 @@ import type {
   Wiedervorlage,
   WiedervorlageInput,
   WordleErgebnis,
+  KundenTracking,
 } from './types';
 
 export interface CrmDeps {
@@ -1325,6 +1327,20 @@ export class CrmService {
     const zugang: PortalZugang = { id: newId(ID_PREFIX.portal_zugaenge), firma_id: firmaId, kontakt_id: kontaktId, aktiv, zuletzt_am: '', updates: '', kanal_updates: '', kanal_hinweise: '', update_am: '', hinweise_bis: '', ...this.created() };
     await this.store.insert('portal_zugaenge', [zugang]);
     return zugang;
+  }
+
+  /** Where a client's numbers come from and whether the client sees them; one row per client, created on first save. */
+  async saveTracking(firmaId: string, eingabe: TrackingEingabe): Promise<KundenTracking> {
+    CrmService.find((await this.store.load()).firmen, firmaId);
+    const clean = prepareTracking(eingabe);
+    const vorhanden = trackingVon((await this.store.loadPortalDaten()).tracking, firmaId);
+    if (vorhanden) {
+      const [t] = await this.store.update('kunden_tracking', [{ id: vorhanden.id, changes: { ...clean, ...this.changed() } }]);
+      return t;
+    }
+    const t: KundenTracking = { id: newId(ID_PREFIX.kunden_tracking), firma_id: firmaId, ...clean, stand_am: '', fehler: '', daten: '', ...this.created() };
+    await this.store.insert('kunden_tracking', [t]);
+    return t;
   }
 
   /** Updates and notifications of one portal login, changed by the team (the client changes them in the portal). */
