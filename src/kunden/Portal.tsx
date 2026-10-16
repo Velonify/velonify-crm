@@ -13,6 +13,7 @@ import { errorMessage } from '../lib/errors';
 import { formatDate, formatDateTime } from '../lib/format';
 import { MeilensteinDialog, type Aendern } from './Dialoge';
 import { usePortalDaten } from './usePortalDaten';
+import { einstellungenVon, KANAELE, KANAL_LABEL, RHYTHMUS_LABEL, UPDATE_RHYTHMEN, type PortalEinstellungen } from '../data/portalBenachrichtigung';
 import { useAuth } from '../auth/AuthContext';
 import { config, isDemo } from '../config';
 
@@ -77,6 +78,14 @@ function Zugaenge({ firma, db, portal, aendern }: { firma: Firma; db: Database; 
                   <br />
                   {aktiv ? (zugang?.zuletzt_am ? `Zuletzt angemeldet ${formatDateTime(zugang.zuletzt_am)}` : 'Hat Zugang, noch nicht angemeldet') : moeglich ? 'Kein Zugang' : 'Keine E-Mail-Adresse – in der CRM-Akte ergänzen'}
                 </div>
+                {aktiv && zugang && (
+                  <EinstellungenZeile
+                    werte={einstellungenVon(zugang)}
+                    slack={!!firma.slack_channel.trim()}
+                    disabled={laeuft !== ''}
+                    onChange={(e) => void schalten(`e-${k.id}`, (s) => s.setPortalEinstellungen(zugang.id, e), `Benachrichtigungen für ${kontaktName(k)} gespeichert`)}
+                  />
+                )}
               </div>
               <Schalter
                 an={aktiv}
@@ -88,8 +97,40 @@ function Zugaenge({ firma, db, portal, aendern }: { firma: Firma; db: Database; 
           );
         })}
       </ul>
-      <p className="hint">Angemeldet wird per Link an die E-Mail-Adresse, ohne Passwort. Das Portal selbst kommt im nächsten Schritt, bis dahin bereitet ihr hier die Zugänge vor.</p>
+      <p className="hint">Angemeldet wird per Link an die E-Mail-Adresse, ohne Passwort. Updates und Sofort-Benachrichtigungen stellt jede Person im Portal selbst ein; hier könnt ihr sie für sie ändern.</p>
     </Card>
+  );
+}
+
+/** Summary rhythm and the channels of one login, saved on change. Slack only with a channel at the firm. */
+function EinstellungenZeile({ werte, slack, disabled, onChange }: { werte: PortalEinstellungen; slack: boolean; disabled: boolean; onChange: (e: PortalEinstellungen) => void }) {
+  const kanal = (name: 'kanal_updates' | 'kanal_hinweise', label: string) => (
+    <label>
+      <span>{label}</span>
+      <select value={werte[name]} disabled={disabled} onChange={(e) => onChange({ ...werte, [name]: e.target.value })}>
+        {KANAELE.map((k) => (
+          <option key={k} value={k} disabled={k !== 'email' && !slack}>
+            {KANAL_LABEL[k]}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+  return (
+    <div className="portal-einstellungen">
+      <label>
+        <span>Updates</span>
+        <select value={werte.updates} disabled={disabled} onChange={(e) => onChange({ ...werte, updates: e.target.value as PortalEinstellungen['updates'] })}>
+          {UPDATE_RHYTHMEN.map((r) => (
+            <option key={r} value={r}>
+              {RHYTHMUS_LABEL[r]}
+            </option>
+          ))}
+        </select>
+      </label>
+      {werte.updates !== 'aus' && kanal('kanal_updates', 'per')}
+      {kanal('kanal_hinweise', 'Sofort-Hinweise per')}
+    </div>
   );
 }
 
@@ -226,8 +267,8 @@ function Sichtbar({ firma, kunden, todos, portal }: { firma: Firma; kunden?: Kun
 }
 
 /**
- * Opens the client's portal in a new tab as a read-only preview: the portal function checks the hub's Google token
- * and hands out an 8-hour preview session, which goes to the portal in the address (#/vorschau/<session>).
+ * Opens the client's portal in a new tab with every function (team access): the portal function checks the hub's
+ * Google token and hands out an 8-hour team session, which goes to the portal in the address (#/vorschau/<session>).
  */
 function AlsKundeAnsehen({ firma }: { firma: Firma }) {
   const { getToken } = useAuth();
