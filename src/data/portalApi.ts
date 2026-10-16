@@ -7,6 +7,7 @@ import { CLIENT_SHARE_ORDNER } from './kunden';
 import { freigabeVon, meilensteineVon, type FreigabeStatus } from './portal';
 import { checklisteVon, erledigtSpalte, spaltenVon } from './todos';
 import { loginMailHtml } from './portalMail';
+import { teamTelefonSchluessel } from './constants';
 import { slackChannelUrl } from './start';
 import { personen } from './zustaendig';
 import type { Aufgabe, AufgabenKommentar, Board, Database, Firma, Kontakt, KundenDaten, MeilensteinStatus, PortalDaten, PortalZugang, Spalte, TodoDaten } from './types';
@@ -69,6 +70,8 @@ export interface Kundensicht {
   /** All clients this person may open (same e-mail, active login each), for the switcher; the current one included. */
   firmen: { id: string; name: string }[];
   team: string[];
+  /** Phone numbers of the team members in `team` (name as clients see it → number); missing when not set. */
+  telefone: Record<string, string>;
   fahrplan: { titel: string; datum: string; status: MeilensteinStatus }[];
   karten: PortalKarte[];
   news: { id: string; art: string; titel: string; text: string; datum: string }[];
@@ -259,6 +262,11 @@ export function kundensicht(args: {
       .map((b) => ({ id: b.firma.id, name: b.firma.name }))
       .sort((a, b) => a.name.localeCompare(b.name, 'de')),
     team: fuerKunden(firma.zustaendig),
+    telefone: Object.fromEntries(
+      personen(firma.zustaendig)
+        .map((n) => [KUNDEN_NAME[n] ?? n, (args.db.einstellungen?.[teamTelefonSchluessel(n)] ?? '').trim()])
+        .filter(([, nummer]) => nummer),
+    ),
     fahrplan: meilensteineVon(portal.meilensteine, firma.id).map((m) => ({ titel: m.titel, datum: m.datum, status: m.status })),
     karten: [...offen, ...erledigt].map((a) => portalKarte(a, kontext)),
     news: kunden.news

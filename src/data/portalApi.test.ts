@@ -93,6 +93,10 @@ describe('portal API', () => {
     // Only the team member's own comments count as "Du", never the client's.
     expect(vorschau.karten.flatMap((k) => k.kommentare).filter((c) => c.ich).every((c) => c.team)).toBe(true);
     expect(vorschauBerechtigung(db, 'F-GIBTSNICHT', 'lukas@velonify.de')).toBeNull();
+    expect(sicht.telefone).toEqual({});
+    const mitNummer = kundensicht({ berechtigung: team, db: { ...db, einstellungen: { ...db.einstellungen, telefon_team_Johannes: ' +49 151 000000 ', telefon_team_Julian: '+49 160 1' } }, kunden, todos: await service.loadTodoDaten(), portal, dateien: [], teamDomain: 'velonify.de' });
+    // Only people looking after this client, under the name the client sees.
+    expect(mitNummer.telefone).toEqual({ Johannes: '+49 151 000000' });
     expect(sicht.slack).toEqual({ channel: 'client-agk-general', url: expect.stringContaining('app_redirect?channel=client-agk-general') });
     const titel = sicht.karten.map((k) => k.titel);
     expect(titel).toContain('Black-Week-Banner einbauen');

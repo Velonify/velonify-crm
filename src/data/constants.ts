@@ -113,6 +113,9 @@ export const FIRMEN_LINKS = [
   { einstellung: 'link_notion', label: 'Notion', hinweis: 'Velonify-Workspace' },
 ] as const;
 
+/** Phone number of a team member (name as in the team list, e.g. "Lugge"), shown to clients in the portal. */
+export const teamTelefonSchluessel = (name: string) => `telefon_team_${name.trim()}`;
+
 /** Folder names in the shared drive, used by "Ordner automatisch suchen". */
 export const DRIVE_ORDNER_NAMEN = {
   leads: '01_Leads',
