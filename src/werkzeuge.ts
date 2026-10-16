@@ -49,7 +49,7 @@ export const WERKZEUGE: Werkzeug[] = [
     kurz: 'Kunden',
     beschreibung: 'Client-Hub: Dateien, Tools, Ressourcen und News je Kunde',
     pfad: '/kunden',
-    navigation: [{ label: 'Alle Kunden', pfad: '/kunden' }],
+    navigation: [{ label: 'Alle Kunden', pfad: '/kunden', end: true }],
   },
   {
     id: 'todo',
