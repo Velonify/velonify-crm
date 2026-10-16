@@ -57,7 +57,7 @@ describe('holeKennzahlen', () => {
 
   it('names a missing viewer right and keeps the other sources', async () => {
     const { daten, fehler } = await holeKennzahlen(QUELLEN, { googleToken: async () => 'T', pagespeedKey: '', fetch: googleFetch({ gscStatus: 403 }), jetzt: JETZT });
-    expect(fehler).toEqual(['Search Console: kein Zugriff – analytics@velonify.de als Betrachter hinzufügen.']);
+    expect(fehler).toEqual(['Search Console: kein Zugriff – hallo@velonify.de als Betrachter hinzufügen.']);
     expect(daten.gsc).toBeUndefined();
     expect(daten.ga4).toBeDefined();
   });

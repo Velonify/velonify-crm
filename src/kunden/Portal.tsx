@@ -222,7 +222,7 @@ const mitVeraenderung = (jetzt: number, vorher: number) => {
 
 /**
  * Tracking hub of the client: GA4 property, Search Console property and the page for PageSpeed. The portal function
- * fetches the numbers every morning with analytics@velonify.de; "Jetzt abrufen" does it right away.
+ * fetches the numbers every morning with hallo@velonify.de; "Jetzt abrufen" does it right away.
  */
 function Tracking({ firma, portal, aendern, reload }: { firma: Firma; portal: PortalDaten; aendern: Aendern; reload: () => void }) {
   const { getToken } = useAuth();
@@ -277,7 +277,7 @@ function Tracking({ firma, portal, aendern, reload }: { firma: Firma; portal: Po
   return (
     <Card title="Tracking">
       <p className="muted small">
-        Damit wir die Zahlen lesen dürfen, muss <strong>analytics@velonify.de</strong> in Google Analytics (Property-Zugriff, Rolle „Betrachter“) und in der Search
+        Damit wir die Zahlen lesen dürfen, muss <strong>hallo@velonify.de</strong> in Google Analytics (Property-Zugriff, Rolle „Betrachter“) und in der Search
         Console (Nutzer, „Eingeschränkt“) eingetragen sein – vom Kunden oder von uns.
       </p>
       <div className="grid">

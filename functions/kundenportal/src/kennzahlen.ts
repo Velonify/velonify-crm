@@ -4,7 +4,7 @@ import type { KundenTracking } from '../../../src/data/types';
 import { pagespeed, type Strategie } from '../../shop-audit/src/pagespeed';
 
 export interface KennzahlenAbhaengigkeiten {
-  /** Access token of analytics@velonify.de (scopes analytics.readonly, webmasters.readonly); null = not set up. */
+  /** Access token of hallo@velonify.de (scopes analytics.readonly, webmasters.readonly); null = not set up. */
   googleToken: (() => Promise<string>) | null;
   pagespeedKey: string;
   fetch?: typeof fetch;
@@ -39,7 +39,7 @@ export async function holeKennzahlen(t: Pick<KundenTracking, 'ga4_property' | 'g
   const fehler: string[] = [];
   const merke = (err: unknown, quelle: string) => fehler.push(err instanceof QuellenFehler ? err.message : `${quelle}: ${err instanceof Error ? err.message.slice(0, 160) : 'Fehler'}`);
   const token = (t.ga4_property || t.gsc_site) && d.googleToken ? await d.googleToken() : '';
-  if ((t.ga4_property || t.gsc_site) && !d.googleToken) fehler.push('GA4/Search Console: Zugang von analytics@velonify.de ist nicht eingerichtet.');
+  if ((t.ga4_property || t.gsc_site) && !d.googleToken) fehler.push('GA4/Search Console: Zugang von hallo@velonify.de ist nicht eingerichtet.');
 
   const ga4 = async () => {
     const z = zeitraum(d.jetzt);

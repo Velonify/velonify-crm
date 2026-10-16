@@ -64,12 +64,12 @@ gcloud scheduler jobs create http kundenportal-versand --project=velonify-crm --
 
 Je Kunde im Hub (Kundenseite → Portal → Tracking): GA4-Property-ID, Search-Console-Property, Seite für PageSpeed und ob der Kunde den Tab „Zahlen“ sieht (Tabelle `kunden_tracking`, Migration 008). `POST /kennzahlen` holt die letzten 28 Tage gegen die 28 davor (Search Console zwei Tage versetzt) und PageSpeed mobil + Desktop und speichert den Stand als JSON in `kunden_tracking.daten`. Aufruf vom Scheduler (Header `X-Versand-Schluessel`, alle Kunden) oder aus dem Hub („Jetzt abrufen“, Google-Token, `{ firma_id }`). Fällt eine Quelle aus, bleiben die Zahlen vom Vortag stehen, der Grund steht in `fehler` und im Hub.
 
-GA4 und Search Console liest das Konto **analytics@velonify.de**: Der Kunde (oder wir) trägt es in GA4 als Betrachter und in der Search Console als Nutzer ein.
+GA4 und Search Console liest das Konto **hallo@velonify.de**: Der Kunde (oder wir) trägt es in GA4 als Betrachter und in der Search Console als Nutzer ein.
 
 Einrichtung:
 ```bash
 gcloud services enable analyticsdata.googleapis.com searchconsole.googleapis.com --project=velonify-crm
-# Token holen (OAuth-Client wie für die Mail), als analytics@velonify.de anmelden:
+# Token holen (OAuth-Client wie für die Mail), als hallo@velonify.de anmelden:
 GMAIL_CLIENT_ID=… GMAIL_CLIENT_SECRET=… node scripts/analytics-token.mjs
 printf %s '<REFRESH-TOKEN>' | gcloud secrets create kundenportal-analytics-token --data-file=- --project=velonify-crm
 for s in kundenportal-analytics-token pagespeed-api-key; do

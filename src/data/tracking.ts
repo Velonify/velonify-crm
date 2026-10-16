@@ -1,6 +1,6 @@
 /**
  * Tracking hub: a client's numbers from Google Analytics 4, Search Console and PageSpeed. The portal function fetches
- * them once a day with analytics@velonify.de (added as viewer by the client or by us) and keeps the last snapshot in
+ * them once a day with hallo@velonify.de (added as viewer by the client or by us) and keeps the last snapshot in
  * kunden_tracking.daten; the hub and the portal only read that snapshot.
  */
 import { ValidationError } from './errors';
@@ -207,9 +207,9 @@ export function gscAuswerten(args: { summe: GscAntwort; vorher: GscAntwort; such
   };
 }
 
-/** Human error text for the team when a source fails (403 = analytics@ is not a viewer yet). */
+/** Human error text for the team when a source fails (403 = hallo@ is not a viewer yet). */
 export function quellenFehler(quelle: 'GA4' | 'Search Console' | 'PageSpeed', status: number, text: string): string {
-  if (status === 403) return `${quelle}: kein Zugriff – analytics@velonify.de als Betrachter hinzufügen.`;
+  if (status === 403) return `${quelle}: kein Zugriff – hallo@velonify.de als Betrachter hinzufügen.`;
   if (status === 404) return `${quelle}: Property nicht gefunden – ID prüfen.`;
   return `${quelle}: ${status || 'Fehler'} ${text.slice(0, 140)}`.trim();
 }
