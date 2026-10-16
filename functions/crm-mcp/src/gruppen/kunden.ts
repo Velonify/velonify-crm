@@ -396,8 +396,10 @@ export function registriereKunden(k: Werkzeugkasten): void {
       const [db, { news }] = await Promise.all([service.load(), service.loadKundenDaten()]);
       const alt = finde(news, news_id, 'Meldung', 'kunde_anzeigen');
       const firmaId = kunde === undefined ? alt.firma_id : klein(kunde) === 'alle' ? '' : findeKunde(db, kunde).id;
+      // A visible message moved to another client (or to all) must not show up there unasked.
+      const sichtbar = firmaId !== alt.firma_id ? false : alt.sichtbar_kunde;
       const neu = await service.saveKundenNews(
-        { firma_id: firmaId, art: alt.art, titel: alt.titel, text: alt.text, datum: alt.datum, angeheftet: alt.angeheftet, sichtbar_kunde: alt.sichtbar_kunde, ...ohneUndefined(felder) },
+        { firma_id: firmaId, art: alt.art, titel: alt.titel, text: alt.text, datum: alt.datum, angeheftet: alt.angeheftet, sichtbar_kunde: sichtbar, ...ohneUndefined(felder) },
         { id: alt.id, expectedGeaendertAm: alt.geaendert_am },
       );
       const firma = db.firmen.find((f) => f.id === neu.firma_id);

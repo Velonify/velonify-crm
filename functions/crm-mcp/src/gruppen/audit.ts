@@ -382,6 +382,11 @@ export function registriereAudit(k: Werkzeugkasten): void {
     sicher(async ({ audit_id, firma_id, als_lead_anlegen }) => {
       const [db, audits] = await Promise.all([service.load(), service.loadAudits()]);
       const audit = finde(audits, audit_id, 'Audit', 'audits');
+      // Like the hub, only audits without a firm get assigned; moving one to another firm is not offered there.
+      if (audit.firma_id) {
+        const bisher = db.firmen.find((f) => f.id === audit.firma_id);
+        return fehler(`Das Audit gehört schon zu ${bisher ? `${bisher.name} (firma_id ${bisher.id})` : `firma_id ${audit.firma_id}`}. Nichts geändert.`);
+      }
       const domain = domainSchluessel(audit.domain);
       const gleicheDomain = db.firmen.find((f) => !f.archiviert && f.domain && domainSchluessel(f.domain) === domain);
       let zielId = firma_id;

@@ -306,7 +306,10 @@ export function registriereEingang(k: Werkzeugkasten): void {
       if (!firma_id && !firma) return fehler('Entweder firma_id oder firma angeben.');
       const db = await service.load();
       const ich = meinName(db) ?? '';
-      if (firma_id) finde(db.firmen, firma_id, 'Firma');
+      if (firma_id) {
+        const bestehend = finde(db.firmen, firma_id, 'Firma');
+        if (bestehend.archiviert) return fehler(`„${bestehend.name}“ ist archiviert. Andere Firma wählen oder sie erst wiederherstellen.`);
+      }
       const firmaInput = { ...EMPTY_FIRMA_INPUT, quelle: 'LinkedIn', zustaendig: ich, ...ohneUndefined(firma ?? { name: '' }) };
       if (!firma_id) {
         pruefeTeam(db, firmaInput.zustaendig);
@@ -648,6 +651,12 @@ export function registriereEingang(k: Werkzeugkasten): void {
       const kandidaten = await api.details(gesucht);
       const unbekannt = gesucht.filter((d) => !kandidaten.some((kd) => kd.domain === d));
       if (unbekannt.length > 0) return fehler(`Nicht geprüft oder unbekannt: ${unbekannt.join(', ')}. Domains über \`lead_finder_backlog\` holen. Nichts übernommen.`);
+      // The hub only takes shops from the backlog: qualified or released, and not yet decided otherwise.
+      const details = await Promise.all(gesucht.map((d) => api.detail(d)));
+      const gesperrt = details.filter((d) => !(d.entscheidung === 'freigegeben' || (d.kandidat.qualifiziert && (!d.entscheidung || d.entscheidung === 'zurueckgestellt'))));
+      if (gesperrt.length > 0) {
+        return fehler(`Nicht übernehmbar (nicht qualifiziert oder schon entschieden): ${gesperrt.map((d) => `${d.kandidat.domain}${d.entscheidung ? ` (${d.entscheidung})` : ''}`).join(', ')}. Nichts übernommen.`);
+      }
 
       // The same steps as useUebernahme in src/leads/useLeadFinder.ts.
       const plan = planeImport(importZeilen(kandidaten, sicht), db, {

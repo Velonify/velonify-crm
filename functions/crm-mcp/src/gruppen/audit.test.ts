@@ -42,6 +42,10 @@ describe('Shop-Audit', () => {
     const firma = (await service.load()).firmen.find((f) => f.id === neu.daten.firma_id)!;
     expect(firma).toMatchObject({ name: 'neuer-testshop.example', quelle: 'Shop-Audit', status: 'lead' });
     expect((await service.loadAudits()).find((a) => a.id === daten.audit_id)?.firma_id).toBe(firma.id);
+
+    const umhaengen = await rufe('audit_zuordnen', { audit_id: daten.audit_id, als_lead_anlegen: true });
+    expect(umhaengen.fehler).toBe(true);
+    expect(umhaengen.text).toContain('gehört schon zu');
   });
 
   it('meldet, wenn das Shop-Audit nicht eingerichtet ist', async () => {

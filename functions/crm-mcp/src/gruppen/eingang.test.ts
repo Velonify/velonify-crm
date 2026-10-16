@@ -167,6 +167,10 @@ describe('Eingang: Lead-Finder', () => {
 
     const unbekannt = await rufe('lead_finder_uebernehmen', { domains: ['nicht-geprueft.example'] });
     expect(unbekannt.fehler).toBe(true);
+
+    const nochmal = await rufe('lead_finder_uebernehmen', { domains: [shop.domain] });
+    expect(nochmal.fehler).toBe(true);
+    expect(nochmal.text).toContain('schon entschieden');
   });
 
   it('lehnt ab, stellt zurück und gibt manuell geprüfte Shops frei', async () => {
