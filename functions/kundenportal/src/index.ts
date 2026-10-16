@@ -47,7 +47,7 @@ interface Laufzeit {
   versandSchluessel: string;
   /** Bot token of the Slack app "Velonify Hub" for posts into client channels. Empty = e-mail only. */
   slackToken: string;
-  /** Access tokens of analytics@velonify.de for GA4 and Search Console; null without ANALYTICS_REFRESH_TOKEN. */
+  /** Access tokens of hallo@velonify.de for GA4 and Search Console; null without ANALYTICS_REFRESH_TOKEN. */
   analyticsToken: (() => Promise<string>) | null;
   pagespeedKey: string;
 }

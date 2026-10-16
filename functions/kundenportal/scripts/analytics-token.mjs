@@ -1,7 +1,7 @@
-// One-time: fetches a refresh token that lets the portal read GA4 and Search Console as analytics@velonify.de (read only).
+// One-time: fetches a refresh token that lets the portal read GA4 and Search Console as hallo@velonify.de (read only).
 // Usage: GMAIL_CLIENT_ID=… GMAIL_CLIENT_SECRET=… node scripts/analytics-token.mjs
 // The CRM's OAuth client is a web client: add http://127.0.0.1:53682 once under „Autorisierte Weiterleitungs-URIs“.
-// Open the printed link, sign in as analytics@velonify.de, allow – the token is printed here.
+// Open the printed link, sign in as hallo@velonify.de, allow – the token is printed here.
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
 
@@ -45,8 +45,8 @@ server.listen(PORT, '127.0.0.1', () => {
     scope: 'https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly',
     access_type: 'offline',
     prompt: 'consent',
-    login_hint: 'analytics@velonify.de',
+    login_hint: 'hallo@velonify.de',
     state,
   });
-  console.log(`Im Browser öffnen und als analytics@velonify.de anmelden:\n\nhttps://accounts.google.com/o/oauth2/v2/auth?${params}\n`);
+  console.log(`Im Browser öffnen und als hallo@velonify.de anmelden:\n\nhttps://accounts.google.com/o/oauth2/v2/auth?${params}\n`);
 });

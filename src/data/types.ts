@@ -792,7 +792,7 @@ export interface PortalWerkzeug extends Meta {
 
 /**
  * Where a client's numbers come from (GA4 property, Search Console property, page for PageSpeed) and the last
- * snapshot the portal function fetched with analytics@velonify.de. One row per client.
+ * snapshot the portal function fetched with hallo@velonify.de. One row per client.
  */
 export interface KundenTracking extends Meta {
   id: string;
