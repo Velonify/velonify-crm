@@ -1,12 +1,13 @@
 import { createHash } from 'node:crypto';
 
-/** Sheets for the data, Drive for client folders – the same as the hub, without Calendar. */
+/** Sheets for the data, Drive for client folders, Calendar for appointments – the same as the hub. */
 export const GOOGLE_SCOPES = [
   'openid',
   'email',
   'profile',
   'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/drive',
+  'https://www.googleapis.com/auth/calendar.events',
 ];
 
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -92,7 +93,7 @@ export async function tauscheGoogleCode(
     throw new ZugriffVerweigert(`Nur für Konten mit @${konfig.domain}.`);
   }
   const fehlend = GOOGLE_SCOPES.filter((s) => s.startsWith('https://') && !(daten.scope ?? '').split(' ').includes(s));
-  if (fehlend.length > 0) throw new ZugriffVerweigert('Bitte bei Google alle Häkchen setzen: Das CRM braucht Sheets und Drive.');
+  if (fehlend.length > 0) throw new ZugriffVerweigert('Bitte bei Google alle Häkchen setzen: Das CRM braucht Sheets, Drive und Kalender.');
   if (!daten.refresh_token) throw new Error('Google hat kein Refresh-Token geschickt. Bitte die Verbindung neu herstellen.');
   return { person: { email, name: String(claims.name ?? '') }, refreshToken: daten.refresh_token };
 }

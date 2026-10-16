@@ -29,6 +29,14 @@ describe('pruefeGoogleToken', () => {
     await expect(pruefe('t5', { aud: CLIENT_ID, email: 'a@notvelonify.de', email_verified: 'true' })).rejects.toMatchObject({ status: 403 });
   });
 
+  it('accepts the tokens of every listed client, e.g. the hub and the CRM MCP server', async () => {
+    const zwei = (token: string, aud: string) =>
+      pruefeGoogleToken(token, { clientId: `${CLIENT_ID}, mcp-456.apps.googleusercontent.com`, domain: 'velonify.de', fetch: fakeFetch({ aud, email: 'a@velonify.de', email_verified: 'true' }).f });
+    await expect(zwei('t7', 'mcp-456.apps.googleusercontent.com')).resolves.toBe('a@velonify.de');
+    await expect(zwei('t8', CLIENT_ID)).resolves.toBe('a@velonify.de');
+    await expect(zwei('t9', 'other')).rejects.toMatchObject({ status: 401 });
+  });
+
   it('treats a token Google does not know as expired', async () => {
     await expect(pruefe('t6', { error: 'invalid_token' }, false)).rejects.toBeInstanceOf(ZugriffsFehler);
   });
