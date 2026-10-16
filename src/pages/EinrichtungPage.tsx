@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/Toasts';
 import { Card, ErrorBox, FormError, Loading, PageHeader } from '../components/ui';
 import { config, isDemo, spreadsheetUrl } from '../config';
-import { DEFAULT_DEAL_TITEL, DRIVE_ORDNER_NAMEN, EINSTELLUNG, FIRMEN_LINKS } from '../data/constants';
+import { DEFAULT_DEAL_TITEL, DRIVE_ORDNER_NAMEN, EINSTELLUNG, FIRMEN_LINKS, teamTelefonSchluessel } from '../data/constants';
 import { useCrm } from '../data/CrmContext';
 import { AuthExpiredError } from '../data/errors';
 import { driveFolderUrl, type DriveFile } from '../data/google/drive';
@@ -254,6 +254,53 @@ function TeamKarte() {
   );
 }
 
+/** Phone numbers of the team, shown to clients in the portal next to the people looking after them. */
+function TelefonKarte() {
+  const { db, mutate } = useCrm();
+  const toast = useToast();
+  const team = db?.listen.team ?? [];
+  const [werte, setWerte] = useState<Record<string, string>>(() => Object.fromEntries(team.map((n) => [teamTelefonSchluessel(n), db?.einstellungen[teamTelefonSchluessel(n)] ?? ''])));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>();
+  const ungueltig = team.filter((n) => (werte[teamTelefonSchluessel(n)] ?? '').trim() && !/^\+?[\d\s/()-]{6,}$/.test(werte[teamTelefonSchluessel(n)].trim()));
+
+  const speichern = async () => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      const bereinigt = Object.fromEntries(Object.entries(werte).map(([k, v]) => [k, v.trim()]));
+      await mutate((s) => s.saveEinstellungen(bereinigt));
+      setWerte(bereinigt);
+      toast.show('Telefonnummern gespeichert');
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card title="4. Telefonnummern im Kundenportal">
+      <p className="muted">Kunden sehen unter „Dein Team bei Velonify“ die Nummer jeder Person, die für sie zuständig ist. Leere Felder erscheinen nicht.</p>
+      <div className="grid">
+        {team.map((n) => (
+          <label key={n} className={`field${ungueltig.includes(n) ? ' invalid' : ''}`}>
+            <span className="field-label">{n}</span>
+            <input type="tel" value={werte[teamTelefonSchluessel(n)] ?? ''} onChange={(e) => setWerte((w) => ({ ...w, [teamTelefonSchluessel(n)]: e.target.value }))} placeholder="+49 …" />
+            {ungueltig.includes(n) && <small className="field-hint">Nur Ziffern, Leerzeichen und + / ( ) -</small>}
+          </label>
+        ))}
+      </div>
+      <FormError error={error} />
+      <div className="form-actions">
+        <button type="button" className="button primary" onClick={speichern} disabled={busy || ungueltig.length > 0}>
+          {busy ? 'Speichert …' : 'Speichern'}
+        </button>
+      </div>
+    </Card>
+  );
+}
+
 function LinksKarte() {
   const { db, mutate } = useCrm();
   const toast = useToast();
@@ -278,7 +325,7 @@ function LinksKarte() {
   };
 
   return (
-    <Card title="4. Links auf der Startseite">
+    <Card title="5. Links auf der Startseite">
       <p className="muted">Firmenweite Adressen für den Schnellzugriff. Leere Felder erscheinen nicht auf der Startseite.</p>
       <div className="grid">
         {FIRMEN_LINKS.map((l) => (
@@ -320,6 +367,7 @@ export function EinrichtungPage() {
       {/* Remount once data is there, so the fields start with the saved values. */}
       <DriveKarte key={db ? 'bereit' : 'laedt'} />
       <TeamKarte />
+      <TelefonKarte key={db ? 'bereit' : 'laedt'} />
       <LinksKarte key={db ? 'bereit' : 'laedt'} />
     </div>
   );
