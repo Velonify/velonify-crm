@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { isDemo } from '../config';
 import { useCrm } from '../data/CrmContext';
+import { kundenListe } from '../data/kunden';
 import { useTheme } from '../lib/useTheme';
 import { WERKZEUGE, seitentitel, werkzeugFuerPfad } from '../werkzeuge';
 import { Glocke } from './Glocke';
@@ -65,6 +66,18 @@ export function Layout() {
             </NavLink>
           ))}
         </nav>
+        {/* In the client hub: every client one click away, also from inside a client. */}
+        {werkzeug.id === 'kunden' && db && kundenListe(db).length > 0 && (
+          <nav className="nav nav-kunden" aria-label="Kunden">
+            <span className="nav-abschnitt">Kunden</span>
+            {kundenListe(db).map((f) => (
+              <NavLink key={f.id} to={`/kunden/${f.id}`} className={navClass} title={f.name}>
+                {f.kuerzel && <span className="nav-kuerzel">{f.kuerzel}</span>}
+                <span className="nav-name">{f.name}</span>
+              </NavLink>
+            ))}
+          </nav>
+        )}
         <div className="sidebar-footer">
           <div className="segmented theme-switch" role="radiogroup" aria-label="Darstellung">
             <button type="button" role="radio" aria-checked={theme === 'light'} className={theme === 'light' ? 'is-active' : ''} onClick={() => setTheme('light')}>
