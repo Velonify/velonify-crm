@@ -38,6 +38,28 @@ Im Hub auf der Kundenseite → Reiter „Portal“ → **Portal öffnen**. Der H
 
 Der Hub braucht dafür die Repo-Variable `KUNDENPORTAL_API_URL`, die Function `GOOGLE_CLIENT_ID` (Client-ID des Hubs). `https://crm.velonify.de` ist als Origin immer erlaubt (`HUB_URL` ändert das).
 
+## Updates und Benachrichtigungen
+
+Jeder Kontakt stellt im Portal unter **Benachrichtigungen** ein (Hub: Kundenseite → Portal → Zugänge):
+- **Updates** (Zusammenfassung): täglich (werktags), wöchentlich (montags), monatlich (am 1.) jeweils ab 8 Uhr, oder aus. Standard: wöchentlich. Ohne Inhalt wird nichts geschickt.
+- **Sofort-Benachrichtigungen** (immer an): Freigabe nötig, Antwort vom Team, Meilenstein erreicht, neue Datei in 07_Client-Share, sichtbare Neuigkeit. Eigene Aktionen des Kontakts lösen nichts aus.
+- **Weg** je Art: E-Mail, Slack (Channel der Firma) oder beides. Slack geht pro Kunde und Lauf nur einmal raus; klappt Slack nicht, kommt eine E-Mail.
+
+`POST /versand` erledigt einen Lauf und wird von Cloud Scheduler alle 15 Minuten aufgerufen (Header `X-Versand-Schluessel`). Jeder Zugang merkt sich `hinweise_bis` und `update_am`; der erste Lauf startet nur die Uhr. Fehlgeschlagene Mails werden im nächsten Lauf wiederholt. Für Slack muss die App „Velonify Hub“ im Channel des Kunden sein (`/invite @Velonify Hub`).
+
+Einrichtung:
+```bash
+openssl rand -hex 32 | tr -d '\n' | gcloud secrets create kundenportal-versand --data-file=- --project=velonify-crm
+for s in kundenportal-versand velonify-slack-bot-token; do
+  gcloud secrets add-iam-policy-binding $s --member=serviceAccount:kundenportal@velonify-crm.iam.gserviceaccount.com --role=roles/secretmanager.secretAccessor --project=velonify-crm
+done
+# Deploy wie unten, zusätzlich: --update-secrets=VERSAND_SCHLUESSEL=kundenportal-versand:latest,SLACK_BOT_TOKEN=velonify-slack-bot-token:latest
+gcloud scheduler jobs create http kundenportal-versand --project=velonify-crm --location=europe-west3 \
+  --schedule='*/15 * * * *' --time-zone=Europe/Berlin --http-method=POST \
+  --uri=https://europe-west3-velonify-crm.cloudfunctions.net/kundenportal/versand \
+  --headers=X-Versand-Schluessel=$(gcloud secrets versions access latest --secret=kundenportal-versand --project=velonify-crm)
+```
+
 ## Einrichtung (einmalig)
 
 1. **Dienstkonto**

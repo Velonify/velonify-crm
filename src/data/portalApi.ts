@@ -10,6 +10,7 @@ import { loginMailHtml } from './portalMail';
 import { teamTelefonSchluessel } from './constants';
 import { slackChannelUrl } from './start';
 import { personen } from './zustaendig';
+import type { PortalEinstellungen } from './portalBenachrichtigung';
 import type { Aufgabe, AufgabenKommentar, Board, Database, Firma, Kontakt, KundenDaten, MeilensteinStatus, PortalDaten, PortalZugang, Spalte, TodoDaten } from './types';
 
 export { CLIENT_SHARE_ORDNER };
@@ -72,6 +73,8 @@ export interface Kundensicht {
   team: string[];
   /** Phone numbers of the team members in `team` (name as clients see it → number); missing when not set. */
   telefone: Record<string, string>;
+  /** Updates and notifications of the logged-in contact; null in the team access (they belong to a person). */
+  einstellungen: PortalEinstellungen | null;
   fahrplan: { titel: string; datum: string; status: MeilensteinStatus }[];
   karten: PortalKarte[];
   news: { id: string; art: string; titel: string; text: string; datum: string }[];
@@ -116,7 +119,7 @@ export function vorschauBerechtigung(db: Pick<Database, 'firmen'>, firmaId: stri
   if (!firma) return null;
   const email = normalisiereEmail(teamEmail);
   const kontakt = { id: '', firma_id: firma.id, vorname: teamVorname(email), nachname: '(Velonify)', email } as Kontakt;
-  const zugang = { id: '', firma_id: firma.id, kontakt_id: '', aktiv: true, zuletzt_am: '' } as PortalZugang;
+  const zugang = { id: '', firma_id: firma.id, kontakt_id: '', aktiv: true, zuletzt_am: '', updates: '', kanal_updates: '', kanal_hinweise: '', update_am: '', hinweise_bis: '' } as PortalZugang;
   return { zugang, kontakt, firma };
 }
 
@@ -233,6 +236,8 @@ export function kundensicht(args: {
   teamDomain: string;
   /** E-mail of the team member for a preview session */
   vorschau?: string;
+  /** Settings of the contact (see portalBenachrichtigung.ts); left out = none (team access) */
+  einstellungen?: PortalEinstellungen | null;
   /** All logins of the same e-mail (see `alleBerechtigungen`) */
   andere?: readonly Berechtigung[];
 }): Kundensicht {
@@ -258,6 +263,7 @@ export function kundensicht(args: {
       : null,
     ich: { vorname: kontakt.vorname, nachname: kontakt.nachname, email: kontakt.email },
     vorschau: args.vorschau ?? null,
+    einstellungen: args.einstellungen ?? null,
     firmen: (args.andere?.length ? args.andere : [berechtigung])
       .map((b) => ({ id: b.firma.id, name: b.firma.name }))
       .sort((a, b) => a.name.localeCompare(b.name, 'de')),

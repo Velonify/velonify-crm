@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { http, type Request, type Response } from '@google-cloud/functions-framework';
 import { ConflictError, ValidationError } from '../../../src/data/errors';
 import { GoogleDrive } from '../../../src/data/google/drive';
@@ -18,6 +19,7 @@ import {
   VOM_KUNDEN_ORDNER,
   ZU_GROSS,
 } from '../../../src/data/portalAktionen';
+import { einstellungenVon, pruefeEinstellungen } from '../../../src/data/portalBenachrichtigung';
 import { SheetsClient } from '../../../src/data/sheets/sheetsClient';
 import { SheetStore } from '../../../src/data/sheets/sheetStore';
 import { PostgresStore } from '../../../src/data/postgres/postgresStore';
@@ -26,6 +28,7 @@ import { verbinde, type Verbindung } from '../../../db/verbindung';
 import { Begrenzer, erstelleLink, erstelleSitzung, erstelleVorschau, linkNochGueltig, oeffneLink, oeffneSitzung, verlaengerteSitzung, type SitzungInhalt } from './anmeldung';
 import { dienstkontoToken, Mailer } from './google';
 import { Siegel } from './siegel';
+import { slackPoster, versende } from './versand';
 
 interface Laufzeit {
   siegel: Siegel;
@@ -39,6 +42,10 @@ interface Laufzeit {
   teamDomain: string;
   /** OAuth client of the hub: its Google tokens may open a team preview. Empty = no previews. */
   hubClientId: string;
+  /** Shared secret of the scheduler job that calls /versand. Empty = no sending. */
+  versandSchluessel: string;
+  /** Bot token of the Slack app "Velonify Hub" for posts into client channels. Empty = e-mail only. */
+  slackToken: string;
 }
 
 let laufzeit: Laufzeit | null = null;
@@ -67,6 +74,8 @@ function holeLaufzeit(): Laufzeit {
     origins: new Set([new URL(portalUrl).origin, new URL(process.env.HUB_URL || 'https://crm.velonify.de').origin, ...(process.env.WEITERE_ORIGINS ?? '').split(',').map((o) => o.trim()).filter(Boolean)]),
     teamDomain: (process.env.TEAM_DOMAIN || 'velonify.de').toLowerCase(),
     hubClientId: process.env.GOOGLE_CLIENT_ID ?? '',
+    versandSchluessel: (process.env.VERSAND_SCHLUESSEL ?? '').trim(),
+    slackToken: (process.env.SLACK_BOT_TOKEN ?? '').trim(),
   };
   return laufzeit;
 }
@@ -207,6 +216,7 @@ async function daten(req: Request, res: Response, lz: Laufzeit): Promise<void> {
     ladeKundenDateien(drive, anmeldung.berechtigung.firma.drive_ordner_id),
   ]);
   json(res, 200, kundensicht({ berechtigung: anmeldung.berechtigung, db: anmeldung.db, kunden, todos, portal, dateien: dateien.dateien, teamDomain: lz.teamDomain, vorschau: anmeldung.sitzung.v,
+    einstellungen: anmeldung.sitzung.v ? null : einstellungenVon(anmeldung.berechtigung.zugang),
     andere: anmeldung.sitzung.v ? [] : alleBerechtigungen(anmeldung.db, portal, anmeldung.berechtigung.kontakt.email),
   }));
 }
@@ -307,6 +317,39 @@ async function hochladen(req: Request, res: Response, lz: Laufzeit): Promise<voi
   json(res, 200, { id: datei.id, name: datei.name, mimeType: datei.mimeType, geaendert: datei.modifiedTime ?? new Date().toISOString(), von: 'kunde' });
 }
 
+/** `POST /einstellungen`: the contact chooses how often and where they hear from us. */
+async function einstellungen(req: Request, res: Response, lz: Laufzeit): Promise<void> {
+  const s = await store(lz);
+  const anmeldung = await angemeldet(req, lz, s);
+  if (!anmeldung) return json(res, 401, { fehler: NICHT_ANGEMELDET });
+  if (anmeldung.sitzung.v) return json(res, 403, { fehler: 'Diese Einstellungen gehören zur jeweiligen Person. Im Hub kannst du sie unter „Portal“ für jeden Kontakt ändern.' });
+  const { zugang, kontakt, firma } = anmeldung.berechtigung;
+  if (!schreibenProKontakt.erlaubt(kontakt.id)) return json(res, 429, { fehler: 'Das waren gerade sehr viele Änderungen. Bitte warte ein paar Minuten.' });
+  const neu = pruefeEinstellungen(eingabe(req), !!firma.slack_channel.trim());
+  await s.update('portal_zugaenge', [{ id: zugang.id, changes: { ...neu, geaendert_am: new Date().toISOString(), geaendert_von: kontakt.email.trim() } }]);
+  json(res, 200, neu);
+}
+
+/** `POST /versand`: called by Cloud Scheduler every 15 minutes with the shared secret in `X-Versand-Schluessel`. */
+async function versand(req: Request, res: Response, lz: Laufzeit): Promise<void> {
+  if (!lz.versandSchluessel) return json(res, 503, { fehler: 'Der Versand ist nicht eingerichtet (VERSAND_SCHLUESSEL fehlt).' });
+  const gegeben = Buffer.from(req.get('x-versand-schluessel') ?? '');
+  const erwartet = Buffer.from(lz.versandSchluessel);
+  if (gegeben.length !== erwartet.length || !timingSafeEqual(gegeben, erwartet)) return json(res, 403, { fehler: 'Nicht erlaubt.' });
+  const drive = new GoogleDrive(lz.token);
+  const bericht = await versende({
+    store: await store(lz),
+    dateien: async (firma) => (await ladeKundenDateien(drive, firma.drive_ordner_id)).dateien,
+    sendeMail: (an, betreff, text, html) => lz.mailer.sende(an, betreff, text, html),
+    slack: lz.slackToken ? slackPoster(lz.slackToken) : null,
+    portalUrl: lz.portalUrl,
+    teamDomain: lz.teamDomain,
+    jetzt: new Date(),
+  });
+  console.log(JSON.stringify({ versand: bericht }));
+  json(res, 200, bericht);
+}
+
 http('kundenportal', async (req: Request, res: Response) => {
   let lz: Laufzeit;
   try {
@@ -334,6 +377,8 @@ http('kundenportal', async (req: Request, res: Response) => {
     if (req.method === 'POST' && pfad === '/kommentar') return await kommentar(req, res, lz);
     if (req.method === 'POST' && pfad === '/anfrage') return await anfrage(req, res, lz);
     if (req.method === 'POST' && pfad === '/hochladen') return await hochladen(req, res, lz);
+    if (req.method === 'POST' && pfad === '/einstellungen') return await einstellungen(req, res, lz);
+    if (req.method === 'POST' && pfad === '/versand') return await versand(req, res, lz);
     const dateiPfad = /^\/datei\/([\w-]+)$/.exec(pfad);
     if (req.method === 'GET' && dateiPfad) return await datei(req, res, lz, dateiPfad[1]);
     if (req.method === 'GET' && pfad === '/') return json(res, 200, { dienst: 'velonify-kundenportal' });

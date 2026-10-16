@@ -770,6 +770,15 @@ export interface PortalZugang extends Meta {
   aktiv: boolean;
   /** Last login, written by the portal. */
   zuletzt_am: string;
+  /** Summary rhythm the contact chose ('' = default, see portalBenachrichtigung.ts). */
+  updates: string;
+  /** Channel for the summaries and for the instant notifications: 'email', 'slack' or 'beide' ('' = default). */
+  kanal_updates: string;
+  kanal_hinweise: string;
+  /** When the last summary went out (ISO). */
+  update_am: string;
+  /** Instant notifications are sent for everything up to this time (ISO); empty until the first run. */
+  hinweise_bis: string;
 }
 
 /** A client tool (UTM generator …) switched on or off for one client. */

@@ -1,3 +1,4 @@
+import { pruefeEinstellungen, type PortalEinstellungen } from './portalBenachrichtigung';
 import { istZustaendig, mitPerson } from './zustaendig';
 import {
   DEFAULT_DEAL_TITEL,
@@ -1321,9 +1322,18 @@ export class CrmService {
       const [zugang] = await this.store.update('portal_zugaenge', [{ id: vorhanden.id, changes: { aktiv, ...this.changed() } }]);
       return zugang;
     }
-    const zugang: PortalZugang = { id: newId(ID_PREFIX.portal_zugaenge), firma_id: firmaId, kontakt_id: kontaktId, aktiv, zuletzt_am: '', ...this.created() };
+    const zugang: PortalZugang = { id: newId(ID_PREFIX.portal_zugaenge), firma_id: firmaId, kontakt_id: kontaktId, aktiv, zuletzt_am: '', updates: '', kanal_updates: '', kanal_hinweise: '', update_am: '', hinweise_bis: '', ...this.created() };
     await this.store.insert('portal_zugaenge', [zugang]);
     return zugang;
+  }
+
+  /** Updates and notifications of one portal login, changed by the team (the client changes them in the portal). */
+  async setPortalEinstellungen(zugangId: string, eingabe: PortalEinstellungen): Promise<PortalZugang> {
+    const zugang = CrmService.find((await this.store.loadPortalDaten()).zugaenge, zugangId);
+    const firma = CrmService.find((await this.store.load()).firmen, zugang.firma_id);
+    const einstellungen = pruefeEinstellungen({ ...eingabe }, !!firma.slack_channel.trim());
+    const [neu] = await this.store.update('portal_zugaenge', [{ id: zugangId, changes: { ...einstellungen, ...this.changed() } }]);
+    return neu;
   }
 
   /** Switches a client tool on or off for one client. */
