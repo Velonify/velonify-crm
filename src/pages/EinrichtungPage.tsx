@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/Toasts';
 import { Card, ErrorBox, FormError, Loading, PageHeader } from '../components/ui';
 import { config, isDemo, spreadsheetUrl } from '../config';
-import { DEFAULT_DEAL_TITEL, DRIVE_ORDNER_NAMEN, EINSTELLUNG, FIRMEN_LINKS, teamTelefonSchluessel } from '../data/constants';
+import { DEFAULT_DEAL_TITEL, DRIVE_ORDNER_NAMEN, EINSTELLUNG, FIRMEN_LINKS, istBuchungslink, teamTelefonSchluessel, teamTerminSchluessel } from '../data/constants';
 import { useCrm } from '../data/CrmContext';
 import { AuthExpiredError } from '../data/errors';
 import { driveFolderUrl, type DriveFile } from '../data/google/drive';
@@ -254,15 +254,18 @@ function TeamKarte() {
   );
 }
 
-/** Phone numbers of the team, shown to clients in the portal next to the people looking after them. */
+/** Phone number and booking page of each team member, shown to clients in the portal next to the people looking after them. */
 function TelefonKarte() {
   const { db, mutate } = useCrm();
   const toast = useToast();
   const team = db?.listen.team ?? [];
-  const [werte, setWerte] = useState<Record<string, string>>(() => Object.fromEntries(team.map((n) => [teamTelefonSchluessel(n), db?.einstellungen[teamTelefonSchluessel(n)] ?? ''])));
+  const schluessel = team.flatMap((n) => [teamTelefonSchluessel(n), teamTerminSchluessel(n)]);
+  const [werte, setWerte] = useState<Record<string, string>>(() => Object.fromEntries(schluessel.map((k) => [k, db?.einstellungen[k] ?? ''])));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
-  const ungueltig = team.filter((n) => (werte[teamTelefonSchluessel(n)] ?? '').trim() && !/^\+?[\d\s/()-]{6,}$/.test(werte[teamTelefonSchluessel(n)].trim()));
+  const wert = (k: string) => (werte[k] ?? '').trim();
+  const telefonFalsch = team.filter((n) => wert(teamTelefonSchluessel(n)) && !/^\+?[\d\s/()-]{6,}$/.test(wert(teamTelefonSchluessel(n))));
+  const linkFalsch = team.filter((n) => wert(teamTerminSchluessel(n)) && !istBuchungslink(wert(teamTerminSchluessel(n))));
 
   const speichern = async () => {
     setBusy(true);
@@ -271,7 +274,7 @@ function TelefonKarte() {
       const bereinigt = Object.fromEntries(Object.entries(werte).map(([k, v]) => [k, v.trim()]));
       await mutate((s) => s.saveEinstellungen(bereinigt));
       setWerte(bereinigt);
-      toast.show('Telefonnummern gespeichert');
+      toast.show('Kontaktdaten gespeichert');
     } catch (err) {
       setError(err);
     } finally {
@@ -279,21 +282,32 @@ function TelefonKarte() {
     }
   };
 
+  const feld = (k: string, label: string, typ: 'tel' | 'url', falsch: boolean, hinweis: string, platzhalter: string) => (
+    <label className={`field${falsch ? ' invalid' : ''}`}>
+      <span className="field-label">{label}</span>
+      <input type={typ} value={werte[k] ?? ''} onChange={(e) => setWerte((w) => ({ ...w, [k]: e.target.value }))} placeholder={platzhalter} />
+      {falsch && <small className="field-hint">{hinweis}</small>}
+    </label>
+  );
+
   return (
-    <Card title="4. Telefonnummern im Kundenportal">
-      <p className="muted">Kunden sehen unter „Dein Team bei Velonify“ die Nummer jeder Person, die für sie zuständig ist. Leere Felder erscheinen nicht.</p>
+    <Card title="4. Telefon und Termine im Kundenportal">
+      <p className="muted">
+        Kunden sehen unter „Dein Team bei Velonify“ die Nummer jeder Person, die für sie zuständig ist, und einen Knopf „Termin buchen“. Calendly und
+        Google-Terminbuchung öffnen sich direkt im Portal; bei Google dafür den langen Link nehmen (Buchungsseite → Teilen → „Website-Einbettung“, die Adresse aus
+        dem Code), der Kurzlink calendar.app.google öffnet nur in einem neuen Tab. Dauer und Zeiten stellt ihr im jeweiligen Tool ein. Leere Felder erscheinen nicht.
+      </p>
       <div className="grid">
         {team.map((n) => (
-          <label key={n} className={`field${ungueltig.includes(n) ? ' invalid' : ''}`}>
-            <span className="field-label">{n}</span>
-            <input type="tel" value={werte[teamTelefonSchluessel(n)] ?? ''} onChange={(e) => setWerte((w) => ({ ...w, [teamTelefonSchluessel(n)]: e.target.value }))} placeholder="+49 …" />
-            {ungueltig.includes(n) && <small className="field-hint">Nur Ziffern, Leerzeichen und + / ( ) -</small>}
-          </label>
+          <Fragment key={n}>
+            {feld(teamTelefonSchluessel(n), `${n} · Telefon`, 'tel', telefonFalsch.includes(n), 'Nur Ziffern, Leerzeichen und + / ( ) -', '+49 …')}
+            {feld(teamTerminSchluessel(n), `${n} · Buchungsseite`, 'url', linkFalsch.includes(n), 'Vollständige Adresse mit https://', 'https://calendly.com/… oder https://calendar.google.com/calendar/appointments/…')}
+          </Fragment>
         ))}
       </div>
       <FormError error={error} />
       <div className="form-actions">
-        <button type="button" className="button primary" onClick={speichern} disabled={busy || ungueltig.length > 0}>
+        <button type="button" className="button primary" onClick={speichern} disabled={busy || telefonFalsch.length + linkFalsch.length > 0}>
           {busy ? 'Speichert …' : 'Speichern'}
         </button>
       </div>
@@ -365,10 +379,10 @@ export function EinrichtungPage() {
       {/* Until the sheet is retired: the takeover needs both the API and the sheet. */}
       {config.crmApiUrl && config.spreadsheetId && <UebernahmeKarte />}
       {/* Remount once data is there, so the fields start with the saved values. */}
-      <DriveKarte key={db ? 'bereit' : 'laedt'} />
+      <DriveKarte key={db ? 'drive-bereit' : 'drive-laedt'} />
       <TeamKarte />
-      <TelefonKarte key={db ? 'bereit' : 'laedt'} />
-      <LinksKarte key={db ? 'bereit' : 'laedt'} />
+      <TelefonKarte key={db ? 'telefon-bereit' : 'telefon-laedt'} />
+      <LinksKarte key={db ? 'links-bereit' : 'links-laedt'} />
     </div>
   );
 }

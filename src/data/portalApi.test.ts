@@ -97,6 +97,15 @@ describe('portal API', () => {
     const mitNummer = kundensicht({ berechtigung: team, db: { ...db, einstellungen: { ...db.einstellungen, telefon_team_Johannes: ' +49 151 000000 ', telefon_team_Julian: '+49 160 1' } }, kunden, todos: await service.loadTodoDaten(), portal, dateien: [], teamDomain: 'velonify.de' });
     // Only people looking after this client, under the name the client sees.
     expect(mitNummer.telefone).toEqual({ Johannes: '+49 151 000000' });
+    expect(sicht.termine).toEqual({});
+    const mitTermin = kundensicht({
+      berechtigung: team,
+      db: { ...db, einstellungen: { ...db.einstellungen, termin_team_Johannes: ' https://calendly.com/velonify-johannes/30min ', termin_team_Julian: 'https://calendly.com/julian' } },
+      kunden, todos: await service.loadTodoDaten(), portal, dateien: [], teamDomain: 'velonify.de',
+    });
+    expect(mitTermin.termine).toEqual({ Johannes: 'https://calendly.com/velonify-johannes/30min' });
+    const ohneHttps = kundensicht({ berechtigung: team, db: { ...db, einstellungen: { ...db.einstellungen, termin_team_Johannes: 'javascript:alert(1)' } }, kunden, todos: await service.loadTodoDaten(), portal, dateien: [], teamDomain: 'velonify.de' });
+    expect(ohneHttps.termine).toEqual({});
     expect(sicht.slack).toEqual({ channel: 'client-agk-general', url: expect.stringContaining('app_redirect?channel=client-agk-general') });
     const titel = sicht.karten.map((k) => k.titel);
     expect(titel).toContain('Black-Week-Banner einbauen');

@@ -115,6 +115,10 @@ export const FIRMEN_LINKS = [
 
 /** Phone number of a team member (name as in the team list, e.g. "Lugge"), shown to clients in the portal. */
 export const teamTelefonSchluessel = (name: string) => `telefon_team_${name.trim()}`;
+/** Booking page of a team member (Calendly, Google appointment schedule …), shown to clients as "Termin buchen". */
+export const teamTerminSchluessel = (name: string) => `termin_team_${name.trim()}`;
+/** A booking link the portal may show: https only. */
+export const istBuchungslink = (url: string) => /^https:\/\/[^\s/]+\.[^\s/]+\/\S*$/.test(url.trim());
 
 /** Folder names in the shared drive, used by "Ordner automatisch suchen". */
 export const DRIVE_ORDNER_NAMEN = {

@@ -7,7 +7,7 @@ import { CLIENT_SHARE_ORDNER } from './kunden';
 import { freigabeVon, meilensteineVon, type FreigabeStatus } from './portal';
 import { checklisteVon, erledigtSpalte, spaltenVon } from './todos';
 import { loginMailHtml } from './portalMail';
-import { teamTelefonSchluessel } from './constants';
+import { istBuchungslink, teamTelefonSchluessel, teamTerminSchluessel } from './constants';
 import { slackChannelUrl } from './start';
 import { personen } from './zustaendig';
 import type { PortalEinstellungen } from './portalBenachrichtigung';
@@ -92,6 +92,8 @@ export interface Kundensicht {
   team: string[];
   /** Phone numbers of the team members in `team` (name as clients see it → number); missing when not set. */
   telefone: Record<string, string>;
+  /** Booking pages of the team members in `team` (name as clients see it → https link); missing when not set. */
+  termine: Record<string, string>;
   /** Updates and notifications of the logged-in contact; null in the team access (they belong to a person). */
   einstellungen: PortalEinstellungen | null;
   /** Numbers of the tracking hub when released for the client (always in the team access), else null. */
@@ -300,6 +302,11 @@ export function kundensicht(args: {
       personen(firma.zustaendig)
         .map((n) => [KUNDEN_NAME[n] ?? n, (args.db.einstellungen?.[teamTelefonSchluessel(n)] ?? '').trim()])
         .filter(([, nummer]) => nummer),
+    ),
+    termine: Object.fromEntries(
+      personen(firma.zustaendig)
+        .map((n) => [KUNDEN_NAME[n] ?? n, (args.db.einstellungen?.[teamTerminSchluessel(n)] ?? '').trim()])
+        .filter(([, link]) => istBuchungslink(link)),
     ),
     berichte: berichteVon(portal.berichte ?? [], firma.id)
       .filter((b) => b.status === 'freigegeben' || args.vorschau)
