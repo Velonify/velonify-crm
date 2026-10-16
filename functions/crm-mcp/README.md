@@ -4,7 +4,8 @@ Remote-MCP-Server für das Velonify-CRM. Claude (claude.ai, Desktop, Handy, Clau
 
 ## Aufbau
 
-- **Werkzeuge** (`src/werkzeuge.ts`): `ueberblick`, `suchen`, `firma_anzeigen`, `pipeline`, `mein_tag` (lesen) sowie `lead_anlegen`, `firma_aendern`, `kontakt_speichern`, `deal_speichern`, `phase_aendern`, `vernetzung_ergebnis`, `notiz_hinzufuegen`, `wiedervorlage_setzen`, `wiedervorlage_erledigt`, `archivieren` (schreiben). Für die Lead-Magnete: `magnete`, `magnet_leads` (lesen) sowie `magnet_speichern`, `magnet_lead_uebernehmen`, `magnet_lead_verwerfen` (schreiben); `archivieren` nimmt auch einen Magneten. Für die To-dos des Hubs: `boards`, `karten` (lesen) sowie `karte_anlegen`, `karte_verschieben`, `karte_erledigt`, `karte_kommentieren`, `freigabe_anfragen` (schreiben); das Board heißt „intern“ (Velonify intern) oder wird über Firmenname, Kürzel, ID oder Slack-Channel (`#client-<kürzel>-…`, eigene Channels wie `#ops-…` → intern) gefunden, ein fehlendes Kunden-Board legt `karte_anlegen` an. Mit `aus_slack: true` und dem Permalink als `link` entsteht je Slack-Nachricht nur eine Karte (Label „Slack“, ohne Person, wenn keine genannt ist) – dafür ist der tägliche Slack-Lauf da. Für den Client-Hub: `kunden_news_anlegen` (schreiben). Gelöscht wird nichts, archivieren lässt sich rückgängig machen. Gelöscht wird nichts, archivieren lässt sich rückgängig machen.
+- **Werkzeuge**: Der Server kann alles, was eine Person im Hub kann (117 Werkzeuge). Grundlagen und CRM, Lead-Magnete und To-dos in `src/werkzeuge.ts`, die übrigen Bereiche je Gruppe in `src/gruppen/`: `eingang.ts` (Anfragen, LinkedIn, CSV-Import, Lead-Finder), `kunden.ts` (Client-Hub, Kundenportal, Karten bearbeiten, Board-Spalten), `angebote.ts` (Angebots-Rechner, Contact Generator), `audit.ts` (Shop-Audit, Shop-Roast-Reports, Kalender, Erwähnungen, Einrichtung, Spiele), `social.ts` (Social Media). Gemeinsames steht in `src/hilfen.ts`, Tests nutzen `src/testhilfe.ts` (Demo-Backend mit Demo-Diensten). Was der Server den Modellen zu den Werkzeugen sagt, steht in `ANLEITUNG` (`src/werkzeuge.ts`). Gelöscht wird nichts außer Kalender-Terminen; archivieren lässt sich rückgängig machen. Nicht nachgebaut sind reine Browser-Aktionen (Kopieren, Gmail-Entwurf öffnen, „Als Kunde ansehen“) und technische Einrichtung (Schema, Datenübernahme, Rohdaten-Editor).
+- **Dienste**: Contact Generator, Shop-Audit, Lead-Finder und LinkedIn-Abruf laufen wie im Hub über die Cloud Functions `contact-generator` und `shop-audit`, mit dem Google-Token der Person. Die Functions nehmen das Token nur an, wenn die Client-ID dieses Servers in ihrem `GOOGLE_CLIENT_ID` steht (kommagetrennt neben der Hub-Client-ID). Ohne `CONTACT_GENERATOR_URL` bzw. `SHOP_AUDIT_URL` antworten diese Werkzeuge mit einem Hinweis.
 - **Anmeldung** (`src/oauth.ts`, `src/google.ts`): Der Server ist sein eigener OAuth-Server (Client ID Metadata Documents von claude.ai sowie Dynamic Client Registration, PKCE S256). Die eigentliche Anmeldung läuft über Google, nur mit @velonify.de. Das Google-Refresh-Token steckt AES-256-GCM-verschlüsselt in den eigenen Codes und Tokens (`src/siegel.ts`), deshalb ohne Datenbank. Zugangstoken gelten 1 Stunde. Nach 90 Tagen ist eine neue Anmeldung fällig. Wer den Zugriff unter myaccount.google.com → Sicherheit → Drittanbieter-Apps entzieht, ist beim nächsten Erneuern draußen.
 - **Transport**: Streamable HTTP, zustandslos, unter `/mcp`. Metadaten unter `/.well-known/oauth-protected-resource/mcp` und `/.well-known/oauth-authorization-server`.
 
@@ -32,7 +33,7 @@ Die Adresse ist die deterministische Cloud-Run-URL `https://crm-mcp-<PROJEKTNUMM
 npm install && npm test && npm run build
 gcloud functions deploy crm-mcp --gen2 --region=europe-west3 --runtime=nodejs24 --source=. --entry-point=crmMcp \
   --trigger-http --no-allow-unauthenticated --service-account=crm-mcp@<PROJEKT>.iam.gserviceaccount.com \
-  --set-env-vars=TZ=Europe/Berlin,BASIS_URL=<URL>,SPREADSHEET_ID=<SHEET-ID>,GOOGLE_CLIENT_ID=<CLIENT-ID>,TEAM_ZUORDNUNG=<EMAIL>=<TEAMNAME>,DB_INSTANZ=velonify-apps:europe-west3:velonify-db,DB_NAME=crm,DB_NUTZER=crm-mcp@velonify-crm.iam \
+  --set-env-vars=TZ=Europe/Berlin,BASIS_URL=<URL>,SPREADSHEET_ID=<SHEET-ID>,GOOGLE_CLIENT_ID=<CLIENT-ID>,TEAM_ZUORDNUNG=<EMAIL>=<TEAMNAME>,CONTACT_GENERATOR_URL=<URL>,SHOP_AUDIT_URL=<URL>,DB_INSTANZ=velonify-apps:europe-west3:velonify-db,DB_NAME=crm,DB_NUTZER=crm-mcp@velonify-crm.iam \
   --set-secrets=GOOGLE_CLIENT_SECRET=crm-mcp-google-secret:latest,CRM_MCP_SCHLUESSEL=crm-mcp-schluessel:latest
 gcloud run services update crm-mcp --region=europe-west3 --no-invoker-iam-check
 ```
@@ -46,6 +47,10 @@ gcloud run services update crm-mcp --region=europe-west3 --no-invoker-iam-check
 **@-Erwähnungen:** „@Name“ in `karte_kommentieren` (und in allem, was über den Service geschrieben wird) legt Einträge für die Glocke im Hub an. Mit `SLACK_BOT_TOKEN=velonify-slack-bot-token:latest` in `--set-secrets` gehen sie zusätzlich als Slack-Direktnachricht raus; Einrichtung der Slack-App siehe `../crm-api/README.md`.
 
 Wird `crm-mcp-schluessel` gewechselt, müssen sich alle neu verbinden.
+
+**Kalender (seit 0.4.0):** Der Server fragt bei Google zusätzlich `calendar.events` an. Bestehende Verbindungen funktionieren weiter, die Kalender-Werkzeuge brauchen aber ein Neuverbinden des Connectors.
+
+**Contact Generator und Shop-Audit freischalten (einmalig):** Beide Functions mit beiden Client-IDs deployen, z. B. `--update-env-vars=^@^GOOGLE_CLIENT_ID=<HUB-CLIENT-ID>,<MCP-CLIENT-ID>` (das `^@^` setzt ein anderes Trennzeichen, damit das Komma im Wert bleibt).
 
 ## In Slack (Claude Tag)
 

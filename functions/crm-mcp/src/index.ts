@@ -21,7 +21,7 @@ import { Siegel } from './siegel';
 import type { Dienste } from './hilfen';
 import { ANLEITUNG, leseTeamZuordnung, registriereWerkzeuge } from './werkzeuge';
 
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 
 /** Team names for addresses the hub's name matching cannot place, e.g. TEAM_ZUORDNUNG="lukas@velonify.de=Lugge". */
 const TEAM_ZUORDNUNG = leseTeamZuordnung(process.env.TEAM_ZUORDNUNG ?? '');
@@ -134,8 +134,9 @@ async function mcp(req: Request, res: Response, lz: Laufzeit): Promise<void> {
     throw err;
   }
   const getToken = () => lz.tokens.zugangstoken(zugang.g);
+  const postgres = lz.db ? new PostgresStore((await lz.db).pool, () => zugang.email) : null;
   const service = new CrmService({
-    store: lz.db ? new PostgresStore((await lz.db).pool, () => zugang.email) : new SheetStore(new SheetsClient(lz.spreadsheetId, getToken)),
+    store: postgres ?? new SheetStore(new SheetsClient(lz.spreadsheetId, getToken)),
     drive: new GoogleDrive(getToken),
     calendar: new GoogleCalendar(getToken),
     currentUser: () => zugang.email,
@@ -151,6 +152,7 @@ async function mcp(req: Request, res: Response, lz: Laufzeit): Promise<void> {
     teamName: TEAM_ZUORDNUNG.get(zugang.email),
     heute: () => isoDate(new Date()),
     dienste: dienste(getToken),
+    setzeListe: postgres ? (liste, werte) => postgres.setzeListe(liste, werte) : undefined,
   });
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on('close', () => {
