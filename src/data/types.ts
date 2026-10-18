@@ -531,7 +531,7 @@ export type MagnetInput = Pick<
 >;
 export type MagnetTyp = 'datei' | 'audit' | '';
 
-/** A sign-up for a lead magnet, written by the Apps Script behind the form on velonify.de. */
+/** A sign-up for a lead magnet, written by crm-api (/extern/magnete) behind the form on velonify.de. */
 export interface MagnetLead extends Meta {
   id: string;
   /** Slug of the magnet. */
@@ -563,7 +563,7 @@ export interface MagnetLead extends Meta {
   kontakt_id: string;
   erledigt_am: string;
   erledigt_von: string;
-  /** Audit magnets: signed up after all places were taken. Set by the Apps Script. */
+  /** Audit magnets: signed up after all places were taken. Set by crm-api (/extern/magnete). */
   warteliste: boolean;
   /** Audit magnets: the shop audit the report is built on (tab `audits`). */
   audit_id: string;
@@ -574,7 +574,7 @@ export interface MagnetLead extends Meta {
   /** Only a released report is shown on velonify.de/roast/<token>. */
   report_freigegeben_am: string;
   report_gesendet_am: string;
-  /** First and count of views of the report page, written by the Apps Script. */
+  /** First and count of views of the report page, written by crm-api (/extern/magnete). */
   report_geoeffnet_am: string;
   report_aufrufe: number | null;
 }
@@ -888,7 +888,7 @@ export interface PortalDaten {
   feedback: KundenFeedback[];
 }
 
-/** An inquiry from the website form, written into the sheet by the Apps Script behind the Netlify webhook. */
+/** An inquiry from the website form, written by crm-api (/extern/eingang) behind the Netlify webhook. */
 export interface Anfrage extends Meta {
   id: string;
   eingegangen_am: string;

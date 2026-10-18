@@ -22,7 +22,7 @@ Titel höchstens 200, Texte höchstens 5.000 Zeichen.
 
 Links und Sitzungen sind mit AES-256-GCM versiegelt (`src/siegel.ts`), es gibt keine Sitzungstabelle. Wird `kundenportal-schluessel` gewechselt, müssen sich alle Kunden neu anmelden.
 
-Die Function liest und schreibt seit dem Umzug in Postgres (Datenbank `crm` auf `velonify-db`, IAM-Anmeldung ihres Dienstkontos, keine Passwörter); Drive liest sie mit demselben Dienstkonto (Token vom Metadatenserver, keine Schlüsseldatei). Ohne `DB_INSTANZ` fiele sie aufs alte Sheet zurück. Mails gehen über die Gmail-API mit einem Refresh-Token des Postfachs hallo@velonify.de (nur `gmail.send`).
+Die Function liest und schreibt seit dem Umzug in Postgres (Datenbank `crm` auf `velonify-db`, IAM-Anmeldung ihres Dienstkontos, keine Passwörter); Drive liest sie mit demselben Dienstkonto (Token vom Metadatenserver, keine Schlüsseldatei). `DB_INSTANZ` und `DB_NUTZER` sind Pflicht, einen Rückfall aufs alte Sheet gibt es nicht mehr. Mails gehen über die Gmail-API mit einem Refresh-Token des Postfachs hallo@velonify.de (nur `gmail.send`).
 
 ## Mehrere Kunden je Person
 

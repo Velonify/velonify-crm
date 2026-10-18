@@ -83,7 +83,7 @@ export function requestToken(options: { clientId: string; scopes: string[]; doma
         const apiScopes = options.scopes.filter((scope) => scope.startsWith('https://'));
         if (!oauth2.hasGrantedAllScopes(response, ...apiScopes)) {
           oauth2.revoke(response.access_token);
-          reject(new Error('Bitte bei der Anmeldung alle Berechtigungen erlauben – ohne Zugriff auf Google Sheets kann das CRM keine Daten laden.'));
+          reject(new Error('Bitte bei der Anmeldung alle Berechtigungen erlauben – ohne Drive, Sheets und Kalender fehlen Kundenordner, Kalkulationen und Termine.'));
           return;
         }
         resolve({

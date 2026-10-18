@@ -281,13 +281,13 @@ export const AUDIT_TABS = ['audits'] as const;
 export const WORDLE_TABS = ['wordle'] as const;
 /** Tab of the team plant, loaded only by its card. */
 export const MONSTERA_TABS = ['monstera'] as const;
-/** Tab of the website inbox, written by the Apps Script behind the Netlify form and loaded only by the inbox. */
+/** Tab of the website inbox, written by crm-api (/extern/eingang) behind the Netlify form and loaded only by the inbox. */
 export const EINGANG_TABS = ['eingang'] as const;
 /** Tabs of the social media tool, loaded together only when it is opened. */
 export const SOCIAL_TABS = ['social_plan', 'social_inhalte', 'social_hooks', 'social_aufgaben', 'social_texte', 'social_werte', 'social_dms'] as const;
 /**
- * Tabs of the lead magnets: the magnets are kept in the hub, the sign-ups are written by the Apps Script behind
- * the form on velonify.de (apps-script/magnete). Loaded only when the tool is opened.
+ * Tabs of the lead magnets: the magnets are kept in the hub, the sign-ups are written by crm-api (/extern/magnete)
+ * behind the form on velonify.de. Loaded only when the tool is opened.
  */
 export const MAGNET_TABS = ['magnete', 'magnet_leads'] as const;
 /**

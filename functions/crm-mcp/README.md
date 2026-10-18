@@ -33,12 +33,12 @@ Die Adresse ist die deterministische Cloud-Run-URL `https://crm-mcp-<PROJEKTNUMM
 npm install && npm test && npm run build
 gcloud functions deploy crm-mcp --gen2 --region=europe-west3 --runtime=nodejs24 --source=. --entry-point=crmMcp \
   --trigger-http --no-allow-unauthenticated --service-account=crm-mcp@<PROJEKT>.iam.gserviceaccount.com \
-  --set-env-vars=TZ=Europe/Berlin,BASIS_URL=<URL>,SPREADSHEET_ID=<SHEET-ID>,GOOGLE_CLIENT_ID=<CLIENT-ID>,TEAM_ZUORDNUNG=<EMAIL>=<TEAMNAME>,CONTACT_GENERATOR_URL=<URL>,SHOP_AUDIT_URL=<URL>,DB_INSTANZ=velonify-apps:europe-west3:velonify-db,DB_NAME=crm,DB_NUTZER=crm-mcp@velonify-crm.iam \
+  --set-env-vars=TZ=Europe/Berlin,BASIS_URL=<URL>,GOOGLE_CLIENT_ID=<CLIENT-ID>,TEAM_ZUORDNUNG=<EMAIL>=<TEAMNAME>,CONTACT_GENERATOR_URL=<URL>,SHOP_AUDIT_URL=<URL>,DB_INSTANZ=velonify-apps:europe-west3:velonify-db,DB_NAME=crm,DB_NUTZER=crm-mcp@velonify-crm.iam \
   --set-secrets=GOOGLE_CLIENT_SECRET=crm-mcp-google-secret:latest,CRM_MCP_SCHLUESSEL=crm-mcp-schluessel:latest
 gcloud run services update crm-mcp --region=europe-west3 --no-invoker-iam-check
 ```
 
-**Seit dem Umzug (15.10.2026) liest und schreibt `crm-mcp` in Postgres** (`DB_INSTANZ`, `DB_NAME`, `DB_NUTZER`; Cloud SQL Connector mit IAM-Anmeldung des Dienstkontos). `--set-env-vars` ersetzt alle Variablen: Fehlt `DB_INSTANZ`, fällt die Function aufs alte Sheet zurück, also immer mitgeben. Die Person hinter dem Google-Login steht im Änderungsprotokoll.
+**Seit dem Umzug (15.10.2026) liest und schreibt `crm-mcp` in Postgres** (`DB_INSTANZ`, `DB_NAME`, `DB_NUTZER`; Cloud SQL Connector mit IAM-Anmeldung des Dienstkontos). `--set-env-vars` ersetzt alle Variablen, also `DB_INSTANZ` und `DB_NUTZER` immer mitgeben; ohne sie antwortet die Function mit „Nicht eingerichtet“. Den alten Rückfall aufs Google Sheet gibt es nicht mehr. Die Person hinter dem Google-Login steht im Änderungsprotokoll.
 
 `gcp-build` ist absichtlich leer: Cloud Build bekommt das fertige `dist/index.js` und installiert nur das Functions Framework. Die Org-Policy verbietet `allUsers`, deshalb `--no-invoker-iam-check`. Die Function prüft jede Anfrage selbst.
 
@@ -65,7 +65,7 @@ Im Slack-Workspace von Velonify läuft die offizielle Claude-App. Jede Person au
 
 ```bash
 npm run build
-GOOGLE_CLIENT_ID=… GOOGLE_CLIENT_SECRET=… CRM_MCP_SCHLUESSEL=… SPREADSHEET_ID=… BASIS_URL=http://localhost:8089 npx functions-framework --target=crmMcp --port=8089
+GOOGLE_CLIENT_ID=… GOOGLE_CLIENT_SECRET=… CRM_MCP_SCHLUESSEL=… DB_INSTANZ=velonify-apps:europe-west3:velonify-db DB_NAME=crm_test DB_NUTZER=<EIGENE-ADRESSE> BASIS_URL=http://localhost:8089 npx functions-framework --target=crmMcp --port=8089
 ```
 
 Für den Google-Login lokal muss `http://localhost:8089/google-callback` beim OAuth-Client eingetragen sein.

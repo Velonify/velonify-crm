@@ -10,7 +10,7 @@ export interface RecordUpdate<T> {
 
 /**
  * The storage boundary. Everything above it (CrmService, UI) is storage-agnostic;
- * moving from Google Sheets to e.g. Supabase means writing another implementation of this interface.
+ * ApiStore (crm-api → Postgres) is the one in use; SheetStore (Google Sheets) remains for demo mode and tests.
  */
 export interface Store {
   load(): Promise<Database>;

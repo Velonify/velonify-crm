@@ -1509,8 +1509,8 @@ export class CrmService {
   }
 
   /**
-   * Students, competitors, test entries: stay in the sheet (and in the numbers), but out of the to-do list. Reads
-   * the row fresh, because the Apps Script touches it on every click in the mail – that is no conflict.
+   * Students, competitors, test entries: stay in the table (and in the numbers), but out of the to-do list. Reads
+   * the row fresh, because crm-api (/extern/magnete) touches it on every click in the mail – that is no conflict.
    */
   async verwirfMagnetLead(id: string): Promise<MagnetLead> {
     const aktuell = CrmService.find((await this.store.loadMagnetDaten()).leads, id);
@@ -1527,7 +1527,7 @@ export class CrmService {
 
   // ─── Shop-Roast (Magnete vom Typ „audit“) ──────────────────────────────────
 
-  /** Reads the sign-up fresh: the Apps Script writes to the same row (newsletter clicks, report views). */
+  /** Reads the sign-up fresh: crm-api (/extern/magnete) writes to the same row (newsletter clicks, report views). */
   private async frischerLead(id: string): Promise<MagnetLead> {
     return CrmService.find((await this.store.loadMagnetDaten()).leads, id);
   }

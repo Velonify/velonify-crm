@@ -140,7 +140,7 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   await wordle('Julian', 1, 'xxxxx/yxxyx/xgyxx/ggxgg/ggggg');
   await wordle('Julian', 3, 'xyxxx/xxgyx/gxgxx/gggxg/gggxg/gggxg', false);
 
-  // Two inquiries waiting in the inbox, as the Apps Script behind the website form would write them.
+  // Two inquiries waiting in the inbox, as crm-api writes them from the website form.
   const anfrage = (id: string, stunden: number, felder: Record<string, string>) => {
     const eingegangen = new Date(Date.now() - stunden * 3600_000).toISOString();
     return new SheetStore(sheets).insert('eingang', [
