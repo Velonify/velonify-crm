@@ -11,7 +11,7 @@ import { useLoad } from '../lib/useLoad';
 /** All audits; `reload` after a new one was saved. */
 export function useAudits() {
   const { service } = useCrm();
-  return useLoad(() => (service ? service.loadAudits() : new Promise<never>(() => {})), [service]);
+  return useLoad(() => (service ? service.loadAudits() : new Promise<never>(() => {})), [service], 'audits');
 }
 
 /** The Cloud Function in production, made-up audits in demo mode; null while the address is not configured. */

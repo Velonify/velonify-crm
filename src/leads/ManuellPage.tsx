@@ -16,7 +16,7 @@ import { NICHT_EINGERICHTET, useLeadFinderApi } from './useLeadFinder';
 export function ManuellPage() {
   const api = useLeadFinderApi();
   const toast = useToast();
-  const liste = useLoad(() => (api ? api.manuell() : Promise.reject(new Error(NICHT_EINGERICHTET))), [api]);
+  const liste = useLoad(() => (api ? api.manuell() : Promise.reject(new Error(NICHT_EINGERICHTET))), [api], 'leads:manuell');
   const [erledigt, setErledigt] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState('');
   const [freigabe, setFreigabe] = useState<{ zeile: ListenZeile; email: string; fehler: string } | null>(null);

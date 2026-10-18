@@ -9,7 +9,7 @@ import { useLoad } from '../lib/useLoad';
 /** All results of the word game; `reload` after a game was saved. */
 export function useWordleErgebnisse() {
   const { service } = useCrm();
-  return useLoad(() => (service ? service.loadWordle() : new Promise<never>(() => {})), [service]);
+  return useLoad(() => (service ? service.loadWordle() : new Promise<never>(() => {})), [service], 'wordle');
 }
 
 /** Saves a finished game without reloading the whole CRM. */

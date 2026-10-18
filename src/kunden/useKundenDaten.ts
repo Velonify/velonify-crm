@@ -6,7 +6,7 @@ import { useLoad } from '../lib/useLoad';
 /** Links and news of the client hub; `aendern` runs a write and reloads them. */
 export function useKundenDaten() {
   const { service, mutate } = useCrm();
-  const daten = useLoad(() => (service ? service.loadKundenDaten() : new Promise<never>(() => {})), [service]);
+  const daten = useLoad(() => (service ? service.loadKundenDaten() : new Promise<never>(() => {})), [service], 'kunden');
   const { reload } = daten;
 
   const aendern = useCallback(

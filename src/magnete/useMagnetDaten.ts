@@ -6,7 +6,7 @@ import { useLoad } from '../lib/useLoad';
 /** Magnets and sign-ups; `aendern` runs a write and reloads them. */
 export function useMagnetDaten() {
   const { service, mutate } = useCrm();
-  const daten = useLoad(() => (service ? service.loadMagnetDaten() : new Promise<never>(() => {})), [service]);
+  const daten = useLoad(() => (service ? service.loadMagnetDaten() : new Promise<never>(() => {})), [service], 'magnete');
   const { reload } = daten;
 
   const aendern = useCallback(

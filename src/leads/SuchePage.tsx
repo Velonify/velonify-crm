@@ -15,7 +15,7 @@ const monat = (yyyymm: number) => (yyyymm ? `${String(yyyymm).slice(4)}/${String
 export function SuchePage() {
   const api = useLeadFinderApi();
   const toast = useToast();
-  const statistik = useLoad(() => (api ? api.statistik() : Promise.reject(new Error(NICHT_EINGERICHTET))), [api]);
+  const statistik = useLoad(() => (api ? api.statistik() : Promise.reject(new Error(NICHT_EINGERICHTET))), [api], 'leads:statistik');
   const { reload } = statistik;
   const stapel = useLeadStapel(api, useCallback(() => reload(), [reload]));
   const [menge, setMenge] = useState(200);

@@ -12,7 +12,7 @@ import { useLoad } from '../lib/useLoad';
 export function useTodoDaten() {
   const { service } = useCrm();
   const { expire } = useAuth();
-  const daten = useLoad(() => (service ? service.loadTodoDaten() : new Promise<never>(() => {})), [service]);
+  const daten = useLoad(() => (service ? service.loadTodoDaten() : new Promise<never>(() => {})), [service], 'todo');
   const { reload } = daten;
 
   const aendern = useCallback(
