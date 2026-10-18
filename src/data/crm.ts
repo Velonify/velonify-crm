@@ -61,7 +61,6 @@ import {
 } from './rules';
 import { driveKonfiguration, findeTeamMitglied, tageSeitVernetzung } from './selectors';
 import { auszug, firmenLink, kartenLink, kundenLink, neuErwaehnt } from './erwaehnungen';
-import { OUTREACH_STARTLISTE } from './outreachStart';
 import {
   findeWert,
   prepareAufgabe,
@@ -74,8 +73,6 @@ import {
   dmAlsAnfrage,
   inhaltById,
 } from './social';
-import { SOCIAL_START_AUFGABEN, SOCIAL_START_HOOKS, SOCIAL_START_INHALTE, SOCIAL_START_PLAN, SOCIAL_START_TEXTE } from './socialStart';
-import { STARTKATALOG } from './startkatalog';
 import { EMPTY_DEAL_INPUT } from './types';
 import type { Store } from './store';
 import type {
@@ -704,6 +701,8 @@ export class CrmService {
     if (katalog.kategorien.length > 0) {
       throw new ValidationError('katalog', 'Der Katalog enthält schon Hauptkategorien. Der Startkatalog wird nur in einen leeren Katalog übernommen.');
     }
+    // The start data is only needed once per tool, so it is loaded on demand instead of with the app.
+    const { STARTKATALOG } = await import('./startkatalog');
     const meta = this.created();
     const kategorien: Leistungskategorie[] = [];
     const leistungen: Leistung[] = [];
@@ -888,6 +887,7 @@ export class CrmService {
   async uebernimmOutreachStartliste(): Promise<number> {
     const { leistungen } = await this.store.loadContactDaten();
     if (leistungen.length > 0) throw new ValidationError('leistungen', 'Die Liste enthält schon Leistungen. Die Startliste wird nur in eine leere Liste übernommen.');
+    const { OUTREACH_STARTLISTE } = await import('./outreachStart');
     const meta = this.created();
     const neu: OutreachLeistung[] = OUTREACH_STARTLISTE.map((start, i) => ({
       ...start,
@@ -1634,6 +1634,7 @@ export class CrmService {
     if (daten.plan.length + daten.inhalte.length + daten.hooks.length + daten.aufgaben.length + daten.texte.length > 0) {
       throw new ValidationError('plan', 'Hier stehen schon Einträge. Der Startplan wird nur in ein leeres Werkzeug übernommen.');
     }
+    const { SOCIAL_START_AUFGABEN, SOCIAL_START_HOOKS, SOCIAL_START_INHALTE, SOCIAL_START_PLAN, SOCIAL_START_TEXTE } = await import('./socialStart');
     const meta = this.created();
 
     const inhalte: SocialInhalt[] = SOCIAL_START_INHALTE.map((start, i) => ({

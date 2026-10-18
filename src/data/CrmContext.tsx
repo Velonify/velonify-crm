@@ -4,7 +4,6 @@ import { config, isDemo } from '../config';
 import { useToast } from '../components/Toasts';
 import { errorMessage } from '../lib/errors';
 import { CrmService } from './crm';
-import { createDemoBackend } from './demo/seed';
 import { AuthExpiredError } from './errors';
 import { GoogleCalendar } from './google/calendar';
 import { GoogleDrive } from './google/drive';
@@ -45,7 +44,8 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     if (isDemo) {
-      createDemoBackend(userEmail).then(
+      // Sample data and the in-memory store only reach the browser in demo mode.
+      import('./demo/seed').then(({ createDemoBackend }) => createDemoBackend(userEmail)).then(
         (demo) => !cancelled && setBackend(demo),
         (err: Error) => !cancelled && (setError(err), setLoading(false)),
       );
