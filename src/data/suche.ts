@@ -1,8 +1,19 @@
 import { phaseLabel } from './constants';
+import { kundenListe } from './kunden';
+import { kartenLink } from './erwaehnungen';
 import { kontaktName } from './rules';
-import type { Database } from './types';
+import { spalteDerKarte } from './todos';
+import type { Angebot, Database, Magnet, SocialInhalt, Spalte, TodoDaten } from './types';
 
-export type TrefferArt = 'firma' | 'kontakt' | 'deal' | 'aktion' | 'werkzeug';
+export type TrefferArt = 'firma' | 'kunde' | 'kontakt' | 'deal' | 'karte' | 'angebot' | 'inhalt' | 'magnet' | 'aktion' | 'werkzeug';
+
+/** Data of the other areas, loaded only when the palette opens; a missing area is simply not searched. */
+export interface Bereichsdaten {
+  todo?: Pick<TodoDaten, 'boards' | 'aufgaben'>;
+  angebote?: readonly Angebot[];
+  inhalte?: readonly SocialInhalt[];
+  magnete?: readonly Magnet[];
+}
 
 export interface Treffer {
   art: TrefferArt;
@@ -124,6 +135,11 @@ export function suche(db: Database, eingabe: string, limitProArt = 6): Treffer[]
     }
   }
 
+  return begrenze(treffer, limitProArt);
+}
+
+/** Active records first, then by score and title; at most `limitProArt` hits per kind. */
+function begrenze(treffer: Treffer[], limitProArt: number): Treffer[] {
   const sortiert = treffer.sort(
     (a, b) => Number(a.archiviert) - Number(b.archiviert) || b.score - a.score || a.titel.localeCompare(b.titel, 'de'),
   );
@@ -133,4 +149,99 @@ export function suche(db: Database, eingabe: string, limitProArt = 6): Treffer[]
     proArt.set(t.art, n);
     return n <= limitProArt;
   });
+}
+
+/**
+ * Clients, to-do cards, offers, social content and lead magnets. Clients come from the CRM data, the rest from
+ * `daten`; whatever is not loaded (yet, or because it failed) is left out.
+ */
+export function sucheBereiche(db: Pick<Database, 'firmen'>, daten: Bereichsdaten, eingabe: string, limitProArt = 5): Treffer[] {
+  const woerter = normalisiere(eingabe).split(/\s+/).filter(Boolean);
+  if (woerter.length === 0) return [];
+  const firmen = new Map(db.firmen.map((f) => [f.id, f]));
+  const treffer: Treffer[] = [];
+
+  for (const f of kundenListe(db)) {
+    const score = bewerte(woerter, f.name, [f.kuerzel, f.domain]);
+    if (score > 0) {
+      treffer.push({
+        art: 'kunde', id: f.id, firmaId: f.id, titel: f.name,
+        details: [f.kuerzel, f.domain].filter(Boolean).join(' · '),
+        archiviert: false,
+        score: score + (normalisiere(f.kuerzel) === woerter.join(' ') ? 100 : 0),
+        pfad: `/kunden/${f.id}`,
+      });
+    }
+  }
+
+  if (daten.todo) {
+    const boards = new Map(daten.todo.boards.map((b) => [b.id, b]));
+    for (const a of daten.todo.aufgaben) {
+      const board = boards.get(a.board_id);
+      if (!board) continue;
+      const firma = firmen.get(board.firma_id);
+      const score = bewerte(woerter, a.titel, [board.titel, firma?.kuerzel ?? '', a.labels, a.zustaendig]);
+      if (score > 0) {
+        const spalte: Spalte | undefined = spalteDerKarte(a, board);
+        treffer.push({
+          art: 'karte', id: a.id, firmaId: board.firma_id, titel: a.titel,
+          details: [board.titel, spalte?.titel, a.zustaendig].filter(Boolean).join(' · '),
+          archiviert: a.archiviert || board.archiviert,
+          // Done cards stay findable but come after open ones.
+          score: spalte?.erledigt ? score / 2 : score,
+          pfad: kartenLink(board.id, a.id),
+        });
+      }
+    }
+  }
+
+  if (daten.angebote) {
+    // Versions share a number; only the newest one is listed.
+    const neueste = new Map<string, Angebot>();
+    for (const a of daten.angebote) {
+      const bisher = neueste.get(a.nummer || a.id);
+      if (!bisher || (a.version ?? 0) > (bisher.version ?? 0)) neueste.set(a.nummer || a.id, a);
+    }
+    for (const a of neueste.values()) {
+      const firma = firmen.get(a.firma_id);
+      const score = bewerte(woerter, a.titel || a.nummer, [a.nummer, firma?.name ?? '', firma?.kuerzel ?? '']);
+      if (score > 0) {
+        treffer.push({
+          art: 'angebot', id: a.id, firmaId: a.firma_id, titel: a.titel || `Angebot ${a.nummer}`,
+          details: [a.nummer && `${a.nummer}${a.version ? ` v${a.version}` : ''}`, firma?.name, a.status].filter(Boolean).join(' · '),
+          archiviert: a.archiviert,
+          score,
+          pfad: `/angebote/${a.id}`,
+        });
+      }
+    }
+  }
+
+  for (const i of daten.inhalte ?? []) {
+    const score = bewerte(woerter, i.titel, [i.hook, i.kennung, i.serie]);
+    if (score > 0) {
+      treffer.push({
+        art: 'inhalt', id: i.id, firmaId: '', titel: i.titel || i.hook,
+        details: [i.kennung, i.art, i.hook].filter(Boolean).join(' · '),
+        archiviert: i.archiviert,
+        score: score + (normalisiere(i.kennung) === woerter.join(' ') ? 100 : 0),
+        pfad: `/social/inhalte/${i.id}`,
+      });
+    }
+  }
+
+  for (const m of daten.magnete ?? []) {
+    const score = bewerte(woerter, m.titel, [m.stichwort, m.slug, m.beschreibung]);
+    if (score > 0) {
+      treffer.push({
+        art: 'magnet', id: m.id, firmaId: '', titel: m.titel,
+        details: [m.stichwort, m.aktiv ? 'aktiv' : 'inaktiv'].filter(Boolean).join(' · '),
+        archiviert: m.archiviert,
+        score,
+        pfad: '/magnete/liste',
+      });
+    }
+  }
+
+  return begrenze(treffer, limitProArt);
 }
