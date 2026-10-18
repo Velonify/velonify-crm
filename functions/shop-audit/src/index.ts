@@ -10,6 +10,7 @@ import { katalog } from './technik.js';
 import { kurzfassung } from './regeln.js';
 import { AnfrageFehler, leadRoute, ROUTEN, type Route } from './leads/api.js';
 import { echteBq } from './leads/bq.js';
+import { AuftragSchema, ladeErgebnis, speichereErgebnis } from './ablage.js';
 import { AUSGABE_SCHEMA_BRANCHE, BrancheSchema, MODELL_BRANCHE, SYSTEM_PROMPT_BRANCHE } from './leads/branche.js';
 import * as linkedin from './linkedin.js';
 import { AUSGABE_SCHEMA_ROAST, pruefeRoast, RoastAnfrageSchema, roastNachricht, RoastAusgabeSchema, SYSTEM_PROMPT_ROAST } from './roast.js';
@@ -57,6 +58,8 @@ const AnfrageSchema = z.object({
     .array(z.object({ id: z.string().trim().min(1).max(40), titel: z.string().trim().min(1).max(200), beschreibung: feld(1000), anlass: feld(1000) }))
     .max(20)
     .default([]),
+  /** Order id from the app; with it, the result is also stored for /ergebnis. */
+  auftrag: z.string().regex(AuftragSchema).optional(),
 });
 
 /** A LinkedIn link and the deal titles the team uses, so Claude can pick one. */
@@ -201,6 +204,20 @@ functions.http('shopAudit', async (req, res) => {
     }
   }
 
+  // The app asks here for the result when it lost the long audit request. Not counted against the limit.
+  if (/^\/ergebnis\/?$/.test(req.path)) {
+    const auftrag = z.object({ auftrag: z.string().regex(AuftragSchema) }).safeParse(req.body);
+    if (!auftrag.success) return fehler(400, 'Auftrag fehlt.');
+    try {
+      bq ??= echteBq(LEADS_DATASET);
+      const ergebnis = await ladeErgebnis(bq, LEADS_DATASET, auftrag.data.auftrag, email);
+      return res.json(ergebnis ?? { laeuft: true });
+    } catch (error) {
+      console.error('Ergebnis laden fehlgeschlagen', error);
+      return fehler(502, 'Das Ergebnis konnte nicht geladen werden.');
+    }
+  }
+
   if (!limit.erlaubt(email)) return fehler(429, 'Zu viele Prüfungen in kurzer Zeit. Bitte in ein paar Minuten erneut versuchen.');
 
   const anfrage = AnfrageSchema.safeParse(req.body);
@@ -222,8 +239,17 @@ functions.http('shopAudit', async (req, res) => {
   res.write(' ');
   const puls = setInterval(() => res.write(' '), 10_000);
   res.on('close', () => clearInterval(puls));
-  const antworte = (daten: unknown) => {
+  const { auftrag } = anfrage.data;
+  const antworte = async (daten: unknown) => {
     clearInterval(puls);
+    if (auftrag) {
+      try {
+        bq ??= echteBq(LEADS_DATASET);
+        await speichereErgebnis(bq, auftrag, email, daten);
+      } catch (error) {
+        console.error('Ergebnis speichern fehlgeschlagen', error);
+      }
+    }
     res.end(JSON.stringify(daten));
   };
 
@@ -277,5 +303,5 @@ functions.http('shopAudit', async (req, res) => {
     console.log(JSON.stringify({ email, domain, status: messung.status, dauer_ms: Date.now() - start }));
   }
 
-  antworte({ ...messung, geprueft_am: new Date().toISOString(), zusammenfassung, aufhaenger, hinweis, modell });
+  await antworte({ ...messung, geprueft_am: new Date().toISOString(), zusammenfassung, aufhaenger, hinweis, modell });
 });
