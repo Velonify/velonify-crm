@@ -21,8 +21,6 @@ import {
 } from '../../../src/data/portalAktionen';
 import { einstellungenVon, pruefeEinstellungen } from '../../../src/data/portalBenachrichtigung';
 import { gesehenAenderungen, rundgangVon } from '../../../src/data/portalRundgang';
-import { SheetsClient } from '../../../src/data/sheets/sheetsClient';
-import { SheetStore } from '../../../src/data/sheets/sheetStore';
 import { PostgresStore } from '../../../src/data/postgres/postgresStore';
 import type { Store } from '../../../src/data/store';
 import { verbinde, type Verbindung } from '../../../db/verbindung';
@@ -42,9 +40,8 @@ interface Laufzeit {
   siegel: Siegel;
   mailer: Mailer;
   token: () => Promise<string>;
-  spreadsheetId: string;
-  /** Set when the CRM data lives in Postgres (DB_INSTANZ); otherwise the sheet is used. */
-  db: Promise<Verbindung> | null;
+  /** The CRM data in Postgres (database crm on velonify-db). */
+  db: Promise<Verbindung>;
   portalUrl: string;
   origins: Set<string>;
   teamDomain: string;
@@ -67,8 +64,7 @@ let laufzeit: Laufzeit | null = null;
 /** Built on first use, so a missing setting answers with a clear message instead of crashing the instance. */
 function holeLaufzeit(): Laufzeit {
   if (laufzeit) return laufzeit;
-  const datenquelle = process.env.DB_INSTANZ ? 'DB_NUTZER' : 'SPREADSHEET_ID';
-  const fehlend = ['PORTAL_SCHLUESSEL', datenquelle, 'PORTAL_URL', 'GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN'].filter((name) => !process.env[name]);
+  const fehlend = ['PORTAL_SCHLUESSEL', 'DB_INSTANZ', 'DB_NUTZER', 'PORTAL_URL', 'GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN'].filter((name) => !process.env[name]);
   if (fehlend.length > 0) throw new Error(`Nicht eingerichtet, es fehlt: ${fehlend.join(', ')}`);
   const portalUrl = process.env.PORTAL_URL!.replace(/\/$/, '');
   laufzeit = {
@@ -80,10 +76,7 @@ function holeLaufzeit(): Laufzeit {
       absender: process.env.MAIL_ABSENDER || 'Velonify <hallo@velonify.de>',
     }),
     token: dienstkontoToken(),
-    spreadsheetId: process.env.SPREADSHEET_ID ?? '',
-    db: process.env.DB_INSTANZ
-      ? verbinde({ instanz: process.env.DB_INSTANZ, datenbank: process.env.DB_NAME ?? 'crm', nutzer: process.env.DB_NUTZER!, max: 2 })
-      : null,
+    db: verbinde({ instanz: process.env.DB_INSTANZ!, datenbank: process.env.DB_NAME ?? 'crm', nutzer: process.env.DB_NUTZER!, max: 2 }),
     portalUrl,
     origins: new Set([new URL(portalUrl).origin, new URL(process.env.HUB_URL || 'https://crm.velonify.de').origin, ...(process.env.WEITERE_ORIGINS ?? '').split(',').map((o) => o.trim()).filter(Boolean)]),
     teamDomain: (process.env.TEAM_DOMAIN || 'velonify.de').toLowerCase(),
@@ -122,7 +115,7 @@ function ip(req: Request): string {
 }
 
 async function store(lz: Laufzeit): Promise<Store> {
-  return lz.db ? new PostgresStore((await lz.db).pool, () => 'kundenportal') : new SheetStore(new SheetsClient(lz.spreadsheetId, lz.token));
+  return new PostgresStore((await lz.db).pool, () => 'kundenportal');
 }
 
 /** The login behind the Bearer session, re-checked against the sheet on every call. */

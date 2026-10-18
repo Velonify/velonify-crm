@@ -29,10 +29,14 @@ function assertColumns(schema: TabSchema, header: string[]): void {
   }
 }
 
-/** Google Sheets as database: one request loads every tab; writes re-read only the affected tab. */
 /** How long the list of tabs may be reused; it only changes when someone runs the setup. */
 const STRUKTUR_GILT_MS = 60_000;
 
+/**
+ * Google Sheets as database: one request loads every tab; writes re-read only the affected tab. No longer used in
+ * production (that is ApiStore → crm-api → Postgres); it stays as the store of demo mode (MemorySheets) and of the
+ * tests in src/data, which vitest.postgres.config.ts runs a second time against Postgres.
+ */
 export class SheetStore implements Store {
   private readonly api: SheetsApi;
   private readonly headers = new Map<string, string[]>();

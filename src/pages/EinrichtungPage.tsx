@@ -1,106 +1,14 @@
 import { Fragment, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/Toasts';
-import { Card, ErrorBox, FormError, Loading, PageHeader } from '../components/ui';
-import { config, isDemo, spreadsheetUrl } from '../config';
+import { Card, FormError, PageHeader } from '../components/ui';
+import { config, isDemo } from '../config';
 import { DEFAULT_DEAL_TITEL, DRIVE_ORDNER_NAMEN, EINSTELLUNG, FIRMEN_LINKS, istBuchungslink, teamTelefonSchluessel, teamTerminSchluessel } from '../data/constants';
 import { useCrm } from '../data/CrmContext';
 import { AuthExpiredError } from '../data/errors';
 import { driveFolderUrl, type DriveFile } from '../data/google/drive';
 import { extractDriveFolderId } from '../data/rules';
-import { checkSetup, runSetup } from '../data/sheets/setup';
 import { errorMessage } from '../lib/errors';
-import { useLoad } from '../lib/useLoad';
-import { UebernahmeKarte } from './einrichtung/UebernahmeKarte';
-
-function SheetKarte() {
-  const { sheets, service, refresh } = useCrm();
-  const { expire } = useAuth();
-  const [running, setRunning] = useState(false);
-  const [runError, setRunError] = useState<unknown>();
-  const status = useLoad(() => (sheets ? checkSetup(sheets) : Promise.resolve(null)), [sheets]);
-  const s = status.data;
-  const fertig = s?.ready && s.listenRows > 0 && s.tabs.every((t) => t.isProtected);
-
-  const einrichten = async () => {
-    if (!sheets) return;
-    setRunning(true);
-    setRunError(undefined);
-    try {
-      await runSetup(sheets);
-      // The store still remembers the old list of tabs.
-      service?.vergissStruktur();
-      status.reload();
-      await refresh();
-    } catch (err) {
-      if (err instanceof AuthExpiredError) expire();
-      setRunError(err);
-    } finally {
-      setRunning(false);
-    }
-  };
-
-  return (
-    <Card
-      title="1. Google Sheet"
-      actions={
-        !isDemo && (
-          <a className="button small" href={spreadsheetUrl(config.spreadsheetId)} target="_blank" rel="noreferrer noopener">
-            Sheet öffnen ↗
-          </a>
-        )
-      }
-    >
-      <p className="muted">
-        Legt fehlende Tabellenblätter und Spalten an, ohne vorhandene Daten oder eigene Spalten anzufassen. Kann gefahrlos mehrfach ausgeführt werden.
-      </p>
-      {status.loading && !s && <Loading label="Sheet wird geprüft …" />}
-      {status.error && <ErrorBox error={status.error} onRetry={status.reload} />}
-      {s && (
-        <table className="table compact">
-          <thead>
-            <tr>
-              <th>Tabellenblatt</th>
-              <th>Status</th>
-              <th className="hide-sm">Schutz</th>
-            </tr>
-          </thead>
-          <tbody>
-            {s.tabs.map((tab) => (
-              <tr key={tab.name}>
-                <td>
-                  <code>{tab.name}</code>
-                </td>
-                <td>
-                  {!tab.exists ? (
-                    <span className="badge warn">fehlt</span>
-                  ) : tab.missingColumns.length > 0 ? (
-                    <span className="badge warn" title={tab.missingColumns.join(', ')}>
-                      {tab.missingColumns.length} Spalten fehlen
-                    </span>
-                  ) : (
-                    <span className="badge ok">vollständig</span>
-                  )}
-                </td>
-                <td className="hide-sm">{tab.isProtected ? 'Warnhinweis aktiv' : <span className="muted">–</span>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <FormError error={runError} />
-      <div className="form-actions">
-        <button type="button" className="button" onClick={status.reload} disabled={status.loading || running}>
-          Erneut prüfen
-        </button>
-        <button type="button" className="button primary" onClick={einrichten} disabled={!s || running || fertig}>
-          {running ? 'Richtet ein …' : fertig ? '✓ Eingerichtet' : 'Einrichten'}
-        </button>
-      </div>
-    </Card>
-  );
-}
 
 type OrdnerSchluessel = keyof typeof DRIVE_ORDNER_NAMEN;
 const ORDNER: { key: OrdnerSchluessel; einstellung: string; label: string; hinweis: string }[] = [
@@ -206,7 +114,7 @@ function DriveKarte() {
   );
 }
 
-/** With crm-api there is nothing to set up: the tables come from migrations (db/migrationen). */
+/** Nothing to set up: the tables come from migrations (db/migrationen). */
 function DatenbankKarte() {
   return (
     <Card
@@ -229,16 +137,7 @@ function TeamKarte() {
   return (
     <Card title="3. Team & Auswahllisten">
       <p className="muted">
-        {config.crmApiUrl ? (
-          <>
-            Gepflegt unter <Link to="/einrichtung/daten/listen">Daten → listen</Link>.
-          </>
-        ) : (
-          <>
-            Gepflegt im Tabellenblatt <code>listen</code> (Spalten <code>liste</code> und <code>wert</code>).
-          </>
-        )}{' '}
-        Neue Einträge erscheinen nach dem nächsten Laden.
+        Gepflegt unter <Link to="/einrichtung/daten/listen">Daten → listen</Link>. Neue Einträge erscheinen nach dem nächsten Laden.
       </p>
       <dl className="items">
         <div className="item">
@@ -370,17 +269,15 @@ export function EinrichtungPage() {
       <PageHeader
         eyebrow="System"
         title="Einrichtung"
-        subtitle={isDemo ? 'Demo-Modus: Alles läuft mit einem Beispiel-Sheet im Browser.' : `Angemeldet für @${config.allowedDomain}`}
+        subtitle={isDemo ? 'Demo-Modus: Alles läuft mit Beispieldaten im Browser.' : `Angemeldet für @${config.allowedDomain}`}
       />
       {isDemo && (
         <div className="hint-box">
-          Für echte Daten fehlen noch <strong>GOOGLE_CLIENT_ID</strong> und <strong>SPREADSHEET_ID</strong> – siehe README im Repo, Abschnitt „Einrichtung“.
+          Für echte Daten fehlen noch <strong>GOOGLE_CLIENT_ID</strong> und <strong>CRM_API_URL</strong> – siehe README im Repo, Abschnitt „Einrichtung“.
         </div>
       )}
       {error && !(error instanceof AuthExpiredError) && <p className="alert error">{errorMessage(error)}</p>}
-      {config.crmApiUrl ? <DatenbankKarte /> : <SheetKarte />}
-      {/* Until the sheet is retired: the takeover needs both the API and the sheet. */}
-      {config.crmApiUrl && config.spreadsheetId && <UebernahmeKarte />}
+      <DatenbankKarte />
       {/* Remount once data is there, so the fields start with the saved values. */}
       <DriveKarte key={db ? 'drive-bereit' : 'drive-laedt'} />
       <TeamKarte />

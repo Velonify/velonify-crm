@@ -9,15 +9,12 @@ import { AuthExpiredError } from './errors';
 import { GoogleCalendar } from './google/calendar';
 import { GoogleDrive } from './google/drive';
 import { ApiStore } from './api/apiStore';
-import { SheetsClient, type SheetsApi } from './sheets/sheetsClient';
-import { SheetStore } from './sheets/sheetStore';
+import { SheetsClient } from './sheets/sheetsClient';
 import type { Database } from './types';
 import { read as gemerktesIch } from '../lib/useIch';
 
 interface CrmContextValue {
   service: CrmService | null;
-  /** Raw sheet access for the setup page. */
-  sheets: SheetsApi | null;
   db: Database | null;
   loading: boolean;
   error: Error | null;
@@ -32,14 +29,14 @@ interface CrmContextValue {
 
 const CrmContext = createContext<CrmContextValue | null>(null);
 
-// Colleagues' changes show up without reloading the page; at 60 reads/minute per person this stays far below Google's limit.
+// Colleagues' changes show up without reloading the page, without putting much load on crm-api.
 const REFRESH_INTERVAL_MS = 120_000;
 const REFRESH_ON_FOCUS_AFTER_MS = 30_000;
 
 export function CrmProvider({ children }: { children: ReactNode }) {
   const { getToken, userEmail, expire } = useAuth();
   const toast = useToast();
-  const [backend, setBackend] = useState<{ service: CrmService; sheets: SheetsApi | null } | null>(null);
+  const [backend, setBackend] = useState<{ service: CrmService } | null>(null);
   const [db, setDb] = useState<Database | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -53,17 +50,16 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         (err: Error) => !cancelled && (setError(err), setLoading(false)),
       );
     } else {
-      // With crm-api the data lives in Postgres; the sheet client is then only used for the offer calculations.
-      const sheets = config.crmApiUrl ? null : new SheetsClient(config.spreadsheetId, getToken);
+      // The data lives in Postgres behind crm-api; the Sheets client is only used for the offer calculations.
       const service = new CrmService({
-        store: sheets ? new SheetStore(sheets) : new ApiStore(config.crmApiUrl, getToken),
+        store: new ApiStore(config.crmApiUrl, getToken),
         drive: new GoogleDrive(getToken),
         calendar: new GoogleCalendar(getToken),
         currentUser: userEmail,
         tabelle: (spreadsheetId) => new SheetsClient(spreadsheetId, getToken),
         ich: gemerktesIch,
       });
-      setBackend({ service, sheets });
+      setBackend({ service });
     }
     return () => {
       cancelled = true;
@@ -134,7 +130,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<CrmContextValue>(
-    () => ({ service: backend?.service ?? null, sheets: backend?.sheets ?? null, db, loading, error, refresh, mutate, perform }),
+    () => ({ service: backend?.service ?? null, db, loading, error, refresh, mutate, perform }),
     [backend, db, loading, error, refresh, mutate, perform],
   );
   return <CrmContext.Provider value={value}>{children}</CrmContext.Provider>;

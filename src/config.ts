@@ -2,13 +2,12 @@ const env = import.meta.env;
 
 export const config = {
   googleClientId: env.VITE_GOOGLE_CLIENT_ID || '',
-  spreadsheetId: env.VITE_SPREADSHEET_ID || '',
   allowedDomain: (env.VITE_ALLOWED_DOMAIN || 'velonify.de').toLowerCase(),
   /** Cloud Function of the Contact Generator */
   contactGeneratorUrl: env.VITE_CONTACT_GENERATOR_URL || '',
   /** Cloud Function of the shop audit */
   shopAuditUrl: env.VITE_SHOP_AUDIT_URL || '',
-  /** Cloud Function crm-api in front of Postgres; when set, the data no longer comes from the sheet. */
+  /** Cloud Function crm-api in front of Postgres: all hub data goes through it. */
   crmApiUrl: env.VITE_CRM_API_URL || '',
   /** Cloud Function kundenportal; with it the "Portal" tab can open the client's portal as a read-only preview. */
   kundenportalApiUrl: (env.VITE_KUNDENPORTAL_API_URL || '').replace(/\/$/, ''),
@@ -16,10 +15,15 @@ export const config = {
   kundenportalUrl: (env.VITE_KUNDENPORTAL_URL || 'https://kunden.velonify.de').replace(/\/$/, ''),
 };
 
-/** Without a client ID and a data source (crm-api or sheet) the app runs on in-memory sample data. */
-export const isDemo = !config.googleClientId || (!config.crmApiUrl && !config.spreadsheetId);
+/** Without a client ID and crm-api the app runs on in-memory sample data. */
+export const isDemo = !config.googleClientId || !config.crmApiUrl;
 
-// Sheets for data, Drive for lead/client folders, Calendar for Meet appointments.
+// The data lives in Postgres behind crm-api; Google is still needed for:
+// - Sheets: the calculation sheet of an offer (CrmService.legeKalkulationAn writes it with the Sheets API).
+// - Drive (full): lead/client folders in the shared drive – search by name, list, move, upload. These folders were not
+//   created by the app, so drive.file would not see them. Full drive would also cover the Sheets API; the spreadsheets
+//   scope stays anyway until that has been tried live.
+// - Calendar: Meet appointments.
 export const GOOGLE_SCOPES = [
   'openid',
   'email',
@@ -28,5 +32,3 @@ export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/drive',
   'https://www.googleapis.com/auth/calendar.events',
 ];
-
-export const spreadsheetUrl = (id: string) => `https://docs.google.com/spreadsheets/d/${id}/edit`;

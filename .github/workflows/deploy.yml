@@ -28,7 +28,6 @@ jobs:
         env:
           # Repo → Settings → Secrets and variables → Actions → Variables. Without them the build runs in demo mode.
           VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
-          VITE_SPREADSHEET_ID: ${{ vars.SPREADSHEET_ID }}
           VITE_ALLOWED_DOMAIN: ${{ vars.ALLOWED_DOMAIN }}
           VITE_CONTACT_GENERATOR_URL: ${{ vars.CONTACT_GENERATOR_URL }}
           VITE_SHOP_AUDIT_URL: ${{ vars.SHOP_AUDIT_URL }}
