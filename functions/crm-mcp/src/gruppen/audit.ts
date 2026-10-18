@@ -47,7 +47,7 @@ import { findeTeamMitglied } from '../../../../src/data/selectors';
 import { EMPTY_FIRMA_INPUT, type Audit, type Database, type MagnetLead } from '../../../../src/data/types';
 import { MAX_VERSUCHE, bewerte, muster, normalisiere, raetselNummer, rangliste, teilenText, WORT_LAENGE, wortDesTages } from '../../../../src/data/wordle';
 import { gmailLink } from '../../../../src/lib/gmail';
-import { antwort, datum, fehler, finde, firmaLink, HUB, kompakt, klein, ohneDienst, type Werkzeugkasten } from '../hilfen';
+import { antwort, datum, fehler, finde, firmaLink, HUB, kompakt, klein, ohneDienst, type Werkzeugkasten, zeitBerlin } from '../hilfen';
 
 /** Answer when the person's Google token lacks the calendar scope (connected before calendar access was added). */
 export const KALENDER_NEU_VERBINDEN = 'Bitte den Connector neu verbinden, damit Kalender-Zugriff erteilt wird.';
@@ -442,7 +442,7 @@ export function registriereAudit(k: Werkzeugkasten): void {
         const audit = lead.audit_id ? (await service.loadAudits()).find((a) => a.id === lead.audit_id) : undefined;
         return antwort({
           ...roastZeile(lead),
-          freigegeben_am: lead.report_freigegeben_am ? lead.report_freigegeben_am.slice(0, 16).replace('T', ' ') : undefined,
+          freigegeben_am: lead.report_freigegeben_am ? zeitBerlin(lead.report_freigegeben_am) : undefined,
           fehlt_fuer_freigabe: lead.audit_id && !lead.report_freigegeben_am ? fehltFuerFreigabe(lead) || undefined : undefined,
           report: reportAnsicht(lead, audit) ?? 'Noch kein Report. Mit `roast_shop_pruefen` den Shop prüfen.',
         });
@@ -953,7 +953,7 @@ export function registriereAudit(k: Werkzeugkasten): void {
           kompakt({
             erwaehnung_id: e.id,
             gelesen: Boolean(e.gelesen_am),
-            datum: e.datum.slice(0, 16).replace('T', ' '),
+            datum: zeitBerlin(e.datum),
             von: findeTeamMitglied(team, '', e.von) ?? e.von,
             art: ART_LABEL[e.art] ?? e.art,
             titel: e.titel,

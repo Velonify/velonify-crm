@@ -50,6 +50,17 @@ import type { LeadFinderApi } from '../../../src/data/leadFinder';
 import type { LinkedinApi } from '../../../src/data/linkedin';
 import type { ShopAuditApi } from '../../../src/data/shopAudit';
 
+const BERLIN = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+/** "JJJJ-MM-TT HH:MM" in Berlin time. Timestamps with Z or an offset are UTC instants; plain ones are already local. */
+export function zeitBerlin(wert: string): string {
+  if (/T\d{2}:\d{2}.*(Z|[+-]\d{2}:?\d{2})$/.test(wert)) {
+    const datum = new Date(wert);
+    if (!Number.isNaN(datum.getTime())) return BERLIN.format(datum);
+  }
+  return wert.slice(0, 16).replace('T', ' ');
+}
+
 export const HUB = 'https://crm.velonify.de';
 export const firmaLink = (id: string) => `${HUB}/#/crm/firmen/${id}`;
 export const driveLink = (id: string) => (id ? `https://drive.google.com/drive/folders/${id}` : undefined);
@@ -148,7 +159,7 @@ export function leadZeile(l: MagnetLead) {
   return kompakt({
     lead_id: l.id,
     magnet: l.magnet,
-    eingegangen_am: l.eingegangen_am.slice(0, 16).replace('T', ' '),
+    eingegangen_am: zeitBerlin(l.eingegangen_am),
     vorname: l.vorname,
     email: l.email,
     shop: l.shop,

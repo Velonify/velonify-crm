@@ -60,7 +60,7 @@ import {
   type Leistungskategorie,
   type OutreachLeistung,
 } from '../../../../src/data/types';
-import { antwort, fehler, finde, firmaLink, HUB, kompakt, ohneDienst, ohneUndefined, type Werkzeugkasten } from '../hilfen';
+import { antwort, fehler, finde, firmaLink, HUB, kompakt, ohneDienst, ohneUndefined, type Werkzeugkasten, zeitBerlin } from '../hilfen';
 
 export const angebotLink = (id: string) => `${HUB}/#/angebote/${id}`;
 const KATALOG_LINK = `${HUB}/#/angebote/leistungen`;
@@ -180,7 +180,7 @@ function anschreibenZeile(a: Anschreiben, db: Database, mitText: boolean) {
   const kontakt = db.kontakte.find((kt) => kt.id === a.kontakt_id);
   return kompakt({
     anschreiben_id: a.id,
-    gesendet_am: a.gesendet_am.slice(0, 16).replace('T', ' '),
+    gesendet_am: zeitBerlin(a.gesendet_am),
     firma: db.firmen.find((f) => f.id === a.firma_id)?.name ?? 'Firma nicht gefunden',
     firma_id: a.firma_id,
     kontakt: kontakt ? kontaktName(kontakt) : '',

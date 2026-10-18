@@ -36,6 +36,7 @@ import {
   ohneUndefined,
   pruefeTeam,
   type Werkzeugkasten,
+  zeitBerlin,
 } from '../hilfen';
 
 const ANFRAGEN_LINK = `${HUB}/#/crm/anfragen`;
@@ -71,7 +72,7 @@ function anfrageZeile(a: Anfrage, firmen: readonly Firma[]) {
   const aehnlich = offen ? anfrageDubletten(a, firmen) : [];
   return kompakt({
     anfrage_id: a.id,
-    eingegangen_am: a.eingegangen_am.slice(0, 16).replace('T', ' '),
+    eingegangen_am: zeitBerlin(a.eingegangen_am),
     quelle: a.quelle,
     sprache: a.sprache && a.sprache !== 'de' ? a.sprache : '',
     name: a.name,
@@ -547,7 +548,7 @@ export function registriereEingang(k: Werkzeugkasten): void {
       return antwort({
         domain: kd.domain,
         url: kd.url,
-        geprueft_am: d.geprueft_am.slice(0, 16).replace('T', ' '),
+        geprueft_am: zeitBerlin(d.geprueft_am),
         qualifiziert: kd.qualifiziert,
         entscheidung: d.entscheidung
           ? kompakt({ entscheidung: d.entscheidung, grund: d.grund, am: d.entschieden_am?.slice(0, 10), von: d.entschieden_von, firma_id: d.firma_id })
