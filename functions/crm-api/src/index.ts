@@ -39,12 +39,9 @@ function datenbank(name = HAUPT_DB): Promise<Verbindung> {
   return verbindung;
 }
 
-/**
- * Shared secrets of the website's Netlify functions and of Cloud Scheduler, sent in the header `X-Velonify-Token`.
- * `?token=` still works until the website and the scheduler send the header; query strings end up in request logs.
- */
+/** Shared secrets of the website's Netlify functions and of Cloud Scheduler, only in the header (query strings end up in request logs). */
 function mitgegebenesToken(req: functions.Request): unknown {
-  return req.get('x-velonify-token') ?? req.query.token;
+  return req.get('x-velonify-token');
 }
 
 function passt(gegeben: unknown, erwartet: string | undefined): boolean {

@@ -8,7 +8,7 @@ Die API zwischen Hub und Postgres. Seit dem Umzug vom Google Sheet liegen die Da
 - **Übernahme aus dem Sheet** (`/admin/uebernahme`, `/admin/zaehlen`, nur Lukas und Julian): Einmal-Übernahme vom 15.10.2026, erledigt. Die Karte dazu ist aus dem Hub entfernt; die beiden Endpunkte haben damit keinen Aufrufer mehr und können bei der nächsten Arbeit an crm-api raus.
 - **Datenansicht** (`GET /tabelle/<tab>`, `GET /verlauf/<tab>/<id>`, `POST /listen`): *Einrichtung → Daten* im Hub, für das ganze Team. Einträge ändern läuft über `/aendern` mit Konfliktprüfung, „Zurücknehmen“ schreibt die alten Werte aus `aenderungen` zurück. Löschen darf die API nur in `listen` (Migration 003).
 - **Lese-Spiegel** (`POST /extern/spiegel`, Token im Header `X-Velonify-Token`): Cloud Scheduler startet ihn jede Nacht. Er schreibt alle Tabellen in ein Sheet, das das Team nur lesen kann (`SPIEGEL_SHEET_ID`), mit dem Dienstkonto der Function.
-- **Website** (`/extern/eingang`, `/extern/magnete`, Token im Header `X-Velonify-Token`; `?token=` geht übergangsweise noch, landet aber in den Request-Logs): ersetzt die Apps Scripts `eingang` und `magnete` mit demselben Antwortformat (HTTP 200, Ergebnis in `status`). Die Netlify-Functions der Website brauchen dafür nur neue Adressen in `CRM_EINGANG_URL` und `CRM_MAGNETE_URL`. Magnet-Mails gehen über die Gmail-API (Refresh-Token von lukas@, nur `gmail.send`).
+- **Website** (`/extern/eingang`, `/extern/magnete`, Token im Header `X-Velonify-Token`, nicht mehr im Query-String): ersetzt die Apps Scripts `eingang` und `magnete` mit demselben Antwortformat (HTTP 200, Ergebnis in `status`). Die Netlify-Functions der Website brauchen dafür nur neue Adressen in `CRM_EINGANG_URL` und `CRM_MAGNETE_URL`. Magnet-Mails gehen über die Gmail-API (Refresh-Token von lukas@, nur `gmail.send`).
 - **Datenbank** (`../../db/verbindung.ts`): Cloud SQL Connector mit IAM-Anmeldung als `crm-api@velonify-crm.iam`, keine Passwörter. Pool mit 3 Verbindungen, die Rolle darf höchstens 5.
 - **Änderungsprotokoll**: Jede Schreibanfrage setzt `app.person`, ein Trigger schreibt alte und neue Werte nach `aenderungen`.
 
@@ -78,11 +78,13 @@ Ohne `SLACK_BOT_TOKEN` bleibt es bei der Glocke. Kann Slack nicht zustellen, wir
 npm install && npm test && npm run build
 gcloud functions deploy crm-api --gen2 --region=europe-west3 --runtime=nodejs24 --source=. --entry-point=crmApi \
   --trigger-http --no-allow-unauthenticated --service-account=crm-api@velonify-crm.iam.gserviceaccount.com \
-  --memory=512Mi --cpu=1 --concurrency=40 --max-instances=1 --min-instances=0 --project=velonify-crm \
+  --memory=512Mi --cpu=1 --concurrency=40 --max-instances=1 --min-instances=0 --timeout=300s --project=velonify-crm \
   --set-env-vars=TZ=Europe/Berlin,DB_INSTANZ=velonify-apps:europe-west3:velonify-db,DB_NUTZER=crm-api@velonify-crm.iam,DB_NAME=crm,GOOGLE_CLIENT_ID=<CLIENT-ID-HUB>,GMAIL_CLIENT_ID=<CLIENT-ID-CRM-MCP>,SPIEGEL_SHEET_ID=<SHEET-ID> \
   --set-secrets=EINGANG_TOKEN=crm-api-eingang-token:latest,MAGNETE_TOKEN=crm-api-magnete-token:latest,SPIEGEL_TOKEN=crm-api-spiegel-token:latest,GMAIL_REFRESH_TOKEN=crm-api-gmail-token:latest,GMAIL_CLIENT_SECRET=crm-mcp-google-secret:latest
 gcloud run services update crm-api --region=europe-west3 --no-invoker-iam-check --project=velonify-crm
 ```
+
+**Timeout 300 s**, weil der nächtliche Spiegel so lange laufen darf (Scheduler `--attempt-deadline=300s`).
 
 **Eine Instanz, viele Anfragen gleichzeitig** (`--cpu=1 --concurrency=40 --max-instances=1`): Mit der Voreinstellung (eine Anfrage je Instanz) startet Google bei jedem parallelen Laden eine weitere Instanz mit eigenen Verbindungen, und das Konto `crm-api` darf nur 5. So bleibt es bei höchstens 4 (3 für `crm`, 1 für Probeläufe in `crm_test`).
 
