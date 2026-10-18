@@ -214,6 +214,19 @@ functions.http('shopAudit', async (req, res) => {
     throw error;
   }
 
+  // An audit takes up to 90 seconds without sending anything. Some networks drop a connection that stays silent
+  // that long, and the browser then reports a network error although the audit succeeded. So the status goes out
+  // now and a space every 10 seconds keeps the connection alive; JSON allows leading whitespace. From here on,
+  // errors arrive as { fehler } with status 200.
+  res.status(200).set('Content-Type', 'application/json; charset=utf-8');
+  res.write(' ');
+  const puls = setInterval(() => res.write(' '), 10_000);
+  res.on('close', () => clearInterval(puls));
+  const antworte = (daten: unknown) => {
+    clearInterval(puls);
+    res.end(JSON.stringify(daten));
+  };
+
   const start = Date.now();
   let messung: Awaited<ReturnType<typeof messeShop>>;
   try {
@@ -225,7 +238,7 @@ functions.http('shopAudit', async (req, res) => {
     });
   } catch (error) {
     console.error('Audit fehlgeschlagen', error);
-    return fehler(500, 'Die Prüfung ist unerwartet fehlgeschlagen.');
+    return antworte({ fehler: 'Die Prüfung ist unerwartet fehlgeschlagen.' });
   }
 
   // Claude only adds wording. If it fails, the audit is still returned with the rule-based summary.
@@ -264,5 +277,5 @@ functions.http('shopAudit', async (req, res) => {
     console.log(JSON.stringify({ email, domain, status: messung.status, dauer_ms: Date.now() - start }));
   }
 
-  res.json({ ...messung, geprueft_am: new Date().toISOString(), zusammenfassung, aufhaenger, hinweis, modell });
+  antworte({ ...messung, geprueft_am: new Date().toISOString(), zusammenfassung, aufhaenger, hinweis, modell });
 });
