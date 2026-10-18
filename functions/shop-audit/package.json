@@ -9,12 +9,13 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "node scripts/lade-technik.mjs && tsc",
-    "gcp-build": "node scripts/lade-technik.mjs && tsc",
+    "build": "node scripts/lade-technik.mjs && node scripts/build.mjs",
+    "gcp-build": "",
     "start": "functions-framework --target=shopAudit",
     "test": "vitest run",
     "technik": "node scripts/lade-technik.mjs",
-    "pretest": "node scripts/lade-technik.mjs"
+    "pretest": "node scripts/lade-technik.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.126.0",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.13.5",
+    "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"
   }

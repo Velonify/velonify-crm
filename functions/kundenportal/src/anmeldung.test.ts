@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { Berechtigung } from '../../../src/data/portalApi';
 import { Begrenzer, erstelleLink, erstelleSitzung, erstelleVorschau, linkNochGueltig, oeffneLink, oeffneSitzung, verlaengerteSitzung } from './anmeldung';
-import { rohMail } from './google';
+import { rohMail } from '../../gemeinsam/google';
 import { Siegel } from './siegel';
 
 const siegel = new Siegel(randomBytes(32).toString('base64'));
@@ -60,16 +60,16 @@ describe('login links and sessions', () => {
   });
 
   it('encodes the mail as UTF-8', () => {
-    const roh = Buffer.from(rohMail('Velonify <hallo@velonify.de>', 'sophie@alpenglanz.example', 'Dein Anmeldelink für das Portal', 'Grüße'), 'base64url').toString('utf8');
-    expect(roh).toContain('From: Velonify <hallo@velonify.de>');
+    const roh = Buffer.from(rohMail({ absender: 'Velonify <hallo@velonify.de>' }, { an: 'sophie@alpenglanz.example', betreff: 'Dein Anmeldelink für das Portal', text: 'Grüße' }), 'base64url').toString('utf8');
+    expect(roh).toContain(`From: =?UTF-8?B?${Buffer.from('Velonify').toString('base64')}?= <hallo@velonify.de>`);
     expect(roh).toContain(`Subject: =?UTF-8?B?${Buffer.from('Dein Anmeldelink für das Portal').toString('base64')}?=`);
     expect(roh.split('\r\n\r\n')[1]).toBe(Buffer.from('Grüße').toString('base64'));
   });
 
   it('sends text and HTML as multipart/alternative', () => {
-    const roh = Buffer.from(rohMail('Lukas von Velonify <lukas@velonify.de>', 'a@b.example', 'Betreff', 'Text', '<p>Hallo</p>'), 'base64url').toString('utf8');
+    const roh = Buffer.from(rohMail({ absender: 'Lukas von Velonify <lukas@velonify.de>' }, { an: 'a@b.example', betreff: 'Betreff', text: 'Text', html: '<p>Hallo</p>' }), 'base64url').toString('utf8');
     const grenze = /boundary="([^"]+)"/.exec(roh)![1];
-    expect(roh).toContain('From: Lukas von Velonify <lukas@velonify.de>');
+    expect(roh).toContain('<lukas@velonify.de>');
     expect(roh).toContain('Content-Type: text/plain; charset=UTF-8');
     expect(roh).toContain('Content-Type: text/html; charset=UTF-8');
     expect(roh).toContain(Buffer.from('<p>Hallo</p>').toString('base64'));

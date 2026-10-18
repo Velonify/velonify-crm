@@ -7,8 +7,8 @@ Die API zwischen Hub und Postgres. Seit dem Umzug vom Google Sheet liegen die Da
 - **Hub** (`src/data/api/apiStore.ts`): `GET /daten/<gruppe>`, `POST /einfuegen`, `POST /aendern`, `POST /einstellungen`, 1:1 zur `Store`-Schnittstelle. Anmeldung mit dem Google-Token, das der Hub ohnehin hat (`tokeninfo`, nur @velonify.de, wie im Contact Generator). Konflikte über `geaendert_am` kommen als 409 zurück.
 - **Übernahme aus dem Sheet** (`/admin/uebernahme`, `/admin/zaehlen`, nur Lukas und Julian): Die Karte *Einrichtung → Übernahme aus dem Sheet* liest das Sheet im Browser und schickt es hierher, wahlweise nach `crm_test` (Probelauf) oder `crm`.
 - **Datenansicht** (`GET /tabelle/<tab>`, `GET /verlauf/<tab>/<id>`, `POST /listen`): *Einrichtung → Daten* im Hub, für das ganze Team. Einträge ändern läuft über `/aendern` mit Konfliktprüfung, „Zurücknehmen“ schreibt die alten Werte aus `aenderungen` zurück. Löschen darf die API nur in `listen` (Migration 003).
-- **Lese-Spiegel** (`POST /extern/spiegel?token=…`): Cloud Scheduler startet ihn jede Nacht. Er schreibt alle Tabellen in ein Sheet, das das Team nur lesen kann (`SPIEGEL_SHEET_ID`), mit dem Dienstkonto der Function.
-- **Website** (`/extern/eingang`, `/extern/magnete`, Token im Query-String): ersetzt die Apps Scripts `eingang` und `magnete` mit demselben Antwortformat (HTTP 200, Ergebnis in `status`). Die Netlify-Functions der Website brauchen dafür nur neue Adressen in `CRM_EINGANG_URL` und `CRM_MAGNETE_URL`. Magnet-Mails gehen über die Gmail-API (Refresh-Token von lukas@, nur `gmail.send`).
+- **Lese-Spiegel** (`POST /extern/spiegel`, Token im Header `X-Velonify-Token`): Cloud Scheduler startet ihn jede Nacht. Er schreibt alle Tabellen in ein Sheet, das das Team nur lesen kann (`SPIEGEL_SHEET_ID`), mit dem Dienstkonto der Function.
+- **Website** (`/extern/eingang`, `/extern/magnete`, Token im Header `X-Velonify-Token`; `?token=` geht übergangsweise noch, landet aber in den Request-Logs): ersetzt die Apps Scripts `eingang` und `magnete` mit demselben Antwortformat (HTTP 200, Ergebnis in `status`). Die Netlify-Functions der Website brauchen dafür nur neue Adressen in `CRM_EINGANG_URL` und `CRM_MAGNETE_URL`. Magnet-Mails gehen über die Gmail-API (Refresh-Token von lukas@, nur `gmail.send`).
 - **Datenbank** (`../../db/verbindung.ts`): Cloud SQL Connector mit IAM-Anmeldung als `crm-api@velonify-crm.iam`, keine Passwörter. Pool mit 3 Verbindungen, die Rolle darf höchstens 5.
 - **Änderungsprotokoll**: Jede Schreibanfrage setzt `app.person`, ein Trigger schreibt alte und neue Werte nach `aenderungen`.
 
@@ -46,7 +46,8 @@ openssl rand -hex 24 | tr -d '\n' | gcloud secrets create crm-api-spiegel-token 
 gcloud secrets add-iam-policy-binding crm-api-spiegel-token --project=velonify-crm \
   --member=serviceAccount:crm-api@velonify-crm.iam.gserviceaccount.com --role=roles/secretmanager.secretAccessor
 gcloud scheduler jobs create http crm-spiegel --location=europe-west3 --project=velonify-crm --schedule="30 2 * * *" --time-zone=Europe/Berlin \
-  --http-method=POST --uri="https://europe-west3-velonify-crm.cloudfunctions.net/crm-api/extern/spiegel?token=$(gcloud secrets versions access latest --secret=crm-api-spiegel-token --project=velonify-crm)" \
+  --http-method=POST --uri="https://europe-west3-velonify-crm.cloudfunctions.net/crm-api/extern/spiegel" \
+  --headers="X-Velonify-Token=$(gcloud secrets versions access latest --secret=crm-api-spiegel-token --project=velonify-crm)" \
   --attempt-deadline=300s
 ```
 

@@ -85,7 +85,7 @@ describe('Website: Lead-Magnete', () => {
 
   it('builds a multipart mail with encoded sender name and reply-to', () => {
     const roh = Buffer.from(
-      rohMail({ clientId: '', clientSecret: '', refreshToken: '', absender: 'Lukas von Velonify <hallo@velonify.de>', antwortAn: 'lukas@velonify.de' }, { an: 'a@b.example', betreff: 'Größe', text: 't', html: '<p>h</p>' }, 'G'),
+      rohMail({ absender: 'Lukas von Velonify <hallo@velonify.de>', antwortAn: 'lukas@velonify.de' }, { an: 'a@b.example', betreff: 'Größe', text: 't', html: '<p>h</p>' }, 'G'),
       'base64url',
     ).toString('utf8');
     expect(roh).toContain('From: =?UTF-8?B?');

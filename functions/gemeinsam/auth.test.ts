@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Limit, pruefeGoogleToken, ZugriffsFehler } from './auth.js';
+import { Limit, pruefeGoogleToken, ZugriffsFehler } from './auth';
 
 const CLIENT_ID = 'client-123.apps.googleusercontent.com';
 

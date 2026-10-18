@@ -3,7 +3,7 @@ import { http, type Request, type Response } from '@google-cloud/functions-frame
 import { ConflictError, ValidationError } from '../../../src/data/errors';
 import { GoogleDrive } from '../../../src/data/google/drive';
 import { alleBerechtigungen, findeBerechtigung, kartenKontext, kundensicht, loginMail, normalisiereEmail, portalKarte, pruefeBerechtigung, vorschauBerechtigung, type Berechtigung } from '../../../src/data/portalApi';
-import { pruefeGoogleToken, ZugriffsFehler } from '../../contact-generator/src/auth';
+import { pruefeGoogleToken, ZugriffsFehler } from '../../gemeinsam/auth';
 import {
   anfrageHatAnhaenge,
   dateiErlaubt,
@@ -27,7 +27,7 @@ import { PostgresStore } from '../../../src/data/postgres/postgresStore';
 import type { Store } from '../../../src/data/store';
 import { verbinde, type Verbindung } from '../../../db/verbindung';
 import { Begrenzer, erstelleLink, erstelleSitzung, erstelleVorschau, linkNochGueltig, oeffneLink, oeffneSitzung, verlaengerteSitzung, type SitzungInhalt } from './anmeldung';
-import { dienstkontoToken, Mailer, nutzerToken } from './google';
+import { dienstkontoToken, Mailer, nutzerToken } from '../../gemeinsam/google';
 import { Siegel } from './siegel';
 import { slackPoster, versende } from './versand';
 import { aktualisiereKennzahlen } from './kennzahlen';
@@ -116,8 +116,9 @@ function json(res: Response, status: number, daten: unknown): void {
   res.status(status).set('Cache-Control', 'no-store').json(daten);
 }
 
+/** Google appends the real client address last; earlier entries come from the client and can be made up. */
 function ip(req: Request): string {
-  return (req.get('x-forwarded-for') ?? '').split(',')[0].trim() || req.ip || 'unbekannt';
+  return (req.get('x-forwarded-for') ?? '').split(',').at(-1)?.trim() || req.ip || 'unbekannt';
 }
 
 async function store(lz: Laufzeit): Promise<Store> {
@@ -250,7 +251,7 @@ async function anmelden(req: Request, res: Response, lz: Laufzeit): Promise<void
   const link = `${lz.portalUrl}/#/anmelden/${erstelleLink(lz.siegel, berechtigung, Date.now())}`;
   const mail = loginMail(berechtigung.kontakt.vorname, link);
   try {
-    await lz.mailer.sende(berechtigung.kontakt.email.trim(), mail.betreff, mail.text, mail.html);
+    await lz.mailer.sende({ an: berechtigung.kontakt.email.trim(), betreff: mail.betreff, text: mail.text, html: mail.html });
   } catch (err) {
     console.error('Login-Mail fehlgeschlagen', err);
   }
@@ -462,7 +463,7 @@ async function versand(req: Request, res: Response, lz: Laufzeit): Promise<void>
   const bericht = await versende({
     store: await store(lz),
     dateien: async (firma) => (await ladeKundenDateien(drive, firma.drive_ordner_id)).dateien,
-    sendeMail: (an, betreff, text, html) => lz.mailer.sende(an, betreff, text, html),
+    sendeMail: (an, betreff, text, html) => lz.mailer.sende({ an, betreff, text, html }),
     slack: lz.slackToken ? slackPoster(lz.slackToken) : null,
     portalUrl: lz.portalUrl,
     teamDomain: lz.teamDomain,
