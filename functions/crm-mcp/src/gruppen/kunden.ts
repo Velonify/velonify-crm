@@ -44,6 +44,7 @@ import {
   pruefeTeam,
   spalteZeile,
   type Werkzeugkasten,
+  zeitBerlin,
 } from '../hilfen';
 
 /** Finished cards of the client board stay in the ticker for a week, as in the hub. */
@@ -55,7 +56,7 @@ const boardAngabe = z.string().min(1).describe('"intern" für „Velonify intern
 
 const kundeHub = (firmaId: string, bereich = '') => `${HUB}/#${kundenLink(firmaId)}${bereich ? `/${bereich}` : ''}`;
 const karteHub = (k: Pick<Aufgabe, 'board_id' | 'id'>) => `${HUB}/#${kartenLink(k.board_id, k.id)}`;
-const zeit = (wert: string) => wert.slice(0, 16).replace('T', ' ');
+const zeit = zeitBerlin;
 
 /** The client a name points to, like `kunden_news_anlegen`: never the internal board. */
 function findeKunde(db: Database, angabe: string): Firma {
