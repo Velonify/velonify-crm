@@ -1326,7 +1326,7 @@ export class CrmService {
       const [zugang] = await this.store.update('portal_zugaenge', [{ id: vorhanden.id, changes: { aktiv, ...this.changed() } }]);
       return zugang;
     }
-    const zugang: PortalZugang = { id: newId(ID_PREFIX.portal_zugaenge), firma_id: firmaId, kontakt_id: kontaktId, aktiv, zuletzt_am: '', updates: '', kanal_updates: '', kanal_hinweise: '', update_am: '', hinweise_bis: '', ...this.created() };
+    const zugang: PortalZugang = { id: newId(ID_PREFIX.portal_zugaenge), firma_id: firmaId, kontakt_id: kontaktId, aktiv, zuletzt_am: '', updates: '', kanal_updates: '', kanal_hinweise: '', update_am: '', hinweise_bis: '', rundgang_am: '', neuerungen_gesehen: '', ...this.created() };
     await this.store.insert('portal_zugaenge', [zugang]);
     return zugang;
   }
@@ -1372,6 +1372,13 @@ export class CrmService {
     const firma = CrmService.find((await this.store.load()).firmen, zugang.firma_id);
     const einstellungen = pruefeEinstellungen({ ...eingabe }, !!firma.slack_channel.trim());
     const [neu] = await this.store.update('portal_zugaenge', [{ id: zugangId, changes: { ...einstellungen, ...this.changed() } }]);
+    return neu;
+  }
+
+  /** Shows the portal tour to this login again on the next visit. */
+  async setzeRundgangZurueck(zugangId: string): Promise<PortalZugang> {
+    CrmService.find((await this.store.loadPortalDaten()).zugaenge, zugangId);
+    const [neu] = await this.store.update('portal_zugaenge', [{ id: zugangId, changes: { rundgang_am: '', ...this.changed() } }]);
     return neu;
   }
 

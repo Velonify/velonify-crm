@@ -3,6 +3,7 @@
  * whitelisted fields of the client's own, released records – nothing else of the sheet leaves the server.
  * Shared with the portal frontend as the contract of the API.
  */
+import type { PortalRundgang } from './portalRundgang';
 import { CLIENT_SHARE_ORDNER } from './kunden';
 import { freigabeVon, meilensteineVon, type FreigabeStatus } from './portal';
 import { checklisteVon, erledigtSpalte, spaltenVon } from './todos';
@@ -97,6 +98,8 @@ export interface Kundensicht {
   termine: Record<string, string>;
   /** Updates and notifications of the logged-in contact; null in the team access (they belong to a person). */
   einstellungen: PortalEinstellungen | null;
+  /** Tour and "Neu im Portal" of the logged-in contact; null in the team access (it saves nothing there). */
+  rundgang: PortalRundgang | null;
   /** Numbers of the tracking hub when released for the client (always in the team access), else null. */
   zahlen: { stand_am: string; daten: TrackingDaten; sichtbar_kunde: boolean } | null;
   /**
@@ -150,7 +153,7 @@ export function vorschauBerechtigung(db: Pick<Database, 'firmen'>, firmaId: stri
   if (!firma) return null;
   const email = normalisiereEmail(teamEmail);
   const kontakt = { id: '', firma_id: firma.id, vorname: teamVorname(email), nachname: '(Velonify)', email } as Kontakt;
-  const zugang = { id: '', firma_id: firma.id, kontakt_id: '', aktiv: true, zuletzt_am: '', updates: '', kanal_updates: '', kanal_hinweise: '', update_am: '', hinweise_bis: '' } as PortalZugang;
+  const zugang = { id: '', firma_id: firma.id, kontakt_id: '', aktiv: true, zuletzt_am: '', updates: '', kanal_updates: '', kanal_hinweise: '', update_am: '', hinweise_bis: '', rundgang_am: '', neuerungen_gesehen: '' } as PortalZugang;
   return { zugang, kontakt, firma };
 }
 
@@ -269,6 +272,8 @@ export function kundensicht(args: {
   vorschau?: string;
   /** Settings of the contact (see portalBenachrichtigung.ts); left out = none (team access) */
   einstellungen?: PortalEinstellungen | null;
+  /** Tour state of the contact (see portalRundgang.ts); left out = none (team access) */
+  rundgang?: PortalRundgang | null;
   /** All logins of the same e-mail (see `alleBerechtigungen`) */
   andere?: readonly Berechtigung[];
   jetzt?: Date;
@@ -296,6 +301,7 @@ export function kundensicht(args: {
     ich: { vorname: kontakt.vorname, nachname: kontakt.nachname, email: kontakt.email },
     vorschau: args.vorschau ?? null,
     einstellungen: args.einstellungen ?? null,
+    rundgang: args.rundgang ?? null,
     zahlen: (() => {
       const t = trackingVon(portal.tracking ?? [], firma.id);
       const daten = liesDaten(t);

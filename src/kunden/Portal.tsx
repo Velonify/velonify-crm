@@ -85,6 +85,22 @@ function Zugaenge({ firma, db, portal, aendern }: { firma: Firma; db: Database; 
                   {[k.rolle, k.email].filter(Boolean).join(' · ') || 'keine Angaben'}
                   <br />
                   {aktiv ? (zugang?.zuletzt_am ? `Zuletzt angemeldet ${formatDateTime(zugang.zuletzt_am)}` : 'Hat Zugang, noch nicht angemeldet') : moeglich ? 'Kein Zugang' : 'Keine E-Mail-Adresse – in der CRM-Akte ergänzen'}
+                  {aktiv && zugang && (
+                    <>
+                      <br />
+                      {zugang.rundgang_am ? `Rundgang gesehen ${formatDate(zugang.rundgang_am.slice(0, 10))} · ` : 'Rundgang startet beim nächsten Besuch'}
+                      {zugang.rundgang_am && (
+                        <button
+                          type="button"
+                          className="link-button"
+                          disabled={laeuft !== ''}
+                          onClick={() => void schalten(`r-${k.id}`, (s) => s.setzeRundgangZurueck(zugang.id), `${kontaktName(k)} bekommt den Rundgang beim nächsten Besuch`)}
+                        >
+                          zurücksetzen
+                        </button>
+                      )}
+                    </>
+                  )}
                 </div>
                 {aktiv && zugang && (
                   <EinstellungenZeile
