@@ -28,7 +28,7 @@ export const BRANCHEN = [
 export type BrancheId = (typeof BRANCHEN)[number]['id'];
 const IDS = BRANCHEN.map((b) => b.id) as [BrancheId, ...BrancheId[]];
 
-export const MODELL_BRANCHE = 'claude-haiku-4-5';
+export const MODELL_BRANCHE = 'claude-haiku-5-5';
 
 export const SYSTEM_PROMPT_BRANCHE = `Du ordnest deutsche Online-Shops einer Branche zu. Du bekommst, was die Startseite eines Shops über sich sagt: Domain, Firmenname, Seitentitel, Beschreibung, Überschriften und Menüpunkte.
 

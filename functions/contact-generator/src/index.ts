@@ -2,7 +2,7 @@ import * as functions from '@google-cloud/functions-framework';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { AnfrageSchema, fehlerText } from './anfrage.js';
-import { Limit, pruefeGoogleToken, ZugriffsFehler } from './auth.js';
+import { Limit, pruefeGoogleToken, ZugriffsFehler } from '../../gemeinsam/auth';
 import { AUSGABE_SCHEMA, nutzerNachricht, SYSTEM_PROMPT } from './prompt.js';
 
 const MODELL = 'claude-opus-5';
@@ -70,7 +70,8 @@ functions.http('contactGenerator', async (req, res) => {
       fallbacks: 'default',
       thinking: { type: 'adaptive' },
       output_config: { effort: AUFWAND[anfrage.data.modus], format: { type: 'json_schema', schema: AUSGABE_SCHEMA } },
-      system: SYSTEM_PROMPT,
+      // Outreach runs in batches: messages written within five minutes read the fixed instructions from the cache.
+      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: nutzerNachricht(anfrage.data, heute) }],
     });
 

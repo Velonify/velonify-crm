@@ -1,5 +1,5 @@
 import * as functions from '@google-cloud/functions-framework';
-import { Limit, pruefeGoogleToken, ZugriffsFehler } from '../../contact-generator/src/auth';
+import { Limit, pruefeGoogleToken, ZugriffsFehler } from '../../gemeinsam/auth';
 import { PostgresStore } from '../../../src/data/postgres/postgresStore';
 import { verbinde, type Verbindung } from '../../../db/verbindung';
 import { timingSafeEqual } from 'node:crypto';
@@ -8,7 +8,7 @@ import { nimmAnfrage } from './extern/eingang';
 import { gmailVersand } from './extern/gmail';
 import { behandleMagnet, type MagnetKonfig } from './extern/magnete';
 import { schreibeSpiegel } from './extern/spiegel';
-import { dienstkontoToken } from '../../kundenportal/src/google';
+import { dienstkontoToken } from '../../gemeinsam/google';
 import { SheetsClient } from '../../../src/data/sheets/sheetsClient';
 import { slackBenachrichtiger } from '../../../src/data/slack';
 import { leseTeamZuordnung } from '../../../src/data/selectors';
@@ -39,7 +39,14 @@ function datenbank(name = HAUPT_DB): Promise<Verbindung> {
   return verbindung;
 }
 
-/** Shared secrets of the website's Netlify functions, in the query string like the Apps Scripts had them. */
+/**
+ * Shared secrets of the website's Netlify functions and of Cloud Scheduler, sent in the header `X-Velonify-Token`.
+ * `?token=` still works until the website and the scheduler send the header; query strings end up in request logs.
+ */
+function mitgegebenesToken(req: functions.Request): unknown {
+  return req.get('x-velonify-token') ?? req.query.token;
+}
+
 function passt(gegeben: unknown, erwartet: string | undefined): boolean {
   if (!erwartet || typeof gegeben !== 'string') return false;
   const a = Buffer.from(gegeben);
@@ -108,7 +115,7 @@ functions.http('crmApi', async (req, res) => {
 
   // Nightly copy into the read-only sheet, started by Cloud Scheduler with its own token.
   if (pfad === '/extern/spiegel') {
-    if (req.method !== 'POST' || !passt(req.query.token, process.env.SPIEGEL_TOKEN) || !process.env.SPIEGEL_SHEET_ID) return void fehler(403, 'Falsches Token.');
+    if (req.method !== 'POST' || !passt(mitgegebenesToken(req), process.env.SPIEGEL_TOKEN) || !process.env.SPIEGEL_SHEET_ID) return void fehler(403, 'Falsches Token.');
     try {
       const { pool } = await datenbank();
       const anzahl = await schreibeSpiegel(new PostgresStore(pool), new SheetsClient(process.env.SPIEGEL_SHEET_ID, spiegelToken));
@@ -124,7 +131,7 @@ functions.http('crmApi', async (req, res) => {
   // Website (Netlify functions): same answer format as the Apps Scripts, HTTP 200 with the outcome in `status`.
   if (pfad === '/extern/eingang' || pfad === '/extern/magnete') {
     const eingang = pfad === '/extern/eingang';
-    if (req.method !== 'POST' || !passt(req.query.token, eingang ? process.env.EINGANG_TOKEN : process.env.MAGNETE_TOKEN)) {
+    if (req.method !== 'POST' || !passt(mitgegebenesToken(req), eingang ? process.env.EINGANG_TOKEN : process.env.MAGNETE_TOKEN)) {
       return void res.status(200).json({ status: 403, text: 'Falsches Token.' });
     }
     try {

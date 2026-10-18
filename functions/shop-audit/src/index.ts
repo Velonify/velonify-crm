@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { messeShop } from './audit.js';
 import { AUSGABE_SCHEMA, AusgabeSchema, nutzerNachricht, pruefeAufhaenger, SYSTEM_PROMPT, type Aufhaenger } from './aufhaenger.js';
-import { Limit, pruefeGoogleToken, ZugriffsFehler } from './auth.js';
+import { Limit, pruefeGoogleToken, ZugriffsFehler } from '../../gemeinsam/auth';
 import { DomainFehler, ladeSeite, normalisiereDomain } from './laden.js';
 import { pagespeed } from './pagespeed.js';
 import { katalog } from './technik.js';
@@ -16,6 +16,8 @@ import * as linkedin from './linkedin.js';
 import { AUSGABE_SCHEMA_ROAST, pruefeRoast, RoastAnfrageSchema, roastNachricht, RoastAusgabeSchema, SYSTEM_PROMPT_ROAST } from './roast.js';
 
 const MODELL = 'claude-opus-5';
+/** Hooks and the LinkedIn reading are short, rule-checked texts; Sonnet does them at a fraction of the Opus price. */
+const MODELL_KURZ = 'claude-sonnet-5-5';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 const DOMAIN = process.env.ALLOWED_DOMAIN ?? 'velonify.de';
@@ -35,13 +37,17 @@ const leadLimit = new Limit(2000, 10 * 60 * 1000);
 const LEADS_DATASET = process.env.LEADS_DATASET ?? 'velonify-crm.leads';
 let bq: ReturnType<typeof echteBq> | null = null;
 
-/** One short Haiku call per shop: picks the industry from the fixed list, nothing else. */
+/**
+ * One short Haiku call per shop: picks the industry from the fixed list, nothing else. The lead finder sends hundreds
+ * in a row, so the fixed system prompt is cached. Haiku 5.5 thinks by default; low effort keeps that short, and the
+ * token cap leaves room for it.
+ */
 async function einordnen(nachricht: string) {
   const antwort = await client.messages.create({
     model: MODELL_BRANCHE,
-    max_tokens: 256,
-    output_config: { format: { type: 'json_schema', schema: AUSGABE_SCHEMA_BRANCHE } },
-    system: SYSTEM_PROMPT_BRANCHE,
+    max_tokens: 1024,
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: AUSGABE_SCHEMA_BRANCHE } },
+    system: [{ type: 'text', text: SYSTEM_PROMPT_BRANCHE, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: nachricht }],
   });
   if (antwort.stop_reason !== 'end_turn') throw new Error(`Einordnung endete mit ${antwort.stop_reason}`);
@@ -154,7 +160,7 @@ functions.http('shopAudit', async (req, res) => {
     let modell = '';
     try {
       const antwort = await client.beta.messages.create({
-        model: MODELL,
+        model: MODELL_KURZ,
         max_tokens: 6000,
         betas: ['server-side-fallback-2026-07-01'],
         fallbacks: 'default',
@@ -276,7 +282,7 @@ functions.http('shopAudit', async (req, res) => {
   if (messung.befunde.length > 0 && leistungen.length > 0) {
     try {
       const antwort = await client.beta.messages.create({
-        model: MODELL,
+        model: MODELL_KURZ,
         max_tokens: 8000,
         betas: ['server-side-fallback-2026-07-01'],
         fallbacks: 'default',

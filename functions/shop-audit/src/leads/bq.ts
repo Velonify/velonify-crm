@@ -23,6 +23,12 @@ function flach(wert: unknown): unknown {
  * BigQuery in the project of the leads dataset. The public HTTP Archive and CrUX tables live in the US multi-region,
  * so every job runs there. Authenticates as the function's service account (locally: gcloud application default).
  */
+/**
+ * Upper limit per query: the pool run scans about 9 GB of HTTP Archive. A query above the limit fails instead of
+ * billing, e.g. after a typo drops a partition filter. Override with BQ_MAX_BYTES if the pool grows.
+ */
+const MAX_BYTES = process.env.BQ_MAX_BYTES?.trim() || String(20 * 1024 ** 3);
+
 export function echteBq(dataset: string): Bq {
   const [projectId, datasetId] = dataset.split('.');
   const client = new BigQuery({ projectId });
@@ -38,7 +44,7 @@ export function echteBq(dataset: string): Bq {
           werte[name] = wert;
         }
       }
-      const [zeilen] = await client.query({ query: sql, params: werte, types: Object.keys(typen).length ? typen : undefined, location: 'US' });
+      const [zeilen] = await client.query({ query: sql, params: werte, types: Object.keys(typen).length ? typen : undefined, location: 'US', maximumBytesBilled: MAX_BYTES });
       return flach(zeilen) as T[];
     },
     async insert(tabelle: string, zeilen: Record<string, unknown>[]): Promise<void> {
