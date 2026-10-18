@@ -94,6 +94,10 @@ Im Hub (Portal → Monatsberichte) schreibt das Team die Einschätzung und gibt 
 
 Bei 1–3 Sternen schickt die Function den Zuständigen des Kunden sofort eine Slack-Direktnachricht (App „Velonify Hub“, `SLACK_BOT_TOKEN`; Namen wie „Lugge“ über `TEAM_ZUORDNUNG` wie bei crm-api) und merkt sich `gemeldet_am`. Bei 5 Sternen bietet das Portal den Google-Bewertungslink aus der Hub-Einrichtung (Karte 4) an und fragt, ob wir den Kommentar als Zitat zeigen dürfen (`zitat_ok`).
 
+## Rundgang und „Neu im Portal“
+
+Die Daten enthalten `rundgang: { gesehen_am, neuerungen }` des Kontakts (im Team-Zugang `null`). Ist `gesehen_am` leer, startet das Portal beim nächsten Besuch den Rundgang. `POST /gesehen` (Sitzung des Kunden, `{ rundgang?: true, neuerungen?: string[] }`) merkt sich den Rundgang (fertig oder übersprungen) und gezeigte Neuerungen in `portal_zugaenge` (Migration 011); es kommt nur etwas dazu, nie weg. Der Team-Zugang speichert nichts (`gespeichert: false`). Im Hub setzt „zurücksetzen“ am Zugang den Rundgang zurück. Die Neuerungen selbst stehen im Portal-Repo (`src/neuerungen.ts`).
+
 ## Einrichtung (einmalig)
 
 1. **Dienstkonto**
