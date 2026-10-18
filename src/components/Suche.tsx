@@ -1,12 +1,69 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
 import { useCrm } from '../data/CrmContext';
-import { befehle, suche, type Treffer, type TrefferArt } from '../data/suche';
+import type { CrmService } from '../data/crm';
+import { AuthExpiredError } from '../data/errors';
+import { befehle, suche, sucheBereiche, type Bereichsdaten, type Treffer, type TrefferArt } from '../data/suche';
 import { WERKZEUGE } from '../werkzeuge';
 
-const ART_LABEL: Record<TrefferArt, string> = { firma: 'Firmen', kontakt: 'Kontakte', deal: 'Deals', aktion: 'Aktionen', werkzeug: 'Werkzeuge' };
-const REIHENFOLGE: TrefferArt[] = ['firma', 'kontakt', 'deal', 'aktion', 'werkzeug'];
+const ART_LABEL: Record<TrefferArt, string> = {
+  firma: 'Firmen', kunde: 'Kunden', kontakt: 'Kontakte', deal: 'Deals', karte: 'To-dos', angebot: 'Angebote',
+  inhalt: 'Social-Inhalte', magnet: 'Lead-Magnete', aktion: 'Aktionen', werkzeug: 'Werkzeuge',
+};
+const REIHENFOLGE: TrefferArt[] = ['firma', 'kunde', 'kontakt', 'deal', 'karte', 'angebot', 'inhalt', 'magnet', 'aktion', 'werkzeug'];
+
+type Bereich = keyof Bereichsdaten;
+const BEREICH_LABEL: Record<Bereich, string> = { todo: 'To-dos', angebote: 'Angebote', inhalte: 'Social-Inhalte', magnete: 'Lead-Magnete' };
+const LADER: { [B in Bereich]-?: (service: CrmService) => Promise<NonNullable<Bereichsdaten[B]>> } = {
+  todo: (s) => s.loadTodoDaten(),
+  angebote: async (s) => (await s.loadAngebotsDaten()).angebote,
+  inhalte: async (s) => (await s.loadSocialDaten()).inhalte,
+  magnete: async (s) => (await s.loadMagnetDaten()).magnete,
+};
+const BEREICHE = Object.keys(LADER) as Bereich[];
+
+/** Reopening the palette within this time reuses the loaded areas instead of asking the backend again. */
+const CACHE_MS = 30_000;
+const cache = new Map<Bereich, { service: CrmService; zeit: number; laden: Promise<unknown> }>();
+
+/**
+ * Loads the other areas when the palette opens – not with the hub, so opening the hub stays as fast as before.
+ * Each area arrives on its own; one that fails is listed in `fehler` and the rest stays searchable.
+ */
+function useBereichsdaten(service: CrmService | null) {
+  const { expire } = useAuth();
+  const [daten, setDaten] = useState<Bereichsdaten>({});
+  const [fehler, setFehler] = useState<Bereich[]>([]);
+
+  useEffect(() => {
+    if (!service) return;
+    let aktiv = true;
+    for (const bereich of BEREICHE) {
+      let eintrag = cache.get(bereich);
+      if (!eintrag || eintrag.service !== service || Date.now() - eintrag.zeit > CACHE_MS) {
+        eintrag = { service, zeit: Date.now(), laden: LADER[bereich](service) };
+        cache.set(bereich, eintrag);
+      }
+      const geladen = eintrag;
+      geladen.laden.then(
+        (wert) => aktiv && setDaten((d) => ({ ...d, [bereich]: wert })),
+        (err: unknown) => {
+          // A failed load is not kept, so the next open tries again.
+          if (cache.get(bereich) === geladen) cache.delete(bereich);
+          if (err instanceof AuthExpiredError) expire();
+          if (aktiv) setFehler((f) => (f.includes(bereich) ? f : [...f, bereich]));
+        },
+      );
+    }
+    return () => {
+      aktiv = false;
+    };
+  }, [service, expire]);
+
+  return { daten, fehler };
+}
 
 export const istMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -39,7 +96,8 @@ export function Suche() {
 }
 
 function SuchDialog({ onClose }: { onClose(): void }) {
-  const { db } = useCrm();
+  const { db, service } = useCrm();
+  const { daten, fehler } = useBereichsdaten(service);
   const navigate = useNavigate();
   const [eingabe, setEingabe] = useState('');
   const [aktiv, setAktiv] = useState(0);
@@ -49,9 +107,9 @@ function SuchDialog({ onClose }: { onClose(): void }) {
 
   // Grouped for display, flat for keyboard navigation.
   const gruppen = useMemo(() => {
-    const treffer = [...(db ? suche(db, eingabe) : []), ...befehle(eingabe, WERKZEUGE)];
+    const treffer = [...(db ? [...suche(db, eingabe), ...sucheBereiche(db, daten, eingabe)] : []), ...befehle(eingabe, WERKZEUGE)];
     return REIHENFOLGE.map((art) => ({ art, treffer: treffer.filter((t) => t.art === art) })).filter((g) => g.treffer.length > 0);
-  }, [db, eingabe]);
+  }, [db, daten, eingabe]);
   const flach = gruppen.flatMap((g) => g.treffer);
 
   useEffect(() => {
@@ -96,7 +154,7 @@ function SuchDialog({ onClose }: { onClose(): void }) {
             value={eingabe}
             onChange={(e) => setEingabe(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Firma, Kontakt, Deal, Werkzeug oder Aktion …"
+            placeholder="Firma, Kunde, To-do, Angebot, Inhalt oder Aktion …"
             role="combobox"
             aria-expanded={flach.length > 0}
             aria-controls={listId}
@@ -109,7 +167,7 @@ function SuchDialog({ onClose }: { onClose(): void }) {
         </div>
 
         {!db && <p className="search-empty">Daten werden geladen …</p>}
-        {eingabe.trim() === '' && <p className="search-empty">Firmen, Kontakte und Deals finden oder direkt etwas starten. ↑ ↓ zum Auswählen, Enter zum Öffnen.</p>}
+        {eingabe.trim() === '' && <p className="search-empty">Firmen, Kunden, To-dos, Angebote und Social-Inhalte finden oder direkt etwas starten. ↑ ↓ zum Auswählen, Enter zum Öffnen.</p>}
         {eingabe.trim() !== '' && flach.length === 0 && <p className="search-empty">Nichts gefunden für „{eingabe}“.</p>}
 
         {flach.length > 0 && (
@@ -147,6 +205,10 @@ function SuchDialog({ onClose }: { onClose(): void }) {
               </li>
             ))}
           </ul>
+        )}
+
+        {eingabe.trim() !== '' && fehler.length > 0 && (
+          <p className="search-empty">Nicht durchsucht, weil das Laden fehlschlug: {fehler.map((b) => BEREICH_LABEL[b]).join(', ')}.</p>
         )}
       </div>
     </div>
