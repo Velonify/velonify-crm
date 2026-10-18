@@ -228,7 +228,7 @@ export const SCHEMA = {
   },
   portal_zugaenge: {
     name: 'portal_zugaenge',
-    columns: ['id', 'firma_id', 'kontakt_id', 'aktiv', 'zuletzt_am', ...META, 'updates', 'kanal_updates', 'kanal_hinweise', 'update_am', 'hinweise_bis'],
+    columns: ['id', 'firma_id', 'kontakt_id', 'aktiv', 'zuletzt_am', ...META, 'updates', 'kanal_updates', 'kanal_hinweise', 'update_am', 'hinweise_bis', 'rundgang_am', 'neuerungen_gesehen'],
     boolean: ['aktiv'],
   },
   portal_werkzeuge: {

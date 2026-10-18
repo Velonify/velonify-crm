@@ -782,6 +782,10 @@ export interface PortalZugang extends Meta {
   update_am: string;
   /** Instant notifications are sent for everything up to this time (ISO); empty until the first run. */
   hinweise_bis: string;
+  /** When the contact finished or skipped the portal tour (ISO); '' = show it on the next visit. */
+  rundgang_am: string;
+  /** Ids of the "Neu im Portal" entries the contact has seen, comma-separated (see portalRundgang.ts). */
+  neuerungen_gesehen: string;
 }
 
 /** A client tool (UTM generator …) switched on or off for one client. */

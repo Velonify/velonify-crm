@@ -20,6 +20,7 @@ import {
   ZU_GROSS,
 } from '../../../src/data/portalAktionen';
 import { einstellungenVon, pruefeEinstellungen } from '../../../src/data/portalBenachrichtigung';
+import { gesehenAenderungen, rundgangVon } from '../../../src/data/portalRundgang';
 import { SheetsClient } from '../../../src/data/sheets/sheetsClient';
 import { SheetStore } from '../../../src/data/sheets/sheetStore';
 import { PostgresStore } from '../../../src/data/postgres/postgresStore';
@@ -297,6 +298,7 @@ async function daten(req: Request, res: Response, lz: Laufzeit): Promise<void> {
   ]);
   json(res, 200, kundensicht({ berechtigung: anmeldung.berechtigung, db: anmeldung.db, kunden, todos, portal, dateien: dateien.dateien, teamDomain: lz.teamDomain, vorschau: anmeldung.sitzung.v,
     einstellungen: anmeldung.sitzung.v ? null : einstellungenVon(anmeldung.berechtigung.zugang),
+    rundgang: anmeldung.sitzung.v ? null : rundgangVon(anmeldung.berechtigung.zugang),
     andere: anmeldung.sitzung.v ? [] : alleBerechtigungen(anmeldung.db, portal, anmeldung.berechtigung.kontakt.email),
   }));
 }
@@ -436,6 +438,22 @@ async function einstellungen(req: Request, res: Response, lz: Laufzeit): Promise
   json(res, 200, neu);
 }
 
+/**
+ * `POST /gesehen` (`{ rundgang?: true, neuerungen?: string[] }`): the contact finished or skipped the tour, or saw new
+ * features. The team access saves nothing, so the client still gets the tour.
+ */
+async function gesehen(req: Request, res: Response, lz: Laufzeit): Promise<void> {
+  const s = await store(lz);
+  const anmeldung = await angemeldet(req, lz, s);
+  if (!anmeldung) return json(res, 401, { fehler: NICHT_ANGEMELDET });
+  if (anmeldung.sitzung.v) return json(res, 200, { gespeichert: false });
+  const { zugang, kontakt } = anmeldung.berechtigung;
+  if (!schreibenProKontakt.erlaubt(kontakt.id)) return json(res, 429, { fehler: 'Das waren gerade sehr viele Änderungen. Bitte warte ein paar Minuten.' });
+  const changes = gesehenAenderungen(eingabe(req), zugang, new Date());
+  const [neu] = await s.update('portal_zugaenge', [{ id: zugang.id, changes }]);
+  json(res, 200, { gespeichert: true, rundgang: rundgangVon(neu) });
+}
+
 /** `POST /versand`: called by Cloud Scheduler every 15 minutes with the shared secret in `X-Versand-Schluessel`. */
 async function versand(req: Request, res: Response, lz: Laufzeit): Promise<void> {
   if (!lz.versandSchluessel) return json(res, 503, { fehler: 'Der Versand ist nicht eingerichtet (VERSAND_SCHLUESSEL fehlt).' });
@@ -482,6 +500,7 @@ http('kundenportal', async (req: Request, res: Response) => {
     if (req.method === 'POST' && pfad === '/anfrage') return await anfrage(req, res, lz);
     if (req.method === 'POST' && pfad === '/hochladen') return await hochladen(req, res, lz);
     if (req.method === 'POST' && pfad === '/einstellungen') return await einstellungen(req, res, lz);
+    if (req.method === 'POST' && pfad === '/gesehen') return await gesehen(req, res, lz);
     if (req.method === 'POST' && pfad === '/versand') return await versand(req, res, lz);
     if (req.method === 'POST' && pfad === '/kennzahlen') return await kennzahlen(req, res, lz);
     if (req.method === 'POST' && pfad === '/bericht') return await monatsbericht(req, res, lz);
