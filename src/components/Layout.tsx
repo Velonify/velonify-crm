@@ -7,6 +7,7 @@ import { kundenListe } from '../data/kunden';
 import { useTheme } from '../lib/useTheme';
 import { WERKZEUGE, seitentitel, werkzeugFuerPfad } from '../werkzeuge';
 import { Glocke } from './Glocke';
+import { Seitenrahmen } from './Seitenrahmen';
 import { Suche } from './Suche';
 import { WerkzeugIcon } from './Icons';
 
@@ -112,7 +113,9 @@ export function Layout() {
             <strong>Demo-Modus</strong> Erfundene Beispieldaten, Drive und Kalender sind simuliert. Änderungen gehen beim Neuladen verloren.
           </div>
         )}
-        <Outlet />
+        <Seitenrahmen schluessel={pathname}>
+          <Outlet />
+        </Seitenrahmen>
       </main>
     </div>
   );

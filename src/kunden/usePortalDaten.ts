@@ -6,7 +6,7 @@ import { useLoad } from '../lib/useLoad';
 /** Logins, client tools and roadmap of the client portal; `aendern` runs a write and reloads them. */
 export function usePortalDaten() {
   const { service, mutate } = useCrm();
-  const daten = useLoad(() => (service ? service.loadPortalDaten() : new Promise<never>(() => {})), [service]);
+  const daten = useLoad(() => (service ? service.loadPortalDaten() : new Promise<never>(() => {})), [service], 'portal');
   const { reload } = daten;
 
   const aendern = useCallback(

@@ -9,7 +9,7 @@ import { useLoad } from '../lib/useLoad';
 /** Services and sent messages of the Contact Generator; `aendern` runs a write and reloads them. */
 export function useContactDaten() {
   const { service, mutate } = useCrm();
-  const daten = useLoad(() => (service ? service.loadContactDaten() : new Promise<never>(() => {})), [service]);
+  const daten = useLoad(() => (service ? service.loadContactDaten() : new Promise<never>(() => {})), [service], 'contact');
   const { reload } = daten;
 
   const aendern = useCallback(

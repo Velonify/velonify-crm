@@ -6,7 +6,7 @@ import { useLoad } from '../lib/useLoad';
 /** Loads catalogue and offers for the offer tool; `aendern` runs a write and reloads them. */
 export function useAngebotsDaten() {
   const { service, mutate } = useCrm();
-  const daten = useLoad(() => (service ? service.loadAngebotsDaten() : new Promise<never>(() => {})), [service]);
+  const daten = useLoad(() => (service ? service.loadAngebotsDaten() : new Promise<never>(() => {})), [service], 'angebote');
   const { reload } = daten;
 
   const aendern = useCallback(

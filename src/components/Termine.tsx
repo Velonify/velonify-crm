@@ -10,7 +10,7 @@ import { useLoad } from '../lib/useLoad';
 /** Events of the signed-in person's primary calendar between two ISO timestamps. */
 export function useTermine(von: string, bis: string) {
   const { service } = useCrm();
-  return useLoad(() => (service ? service.termine(von, bis) : new Promise<CalendarEvent[]>(() => {})), [service, von, bis]);
+  return useLoad(() => (service ? service.termine(von, bis) : new Promise<CalendarEvent[]>(() => {})), [service, von, bis], `termine:${von}:${bis}`);
 }
 
 export function TerminEintrag({

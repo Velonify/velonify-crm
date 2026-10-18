@@ -15,7 +15,7 @@ const SEITE = 100;
 export function BacklogPage() {
   const api = useLeadFinderApi();
   const navigate = useNavigate();
-  const liste = useLoad(() => (api ? api.backlog() : Promise.reject(new Error(NICHT_EINGERICHTET))), [api]);
+  const liste = useLoad(() => (api ? api.backlog() : Promise.reject(new Error(NICHT_EINGERICHTET))), [api], 'leads:backlog');
   const [params, setParams] = useSearchParams();
   const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
   const [erledigt, setErledigt] = useState<Set<string>>(new Set());

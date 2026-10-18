@@ -325,7 +325,7 @@ function Dateiname({ db, heute }: { db: Database; heute: string }) {
 export function StartPage() {
   const { db, service, loading, error, refresh } = useCrm();
   // Word game and plant share one request, so opening the start page stays a small load for Google.
-  const spiele = useLoad(() => (service ? service.loadSpiele() : new Promise<never>(() => {})), [service]);
+  const spiele = useLoad(() => (service ? service.loadSpiele() : new Promise<never>(() => {})), [service], 'spiele');
   const todos = useTodoDaten();
   const kundenDaten = useKundenDaten();
   const eingang = useEingang();

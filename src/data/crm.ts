@@ -61,7 +61,6 @@ import {
 } from './rules';
 import { driveKonfiguration, findeTeamMitglied, tageSeitVernetzung } from './selectors';
 import { auszug, firmenLink, kartenLink, kundenLink, neuErwaehnt } from './erwaehnungen';
-import { OUTREACH_STARTLISTE } from './outreachStart';
 import {
   findeWert,
   prepareAufgabe,
@@ -74,9 +73,8 @@ import {
   dmAlsAnfrage,
   inhaltById,
 } from './social';
-import { SOCIAL_START_AUFGABEN, SOCIAL_START_HOOKS, SOCIAL_START_INHALTE, SOCIAL_START_PLAN, SOCIAL_START_TEXTE } from './socialStart';
-import { STARTKATALOG } from './startkatalog';
 import { EMPTY_DEAL_INPUT } from './types';
+import { Stand } from './stand';
 import type { Store } from './store';
 import type {
   Aktivitaet,
@@ -236,6 +234,7 @@ export interface LinkedinLeadErgebnis {
  */
 export class CrmService {
   private readonly store: Store;
+  private readonly stand: Stand;
   private readonly drive: DriveApi;
   private readonly calendar: CalendarApi;
   private readonly currentUser: () => string;
@@ -245,7 +244,8 @@ export class CrmService {
   private readonly erwaehnt?: (erwaehnungen: Erwaehnung[]) => Promise<void>;
 
   constructor(deps: CrmDeps) {
-    this.store = deps.store;
+    this.stand = new Stand(deps.store);
+    this.store = this.stand.store;
     this.drive = deps.drive;
     this.calendar = deps.calendar;
     this.currentUser = deps.currentUser;
@@ -256,7 +256,12 @@ export class CrmService {
   }
 
   load(): Promise<Database> {
-    return this.store.load();
+    return this.stand.load();
+  }
+
+  /** The last loaded data with this service's own writes applied; null when the next `load()` has to read again. */
+  get aktuellerStand(): Database | null {
+    return this.stand.aktuell;
   }
 
   private timestamp(): string {
@@ -303,7 +308,7 @@ export class CrmService {
   ): Promise<Erwaehnung[]> {
     if (!neu.includes('@')) return [];
     try {
-      const liste = team ?? (await this.store.load()).listen.team ?? [];
+      const liste = team ?? (await this.stand.daten()).listen.team ?? [];
       const von = this.currentUser();
       const ich = this.ich?.() || findeTeamMitglied(liste, '', von);
       const namen = neuErwaehnt(alt, neu, liste).filter((n) => n !== ich);
@@ -345,7 +350,7 @@ export class CrmService {
   // ─── Firmen ────────────────────────────────────────────────────────────────
 
   async createFirma(input: FirmaInput): Promise<Firma> {
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     const firma: Firma = { ...prepareFirma(input, db.firmen), id: newId(ID_PREFIX.firmen), archiviert: false, ...this.created() };
     await this.store.insert('firmen', [firma]);
     await this.erwaehne('', firma.notiz, { art: 'firma', quelle_id: firma.id, firma_id: firma.id, titel: firma.name, link: firmenLink(firma.id) }, db.listen.team);
@@ -353,7 +358,7 @@ export class CrmService {
   }
 
   async updateFirma(id: string, changes: Partial<FirmaInput>, expectedGeaendertAm: string): Promise<Firma> {
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     const [firma] = await this.store.update('firmen', [
       { id, changes: { ...prepareFirma(changes, db.firmen, id), ...this.changed() }, expectedGeaendertAm },
     ]);
@@ -367,7 +372,7 @@ export class CrmService {
    * someone chose by hand is never overwritten. Returns how many firms changed.
    */
   async ergaenzeBranchen(werte: { firmaId: string; branche: string }[]): Promise<number> {
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     const nachId = new Map(db.firmen.map((f) => [f.id, f]));
     const updates = werte
       .filter((w) => istBranche(w.branche) && nachId.get(w.firmaId)?.branche === '')
@@ -385,7 +390,7 @@ export class CrmService {
 
   async saveKontakt(firmaId: string, input: KontaktInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<Kontakt> {
     const clean = prepareKontakt(input);
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     const firma = CrmService.find(db.firmen, firmaId);
     const altNotiz = existing ? (db.kontakte.find((k) => k.id === existing.id)?.notiz ?? '') : '';
 
@@ -421,7 +426,7 @@ export class CrmService {
 
   async saveDeal(firmaId: string, input: DealInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<Deal> {
     const clean = prepareDeal(input);
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     CrmService.find(db.firmen, firmaId);
     if (clean.kontakt_id) CrmService.find(db.kontakte, clean.kontakt_id);
 
@@ -460,7 +465,7 @@ export class CrmService {
     if (!(PHASEN as readonly string[]).includes(phase)) throw new ValidationError('phase', `Unbekannte Phase „${phase}“.`);
     if (phase === 'verloren' && !verlustgrund.trim()) throw new ValidationError('verlustgrund', 'Bitte einen Grund angeben, warum der Deal verloren ist.');
 
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     const alt = CrmService.find(db.deals, dealId);
     const firma = CrmService.find(db.firmen, alt.firma_id);
     if (alt.phase === phase) return alt;
@@ -511,7 +516,7 @@ export class CrmService {
    * On a deal that is already waiting, this is a request to another person and notes that the first one did not accept.
    */
   async sendeVernetzung(dealId: string, expectedGeaendertAm: string, input: { kontaktId: string; notiz: string; ich?: string }): Promise<Deal> {
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     let deal = CrmService.find(db.deals, dealId);
     if (isAbgeschlossen(deal.phase)) throw new ValidationError('phase', 'Der Deal ist schon abgeschlossen.');
     const kontakt = input.kontaktId ? CrmService.find(db.kontakte, input.kontaktId) : undefined;
@@ -554,7 +559,7 @@ export class CrmService {
    * another seven days, "verloren" closes it with "Keine Reaktion". A request to another person is `sendeVernetzung`.
    */
   async vernetzungErgebnis(dealId: string, expectedGeaendertAm: string, ergebnis: Exclude<VernetzungErgebnis, 'andere'>, ich = ''): Promise<Deal> {
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     const deal = CrmService.find(db.deals, dealId);
     if (deal.phase !== 'vernetzung') throw new ValidationError('phase', `Der Deal ist nicht mehr in „Vernetzung“, sondern in „${phaseLabel(deal.phase)}“.`);
     const kontakt = db.kontakte.find((k) => k.id === deal.kontakt_id);
@@ -591,7 +596,7 @@ export class CrmService {
     const aktivitaet = this.aktivitaet({ ...input, text: input.text.trim() });
     await this.store.insert('aktivitaeten', [aktivitaet]);
     if (aktivitaet.text.includes('@')) {
-      const db = await this.store.load();
+      const db = await this.stand.daten();
       const firma = db.firmen.find((f) => f.id === aktivitaet.firma_id);
       await this.erwaehne('', aktivitaet.text, { art: 'verlauf', quelle_id: aktivitaet.id, firma_id: aktivitaet.firma_id, titel: firma?.name ?? 'Verlauf', link: firmenLink(aktivitaet.firma_id) }, db.listen.team);
     }
@@ -704,6 +709,8 @@ export class CrmService {
     if (katalog.kategorien.length > 0) {
       throw new ValidationError('katalog', 'Der Katalog enthält schon Hauptkategorien. Der Startkatalog wird nur in einen leeren Katalog übernommen.');
     }
+    // The start data is only needed once per tool, so it is loaded on demand instead of with the app.
+    const { STARTKATALOG } = await import('./startkatalog');
     const meta = this.created();
     const kategorien: Leistungskategorie[] = [];
     const leistungen: Leistung[] = [];
@@ -744,7 +751,7 @@ export class CrmService {
   async saveAngebot(input: AngebotInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<Angebot> {
     const daten = await this.store.loadAngebotsDaten();
     const clean = prepareAngebot(input, daten.angebote, existing?.id);
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     const firma = CrmService.find(db.firmen, clean.firma_id);
     if (clean.deal_id && CrmService.find(db.deals, clean.deal_id).firma_id !== firma.id) {
       throw new ValidationError('deal_id', 'Der Deal gehört zu einer anderen Firma.');
@@ -806,7 +813,7 @@ export class CrmService {
     const auswahl = parseAuswahl(angebot.auswahl);
     if (anzahlPosten(auswahl) === 0) throw new ValidationError('auswahl', 'Das Angebot enthält keine Leistungen.');
 
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     const firma = CrmService.find(db.firmen, angebot.firma_id);
     const ordner = await this.angebotsOrdner(db, firma);
     if (!ordner) {
@@ -888,6 +895,7 @@ export class CrmService {
   async uebernimmOutreachStartliste(): Promise<number> {
     const { leistungen } = await this.store.loadContactDaten();
     if (leistungen.length > 0) throw new ValidationError('leistungen', 'Die Liste enthält schon Leistungen. Die Startliste wird nur in eine leere Liste übernommen.');
+    const { OUTREACH_STARTLISTE } = await import('./outreachStart');
     const meta = this.created();
     const neu: OutreachLeistung[] = OUTREACH_STARTLISTE.map((start, i) => ({
       ...start,
@@ -908,7 +916,7 @@ export class CrmService {
     const clean = prepareAnschreiben(input);
     // Fails with SchemaError before anything is written while the tabs are missing.
     await this.store.loadContactDaten();
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     const firma = CrmService.find(db.firmen, clean.firma_id);
     if (clean.kontakt_id && CrmService.find(db.kontakte, clean.kontakt_id).firma_id !== firma.id) {
       throw new ValidationError('kontakt_id', 'Der Ansprechpartner gehört zu einer anderen Firma.');
@@ -970,7 +978,7 @@ export class CrmService {
   async speichereAudit(ergebnis: AuditErgebnis, firmaId = ''): Promise<Audit> {
     // Fails with SchemaError before anything is written while the tab is missing.
     await this.store.loadAudits();
-    const firma = firmaId ? CrmService.find((await this.store.load()).firmen, firmaId) : undefined;
+    const firma = firmaId ? CrmService.find((await this.stand.daten()).firmen, firmaId) : undefined;
     const audit: Audit = { ...auditZeile(ergebnis, firma?.id ?? ''), id: newId(ID_PREFIX.audits), von: this.currentUser(), archiviert: false, ...this.created() };
     await this.store.insert('audits', [audit]);
     if (firma) {
@@ -983,7 +991,7 @@ export class CrmService {
 
   /** Links an audit of a domain that was not in the CRM to the company created for it. */
   async ordneAuditZu(auditId: string, firmaId: string, expectedGeaendertAm: string): Promise<Audit> {
-    CrmService.find((await this.store.load()).firmen, firmaId);
+    CrmService.find((await this.stand.daten()).firmen, firmaId);
     const [audit] = await this.store.update('audits', [{ id: auditId, changes: { firma_id: firmaId, ...this.changed() }, expectedGeaendertAm }]);
     return audit;
   }
@@ -1004,7 +1012,7 @@ export class CrmService {
     const anfrage = CrmService.find(anfragen, id);
     if (!istOffen(anfrage)) throw new ValidationError('status', 'Diese Anfrage ist schon bearbeitet.');
 
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     const firma = eingabe.firmaId
       ? CrmService.find(db.firmen, eingabe.firmaId)
       : await this.createFirma({ ...firmaAusAnfrage(anfrage, eingabe.zustaendig), ...eingabe.firma });
@@ -1045,7 +1053,7 @@ export class CrmService {
    * firm is reused instead of created twice.
    */
   async legeLinkedinLeadAn(eingabe: LinkedinLeadEingabe): Promise<LinkedinLeadErgebnis> {
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     const firma = eingabe.firmaId ? CrmService.find(db.firmen, eingabe.firmaId) : await this.createFirma(eingabe.firma);
 
     let kontakt: Kontakt | null = null;
@@ -1093,7 +1101,7 @@ export class CrmService {
       const [link] = await this.store.update('kunden_links', [{ id: existing.id, changes: { ...clean, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm }]);
       return link;
     }
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     CrmService.find(db.firmen, firmaId);
     const { links } = await this.store.loadKundenDaten();
     const link: KundenLink = {
@@ -1123,7 +1131,7 @@ export class CrmService {
 
   async saveKundenNews(input: KundenNewsInput, existing?: { id: string; expectedGeaendertAm: string }): Promise<KundenNews> {
     const clean = prepareKundenNews(input, this.today());
-    if (clean.firma_id) CrmService.find((await this.store.load()).firmen, clean.firma_id);
+    if (clean.firma_id) CrmService.find((await this.stand.daten()).firmen, clean.firma_id);
     const ort = (news: KundenNews) => ({ art: 'news' as const, quelle_id: news.id, firma_id: news.firma_id, titel: news.titel || 'Kunden-News', link: kundenLink(news.firma_id) });
     if (existing) {
       const alt = clean.text.includes('@') ? ((await this.store.loadKundenDaten()).news.find((n) => n.id === existing.id)?.text ?? '') : '';
@@ -1159,7 +1167,7 @@ export class CrmService {
     const { boards } = await this.store.loadTodoDaten();
     const vorhanden = boardVon(boards, firmaId);
     if (vorhanden) return vorhanden;
-    const titel = firmaId ? boardTitelFuer(CrmService.find((await this.store.load()).firmen, firmaId)) : INTERNES_BOARD_TITEL;
+    const titel = firmaId ? boardTitelFuer(CrmService.find((await this.stand.daten()).firmen, firmaId)) : INTERNES_BOARD_TITEL;
     const board: Board = { id: newId(ID_PREFIX.boards), firma_id: firmaId, titel, spalten: JSON.stringify(STANDARD_SPALTEN), archiviert: false, ...this.created() };
     await this.store.insert('boards', [board]);
     return board;
@@ -1317,7 +1325,7 @@ export class CrmService {
 
   /** Switches the portal login of a contact on or off; one row per contact, created on first use. */
   async setPortalZugang(firmaId: string, kontaktId: string, aktiv: boolean): Promise<PortalZugang> {
-    const kontakt = CrmService.find((await this.store.load()).kontakte, kontaktId);
+    const kontakt = CrmService.find((await this.stand.daten()).kontakte, kontaktId);
     if (kontakt.firma_id !== firmaId) throw new ValidationError('kontakt_id', 'Dieser Kontakt gehört zu einer anderen Firma.');
     if (aktiv && !kannPortalZugang(kontakt)) throw new ValidationError('email', 'Für einen Zugang braucht der Kontakt eine E-Mail-Adresse.');
     const { zugaenge } = await this.store.loadPortalDaten();
@@ -1333,7 +1341,7 @@ export class CrmService {
 
   /** Where a client's numbers come from and whether the client sees them; one row per client, created on first save. */
   async saveTracking(firmaId: string, eingabe: TrackingEingabe): Promise<KundenTracking> {
-    CrmService.find((await this.store.load()).firmen, firmaId);
+    CrmService.find((await this.stand.daten()).firmen, firmaId);
     const clean = prepareTracking(eingabe);
     const vorhanden = trackingVon((await this.store.loadPortalDaten()).tracking, firmaId);
     if (vorhanden) {
@@ -1369,7 +1377,7 @@ export class CrmService {
   /** Updates and notifications of one portal login, changed by the team (the client changes them in the portal). */
   async setPortalEinstellungen(zugangId: string, eingabe: PortalEinstellungen): Promise<PortalZugang> {
     const zugang = CrmService.find((await this.store.loadPortalDaten()).zugaenge, zugangId);
-    const firma = CrmService.find((await this.store.load()).firmen, zugang.firma_id);
+    const firma = CrmService.find((await this.stand.daten()).firmen, zugang.firma_id);
     const einstellungen = pruefeEinstellungen({ ...eingabe }, !!firma.slack_channel.trim());
     const [neu] = await this.store.update('portal_zugaenge', [{ id: zugangId, changes: { ...einstellungen, ...this.changed() } }]);
     return neu;
@@ -1386,7 +1394,7 @@ export class CrmService {
   async setPortalWerkzeug(firmaId: string, werkzeug: string, aktiv: boolean): Promise<PortalWerkzeug> {
     if (!istKundenWerkzeug(werkzeug)) throw new ValidationError('werkzeug', 'Dieses Werkzeug gibt es nicht.');
     if (aktiv && KUNDEN_WERKZEUGE.find((w) => w.id === werkzeug && 'bald' in w)) throw new ValidationError('werkzeug', 'Dieses Werkzeug ist noch nicht fertig.');
-    CrmService.find((await this.store.load()).firmen, firmaId);
+    CrmService.find((await this.stand.daten()).firmen, firmaId);
     const { werkzeuge } = await this.store.loadPortalDaten();
     const vorhanden = werkzeuge.find((w) => w.firma_id === firmaId && w.werkzeug === werkzeug);
     if (vorhanden) {
@@ -1404,7 +1412,7 @@ export class CrmService {
       const [meilenstein] = await this.store.update('kunden_meilensteine', [{ id: existing.id, changes: { ...clean, ...this.changed() }, expectedGeaendertAm: existing.expectedGeaendertAm }]);
       return meilenstein;
     }
-    CrmService.find((await this.store.load()).firmen, firmaId);
+    CrmService.find((await this.stand.daten()).firmen, firmaId);
     const { meilensteine } = await this.store.loadPortalDaten();
     const meilenstein: Meilenstein = {
       ...clean,
@@ -1467,7 +1475,7 @@ export class CrmService {
     const lead = CrmService.find(leads, id);
     if (!istOffenerLead(lead)) throw new ValidationError('status', 'Dieser Eintrag ist schon bearbeitet.');
 
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     const firma = eingabe.firmaId
       ? CrmService.find(db.firmen, eingabe.firmaId)
       : await this.createFirma({ ...firmaAusLead(lead, eingabe.zustaendig), ...eingabe.firma });
@@ -1605,6 +1613,7 @@ export class CrmService {
   /** Call after the setup, so newly created tabs are noticed right away. */
   vergissStruktur(): void {
     this.store.vergissStruktur();
+    this.stand.vergiss();
   }
 
   /** Waters the plant. Once per person and day: a second time returns the first entry. */
@@ -1634,6 +1643,7 @@ export class CrmService {
     if (daten.plan.length + daten.inhalte.length + daten.hooks.length + daten.aufgaben.length + daten.texte.length > 0) {
       throw new ValidationError('plan', 'Hier stehen schon Einträge. Der Startplan wird nur in ein leeres Werkzeug übernommen.');
     }
+    const { SOCIAL_START_AUFGABEN, SOCIAL_START_HOOKS, SOCIAL_START_INHALTE, SOCIAL_START_PLAN, SOCIAL_START_TEXTE } = await import('./socialStart');
     const meta = this.created();
 
     const inhalte: SocialInhalt[] = SOCIAL_START_INHALTE.map((start, i) => ({
@@ -1927,7 +1937,7 @@ export class CrmService {
    * With `ort: 'clients'` the folder goes straight into 01_Clients and gets the client folder template.
    */
   async legeLeadOrdnerAn(firmaId: string, kuerzel: string, ordnerName?: string, ort: 'leads' | 'clients' = 'leads'): Promise<Firma> {
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     const konfig = this.konfiguration(db);
     const firma = CrmService.find(db.firmen, firmaId);
     if (firma.drive_ordner_id) throw new ValidationError('drive_ordner_id', `„${firma.name}“ hat schon einen Drive-Ordner.`);
@@ -1958,7 +1968,7 @@ export class CrmService {
 
   /** Moves the firm's folder from 01_Leads to 01_Clients and adds whatever the client folder template has that is missing. */
   async verschiebeNachClients(firmaId: string): Promise<void> {
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     const konfig = this.konfiguration(db);
     const firma = CrmService.find(db.firmen, firmaId);
     if (!firma.drive_ordner_id) throw new ValidationError('drive_ordner_id', `„${firma.name}“ hat noch keinen Drive-Ordner.`);
@@ -2040,7 +2050,7 @@ export class CrmService {
 
   /** Creates an appointment in the signed-in person's calendar; with a firm, it is also logged in the firm's history. */
   async planeTermin(eingabe: TerminEingabe): Promise<CalendarEvent> {
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     const { daten, firma, kontakte } = this.terminDaten(db, eingabe);
     const termin = await this.calendar.createEvent(daten);
     if (!firma) return termin;
@@ -2062,7 +2072,7 @@ export class CrmService {
 
   async aendereTermin(bisher: CalendarEvent, eingabe: TerminEingabe): Promise<CalendarEvent> {
     if (bisher.bearbeitbar === false) throw new ValidationError('termin', 'Diesen Termin kann nur die Person ändern, die ihn angelegt hat.');
-    const db = await this.store.load();
+    const db = await this.stand.daten();
     return this.calendar.updateEvent(bisher, this.terminDaten(db, eingabe).daten);
   }
 
@@ -2096,7 +2106,8 @@ export class CrmService {
 
   /** Writes a previewed import plan: one append per tab for new records, one batch update for filled fields. */
   async importiere(plan: ImportPlan): Promise<ImportErgebnis> {
-    const db = await this.store.load();
+    // A bulk write checks against freshly read data, not the snapshot on screen.
+    const db = await this.stand.load();
     const meta = this.created();
     const firmen: Firma[] = [];
     const kontakte: Kontakt[] = [];

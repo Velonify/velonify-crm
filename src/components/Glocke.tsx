@@ -40,8 +40,9 @@ export function Glocke() {
   }, [ich, laden]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => void laden(), NEU_LADEN_MS);
+    // Background tabs do not poll; coming back to the tab reads once right away.
     const sichtbar = () => document.visibilityState === 'visible' && void laden();
+    const timer = window.setInterval(sichtbar, NEU_LADEN_MS);
     document.addEventListener('visibilitychange', sichtbar);
     return () => {
       window.clearInterval(timer);

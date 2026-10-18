@@ -4,7 +4,6 @@ import { config, isDemo } from '../config';
 import { useToast } from '../components/Toasts';
 import { errorMessage } from '../lib/errors';
 import { CrmService } from './crm';
-import { createDemoBackend } from './demo/seed';
 import { AuthExpiredError } from './errors';
 import { GoogleCalendar } from './google/calendar';
 import { GoogleDrive } from './google/drive';
@@ -12,6 +11,7 @@ import { ApiStore } from './api/apiStore';
 import { SheetsClient } from './sheets/sheetsClient';
 import type { Database } from './types';
 import { read as gemerktesIch } from '../lib/useIch';
+import { leereLadeCache } from '../lib/useLoad';
 
 interface CrmContextValue {
   service: CrmService | null;
@@ -20,7 +20,7 @@ interface CrmContextValue {
   error: Error | null;
   refresh(): Promise<void>;
   /**
-   * Runs a write, reloads the data and reports failures. Rethrows, so forms can show the error inline;
+   * Runs a write, shows its result (a full reload only after errors) and reports failures. Rethrows, so forms can show the error inline;
    * use `perform` for fire-and-forget buttons.
    */
   mutate<T>(action: (service: CrmService) => Promise<T>): Promise<T>;
@@ -44,8 +44,11 @@ export function CrmProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    // Cached page data belongs to the previous sign-in.
+    leereLadeCache();
     if (isDemo) {
-      createDemoBackend(userEmail).then(
+      // Sample data and the in-memory store only reach the browser in demo mode.
+      import('./demo/seed').then(({ createDemoBackend }) => createDemoBackend(userEmail)).then(
         (demo) => !cancelled && setBackend(demo),
         (err: Error) => !cancelled && (setError(err), setLoading(false)),
       );
@@ -102,14 +105,19 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   const mutate = useCallback(
     async <T,>(action: (service: CrmService) => Promise<T>): Promise<T> => {
       if (!backend) throw new Error('Das CRM wird noch geladen.');
+      let fehler = false;
       try {
         return await action(backend.service);
       } catch (err) {
+        fehler = true;
         if (err instanceof AuthExpiredError) expire();
         throw err;
       } finally {
-        // Also after errors: a conflict or partial failure should show the current state.
-        await refresh();
+        // The service already applied its writes to the snapshot, so a success needs no reload.
+        // After errors everything is read again: a conflict or partial failure should show the current state.
+        const stand = fehler ? null : backend.service.aktuellerStand;
+        if (stand) setDb(stand);
+        else await refresh();
       }
     },
     [backend, expire, refresh],
