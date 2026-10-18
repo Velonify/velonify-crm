@@ -50,6 +50,8 @@ export class CloudShopAudit implements ShopAuditApi {
     const body = (await antwort.json().catch(() => null)) as (T & { fehler?: string }) | null;
     if (antwort.status === 401 && /abgelaufen|nicht angemeldet/i.test(body?.fehler ?? '')) throw new AuthExpiredError();
     if (!antwort.ok || !body) throw new Error(body?.fehler ?? `Das Shop-Audit hat mit Fehler ${antwort.status} geantwortet.`);
+    // The audit route keeps the connection alive and therefore reports late errors with status 200.
+    if (body.fehler) throw new Error(body.fehler);
     return body;
   }
 }
