@@ -16,23 +16,66 @@ export interface ShopAuditApi {
   roastTexte(anfrage: RoastAnfrage): Promise<RoastTexte & { verworfen: number }>;
 }
 
-/** Calls the Cloud Function with the Google token the app already holds. One audit takes 20–60 seconds. */
+const NICHT_ERREICHBAR = 'Das Shop-Audit ist gerade nicht erreichbar. Bitte Internetverbindung prüfen und erneut versuchen.';
+
+/** The connection broke before the whole answer arrived; the audit itself may still be running on the server. */
+class VerbindungAbgerissen extends Error {
+  constructor() {
+    super(NICHT_ERREICHBAR);
+  }
+}
+
+/** How often and how long the app asks for the stored result after the connection broke. */
+const NACHFRAGE_ABSTAND_MS = 5_000;
+const NACHFRAGE_HOECHSTENS_MS = 4 * 60_000;
+
+/**
+ * Calls the Cloud Function with the Google token the app already holds. One audit takes 20–90 seconds. On some
+ * networks such a long request breaks although the audit succeeds; the server then keeps the result under the order
+ * id, and the app fetches it from /ergebnis.
+ */
 export class CloudShopAudit implements ShopAuditApi {
   constructor(
     private readonly url: string,
     private readonly getToken: () => Promise<string>,
+    private readonly warte = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
   ) {}
 
   async pruefe(anfrage: AuditAnfrage): Promise<AuditErgebnis> {
-    const body = await this.post<AuditErgebnis>(this.url, anfrage);
+    const auftrag = crypto.randomUUID();
+    let body: AuditErgebnis;
+    try {
+      body = await this.post<AuditErgebnis>(this.url, { ...anfrage, auftrag });
+    } catch (error) {
+      if (!(error instanceof VerbindungAbgerissen)) throw error;
+      body = await this.holeErgebnis(auftrag);
+    }
     if (!body.befunde) throw new Error('Das Shop-Audit hat keine Befunde geliefert.');
     return body;
   }
 
+  private async holeErgebnis(auftrag: string): Promise<AuditErgebnis> {
+    const ende = Date.now() + NACHFRAGE_HOECHSTENS_MS;
+    while (Date.now() < ende) {
+      await this.warte(NACHFRAGE_ABSTAND_MS);
+      try {
+        const body = await this.post<AuditErgebnis & { laeuft?: boolean }>(`${this.basis()}/ergebnis`, { auftrag });
+        if (!body.laeuft) return body;
+      } catch (error) {
+        if (!(error instanceof VerbindungAbgerissen)) throw error;
+      }
+    }
+    throw new Error(NICHT_ERREICHBAR);
+  }
+
   async roastTexte(anfrage: RoastAnfrage): Promise<RoastTexte & { verworfen: number }> {
-    const body = await this.post<RoastTexte & { verworfen: number }>(`${this.url.replace(/\/$/, '')}/roast`, anfrage);
+    const body = await this.post<RoastTexte & { verworfen: number }>(`${this.basis()}/roast`, anfrage);
     if (!Array.isArray(body.punkte)) throw new Error('Claude hat keine Texte geliefert.');
     return body;
+  }
+
+  private basis() {
+    return this.url.replace(/\/$/, '');
   }
 
   private async post<T>(url: string, daten: unknown): Promise<T> {
@@ -45,10 +88,12 @@ export class CloudShopAudit implements ShopAuditApi {
         body: JSON.stringify(daten),
       });
     } catch {
-      throw new Error('Das Shop-Audit ist gerade nicht erreichbar. Bitte Internetverbindung prüfen und erneut versuchen.');
+      throw new VerbindungAbgerissen();
     }
     const body = (await antwort.json().catch(() => null)) as (T & { fehler?: string }) | null;
     if (antwort.status === 401 && /abgelaufen|nicht angemeldet/i.test(body?.fehler ?? '')) throw new AuthExpiredError();
+    // Status 200 without a readable body: the answer broke off on the way.
+    if (antwort.ok && !body) throw new VerbindungAbgerissen();
     if (!antwort.ok || !body) throw new Error(body?.fehler ?? `Das Shop-Audit hat mit Fehler ${antwort.status} geantwortet.`);
     // The audit route keeps the connection alive and therefore reports late errors with status 200.
     if (body.fehler) throw new Error(body.fehler);
