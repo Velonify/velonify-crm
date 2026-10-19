@@ -20,9 +20,10 @@ export const WERKZEUGE: Werkzeug[] = [
     kurz: 'Home',
     beschreibung: 'Überblick, Kunden und Links',
     pfad: '/',
-    bereiche: ['/kalender', '/anfragen', '/wort'],
+    bereiche: ['/eingang', '/kalender', '/anfragen', '/wort'],
     navigation: [
       { label: 'Übersicht', pfad: '/', end: true },
+      { label: 'Eingang', pfad: '/eingang' },
       { label: 'Kalender', pfad: '/kalender' },
       { label: 'Anfragen', pfad: '/anfragen' },
       { label: 'Wort des Tages', pfad: '/wort' },

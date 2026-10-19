@@ -19,6 +19,9 @@ export const SPRUENGE: { taste: string; ziel: string; label: string }[] = [
   { taste: 'm', ziel: '/magnete', label: 'Lead-Magnete' },
 ];
 
+/** When G was pressed last: page shortcuts (Eingang) ignore the letter that follows it. */
+export const letzterG = { zeit: 0 };
+
 let hilfeOffen = false;
 const hoerer = new Set<() => void>();
 const setzeHilfe = (offen: boolean) => {
@@ -73,6 +76,7 @@ export function Tastatur() {
       }
       if (taste === 'g') {
         gSeit = Date.now();
+        letzterG.zeit = gSeit;
         return;
       }
       if (e.key === '/') {

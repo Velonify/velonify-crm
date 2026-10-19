@@ -25,6 +25,7 @@ const ContactGeneratorPage = seite(() => import('./contact/ContactGeneratorPage'
 const GesendetPage = seite(() => import('./contact/GesendetPage'), 'GesendetPage');
 const OutreachLeistungenPage = seite(() => import('./contact/OutreachLeistungenPage'), 'OutreachLeistungenPage');
 const AnfragenPage = seite(() => import('./eingang/AnfragenPage'), 'AnfragenPage');
+const EingangPage = seite(() => import('./eingang/EingangPage'), 'EingangPage');
 const DatenPage = seite(() => import('./pages/DatenPage'), 'DatenPage');
 const EinrichtungPage = seite(() => import('./pages/EinrichtungPage'), 'EinrichtungPage');
 const FirmaAktePage = seite(() => import('./pages/FirmaAktePage'), 'FirmaAktePage');
@@ -70,6 +71,7 @@ export function App() {
           <Routes>
             <Route element={<Layout />}>
               <Route index element={<StartPage />} />
+              <Route path="eingang" element={<EingangPage />} />
               <Route path="kalender" element={<KalenderPage />} />
               <Route path="anfragen" element={<AnfragenPage />} />
               <Route path="wort" element={<WordlePage />} />

@@ -221,7 +221,17 @@ export function usePhaseChange(): { request(deal: Deal, phase: string): Promise<
       }
       const kunde = phase === 'gewonnen' && firma.status !== 'kunde' ? ` · ${firma.name} ist jetzt Kunde` : '';
       const zugeteilt = istZuteilung(deal.phase, phase) && ich && !istZustaendig(deal.zustaendig, ich) ? ` · dir zugeteilt` : '';
-      await perform((s) => s.changePhase(deal.id, phase, deal.geaendert_am, '', ich ?? ''), `${firma.name}: ${phaseLabel(phase)}${kunde}${zugeteilt}`);
+      const meldung = `${firma.name}: ${phaseLabel(phase)}${kunde}${zugeteilt}`;
+      // Winning changes more than the phase (status, folders), so only plain moves get "Rückgängig".
+      if (phase === 'gewonnen') {
+        await perform((s) => s.changePhase(deal.id, phase, deal.geaendert_am, '', ich ?? ''), meldung);
+        return;
+      }
+      const neu = await perform((s) => s.changePhase(deal.id, phase, deal.geaendert_am, '', ich ?? ''));
+      if (!neu) return;
+      toast.rueckgaengig(meldung, () =>
+        void perform((s) => s.changePhase(deal.id, deal.phase, neu.geaendert_am, '', ich ?? ''), `${firma.name}: zurück auf ${phaseLabel(deal.phase)}`),
+      );
     },
     [db, service, perform, toast, ich],
   );

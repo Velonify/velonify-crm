@@ -1,16 +1,18 @@
-import { useMemo, useState, type DragEvent } from 'react';
+import { useMemo, useState, type DragEvent, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { useBlatt } from '../components/Blatt';
 import { BranchenFilter, useBranchenFilter } from '../components/BranchenFilter';
 import { BranchenNachtrag } from '../components/BranchenNachtrag';
 import { DealDialog } from '../components/dialogs/DealDialog';
 import { usePhaseChange } from '../components/dialogs/PhaseChange';
 import { VernetzungKnoepfe } from '../components/dialogs/Vernetzung';
+import { useOffenBei } from '../components/Praesenz';
 import { ErrorBox, Loading, PageHeader, TierBadge } from '../components/ui';
-import { isAbgeschlossen, PHASEN, phaseLabel } from '../data/constants';
+import { isAbgeschlossen, PHASEN, phaseLabel, STANDARD_WAHRSCHEINLICHKEIT } from '../data/constants';
 import { brancheLabel, passtBranche, zahlJeBranche } from '../data/branchen';
 import { useCrm } from '../data/CrmContext';
 import { addDays, isoDate } from '../data/ids';
-import { wahrscheinlichkeit } from '../data/selectors';
+import { RUHT_AB_TAGE, ruhtSeit, wahrscheinlichkeit } from '../data/selectors';
 import type { Deal } from '../data/types';
 import { formatDayShort, formatEuro } from '../lib/format';
 import { useIch } from '../lib/useIch';
@@ -27,7 +29,15 @@ export function PipelinePage() {
   const [ueber, setUeber] = useState<string | null>(null);
   const branchen = useBranchenFilter();
   const phaseChange = usePhaseChange();
+  const blatt = useBlatt();
+  const offenBei = useOffenBei('firma');
   const heute = isoDate(new Date());
+  // Plain click opens the side sheet; with a modifier key the link opens the full record as usual.
+  const imBlatt = (e: MouseEvent, firmaId: string, dealId: string) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    blatt.oeffne(firmaId, dealId);
+  };
 
   // Deals on the board before the industry filter, so the chips count what the other filters leave.
   const sichtbareDeals = useMemo(() => {
@@ -134,14 +144,27 @@ export function PipelinePage() {
                 {phaseLabel(spalte.phase)} <span className="count">{spalte.deals.length}</span>
               </h2>
               <span className="board-column-sum">{formatEuro(spalte.summe)}</span>
+              {!isAbgeschlossen(spalte.phase) && (
+                <div className="spalte-gewichtet" title={`Abschlusswahrscheinlichkeit ${STANDARD_WAHRSCHEINLICHKEIT[spalte.phase]} %`}>
+                  <span className="wbalken" aria-hidden="true">
+                    <i style={{ width: `${STANDARD_WAHRSCHEINLICHKEIT[spalte.phase]}%` }} />
+                  </span>
+                  <span className="muted small">
+                    {STANDARD_WAHRSCHEINLICHKEIT[spalte.phase]} % · gewichtet {formatEuro(Math.round(spalte.gewichtet))}
+                  </span>
+                </div>
+              )}
             </header>
             <ul className="board-cards">
               {spalte.deals.map(({ deal, firma }) => {
                 const ueberfaellig = deal.naechster_schritt_am && deal.naechster_schritt_am < heute && !isAbgeschlossen(deal.phase);
+                const ruht = db ? ruhtSeit(deal, db.aktivitaeten, heute) : null;
+                const ruhend = ruht !== null && ruht >= RUHT_AB_TAGE;
+                const schauen = offenBei.get(firma.id) ?? [];
                 return (
                   <li
                     key={deal.id}
-                    className={`board-card${ziehend === deal.id ? ' is-dragging' : ''}`}
+                    className={`board-card${ziehend === deal.id ? ' is-dragging' : ''}${ruhend ? ' is-ruhend' : ''}`}
                     draggable
                     onDragStart={(e) => {
                       e.dataTransfer.setData('text/plain', deal.id);
@@ -153,8 +176,15 @@ export function PipelinePage() {
                       setUeber(null);
                     }}
                   >
+                    {schauen.length > 0 && (
+                      <span className="schaut" title={`${schauen.join(', ')} ${schauen.length === 1 ? 'hat' : 'haben'} die Firma gerade offen`}>
+                        <span className="schaut-punkt" aria-hidden="true" />
+                        {schauen[0]}
+                        {schauen.length > 1 ? ` +${schauen.length - 1}` : ''}
+                      </span>
+                    )}
                     <div className="board-card-top">
-                      <Link to={`/crm/firmen/${firma.id}`} className="row-title">
+                      <Link to={`/crm/firmen/${firma.id}`} className="row-title" onClick={(e) => imBlatt(e, firma.id, deal.id)}>
                         {firma.name}
                       </Link>
                       {firma.tier && <TierBadge tier={firma.tier} />}
@@ -180,6 +210,7 @@ export function PipelinePage() {
                         {deal.naechster_schritt_am && <strong>{deal.naechster_schritt_am === heute ? 'Heute' : formatDayShort(deal.naechster_schritt_am)}</strong>} {deal.naechster_schritt}
                       </div>
                     )}
+                    {ruhend && <div className="ruht-hinweis">Ruht seit {ruht} Tagen</div>}
                     {deal.phase === 'vernetzung' && <VernetzungKnoepfe deal={deal} firma={firma} />}
                     {deal.phase === 'verloren' && deal.verlustgrund && <div className="row-sub">{deal.verlustgrund}</div>}
                     <select
