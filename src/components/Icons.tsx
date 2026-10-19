@@ -10,6 +10,14 @@ const PFADE: Record<string, string> = {
   social: 'M4 4h12v9H9l-4 3v-3H4z',
   leads: 'M9 3a6 6 0 1 0 0 12A6 6 0 0 0 9 3zM13.5 13.5 18 18',
   magnete: 'M5 3v7a5 5 0 0 0 10 0V3h-3v7a2 2 0 0 1-4 0V3zM5 6h3M12 6h3',
+  hell: 'M10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6 16 16M16 4l-1.4 1.4M5.4 14.6 4 16',
+  dunkel: 'M15.5 12.5A6.5 6.5 0 0 1 7.5 4.5 6.5 6.5 0 1 0 15.5 12.5z',
+  hilfe: 'M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM7.8 7.6a2.3 2.3 0 1 1 3.2 2.1c-.6.3-1 .8-1 1.5v.6M10 14.2v.3',
+  abmelden: 'M8 3H3v14h5M13 6l4 4-4 4M17 10H7',
+  frage: 'M10 2.5l1.7 4.8 4.8 1.7-4.8 1.7L10 15.5l-1.7-4.8L3.5 9l4.8-1.7z',
+  rueckgaengig: 'M7 12 3 8l4-4M3 8h9a4.5 4.5 0 0 1 0 9H9',
+  haken: 'M4 10.5l4 4 8-9',
+  eingang: 'M2.5 11h4.5l1.5 2.5h3L13 11h4.5M2.5 11 5 4h10l2.5 7v5h-15z',
 };
 
 export function WerkzeugIcon({ id }: { id: string }) {
