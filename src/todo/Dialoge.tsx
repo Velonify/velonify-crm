@@ -11,6 +11,7 @@ import { formatDateTime, shortUser } from '../lib/format';
 import { config } from '../config';
 import { PersonenAuswahl } from '../components/PersonenAuswahl';
 import { ErwaehnungsFeld, MitErwaehnungen } from '../components/Erwaehnungen';
+import { AuchOffen, useAnwesenheit } from '../components/Praesenz';
 
 /** Comments from outside the team domain come from the client portal. */
 const istTeam = (von: string) => von.trim().toLowerCase().endsWith(`@${config.allowedDomain}`);
@@ -73,6 +74,7 @@ export function KarteDialog({
   const [neuerPunkt, setNeuerPunkt] = useState('');
   const [kommentar, setKommentar] = useState('');
   const { busy, error, run } = useSpeichern(aendern, onClose);
+  useAnwesenheit(aufgabe ? { art: 'karte', id: aufgabe.id, titel: aufgabe.titel } : null);
   const eigene = aufgabe ? kommentare.filter((k) => k.aufgabe_id === aufgabe.id).sort((a, b) => a.datum.localeCompare(b.datum)) : [];
   useEffect(() => {
     if (kommentarId) document.getElementById(`kommentar-${kommentarId}`)?.scrollIntoView({ block: 'center' });
@@ -128,6 +130,7 @@ export function KarteDialog({
         )
       }
     >
+      <AuchOffen art="karte" id={aufgabe?.id} />
       <div className="grid">
         <Field label="Titel" invalid={fieldOf(error) === 'titel'} wide>
           <input value={werte.titel} onChange={(e) => setWerte((w) => ({ ...w, titel: e.target.value }))} maxLength={200} autoComplete="off" autoFocus />

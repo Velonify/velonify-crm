@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, NavLink, useParams } from 'react-router-dom';
+import { AuchOffen, useAnwesenheit } from '../components/Praesenz';
 import { Card, ErrorBox, Loading, PageHeader, StatusBadge } from '../components/ui';
 import { isDemo } from '../config';
 import { useCrm } from '../data/CrmContext';
@@ -71,6 +72,8 @@ export function KundePage() {
     ];
   }, [board, todos.data, daten.data, id, heute, eintraege]);
 
+  useAnwesenheit(firma ? { art: 'kunde', id: firma.id, titel: firma.name } : null);
+
   if (!db) return <div className="page">{dbError ? <ErrorBox error={dbError} onRetry={refresh} /> : <Loading />}</div>;
   if (!firma) {
     return (
@@ -108,6 +111,7 @@ export function KundePage() {
         // The news strip is what lies over the band; without news the tabs would land on bordeaux.
         ueberlappen={eintraege.length > 0 && firma.status === 'kunde'}
       />
+      <AuchOffen art="kunde" id={firma.id} />
       {firma.status !== 'kunde' && <div className="hint-box warn">Diese Firma ist im CRM nicht als Kunde markiert und steht deshalb nicht in der Kundenliste.</div>}
 
       <TickerBand eintraege={eintraege} />

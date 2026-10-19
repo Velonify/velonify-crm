@@ -11,6 +11,7 @@ import { useIch } from '../lib/useIch';
 import { KarteDialog, SpaltenDialog, type Aendern } from './Dialoge';
 import { useKanbanDrag, type DragZiel } from './useKanbanDrag';
 import { kuerzelVon } from '../data/zustaendig';
+import { useOffenBei } from '../components/Praesenz';
 
 const FILTER: { wert: KartenFilter; label: string }[] = [
   { wert: 'alle', label: 'Alle' },
@@ -18,7 +19,7 @@ const FILTER: { wert: KartenFilter; label: string }[] = [
   { wert: 'faellig', label: 'Fällig' },
 ];
 
-function KarteInhalt({ aufgabe, heute, kommentare }: { aufgabe: Aufgabe; heute: string; kommentare: number }) {
+function KarteInhalt({ aufgabe, heute, kommentare, offenBei = [] }: { aufgabe: Aufgabe; heute: string; kommentare: number; offenBei?: string[] }) {
   const labels = labelsVon(aufgabe);
   const punkte = checklisteVon(aufgabe);
   const fertig = punkte.filter((p) => p.erledigt).length;
@@ -53,6 +54,12 @@ function KarteInhalt({ aufgabe, heute, kommentare }: { aufgabe: Aufgabe; heute: 
         {aufgabe.quelle === 'agent' && <span className="badge subtle">Slack</span>}
         {aufgabe.quelle === 'kunde' && <span className="badge subtle" title="Anfrage aus dem Kundenportal">Anfrage</span>}
         {freigabe ? <span className={`badge freigabe-${freigabe}`}>{FREIGABE_LABEL[freigabe]}</span> : aufgabe.sichtbar_kunde && <span className="badge ok" title="Für den Kunden sichtbar">Kunde</span>}
+        {offenBei.length > 0 && (
+          <span className="karte-offen" title={`Gerade offen bei ${offenBei.join(', ')}`} aria-label={`Gerade offen bei ${offenBei.join(', ')}`}>
+            <span className="anwesend-punkt" aria-hidden="true" />
+            {offenBei.map((n) => kuerzelVon(n)[0] ?? n.slice(0, 2)).join(' ')}
+          </span>
+        )}
         {aufgabe.zustaendig && (
           <span className="karte-personen" title={aufgabe.zustaendig}>
             {kuerzelVon(aufgabe.zustaendig).map((k, i) => (
@@ -131,6 +138,7 @@ export function BoardAnsicht({
   const [label, setLabel] = useState('');
   const [dialog, setDialog] = useState<{ aufgabe?: Aufgabe; spalteId?: string; kommentarId?: string } | null>(null);
   const [spaltenDialog, setSpaltenDialog] = useState(false);
+  const offenBei = useOffenBei('karte');
   // "?karte=<id>&kommentar=<id>" (from the bell or a shared link) opens that card once, scrolled to the comment.
   const [suchParameter, setSuchParameter] = useSearchParams();
   const karteAusLink = suchParameter.get('karte');
@@ -245,7 +253,7 @@ export function BoardAnsicht({
                         }
                       }}
                     >
-                      <KarteInhalt aufgabe={a} heute={heute} kommentare={kommentarZahl.get(a.id) ?? 0} />
+                      <KarteInhalt aufgabe={a} heute={heute} kommentare={kommentarZahl.get(a.id) ?? 0} offenBei={offenBei.get(a.id)} />
                     </li>
                   </KartenPlatz>
                 ))}

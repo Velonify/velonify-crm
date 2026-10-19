@@ -7,6 +7,7 @@ import { kundenListe } from '../data/kunden';
 import { useTheme } from '../lib/useTheme';
 import { WERKZEUGE, seitentitel, werkzeugFuerPfad } from '../werkzeuge';
 import { Glocke } from './Glocke';
+import { GeradeOnline, PraesenzProvider } from './Praesenz';
 import { Seitenrahmen } from './Seitenrahmen';
 import { Suche } from './Suche';
 import { WerkzeugIcon } from './Icons';
@@ -31,6 +32,7 @@ export function Layout() {
   }, [werkzeug]);
 
   return (
+    <PraesenzProvider>
     <div className="app">
       {/* First stop for keyboard users: past the tool rail and page nav straight to the content. */}
       <button type="button" className="skip-link" onClick={() => document.getElementById('inhalt')?.focus()}>
@@ -80,6 +82,7 @@ export function Layout() {
           </nav>
         )}
         <div className="sidebar-footer">
+          <GeradeOnline />
           <div className="segmented theme-switch" role="radiogroup" aria-label="Darstellung">
             <button type="button" role="radio" aria-checked={theme === 'light'} className={theme === 'light' ? 'is-active' : ''} onClick={() => setTheme('light')}>
               Hell
@@ -118,5 +121,6 @@ export function Layout() {
         </Seitenrahmen>
       </main>
     </div>
+    </PraesenzProvider>
   );
 }

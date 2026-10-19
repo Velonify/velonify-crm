@@ -7,6 +7,7 @@ import { usePhaseChange } from '../components/dialogs/PhaseChange';
 import { brancheLabel } from '../data/branchen';
 import { FirmaForm } from '../components/FirmaForm';
 import { useToast } from '../components/Toasts';
+import { AuchOffen, useAnwesenheit } from '../components/Praesenz';
 import { Card, ErrorBox, Loading, PageHeader, StatusBadge, TierBadge } from '../components/ui';
 import { EOL_LABEL } from '../data/constants';
 import { findeDubletten } from '../data/dubletten';
@@ -62,6 +63,8 @@ export function FirmaAktePage() {
   const [ich] = useIch(db?.listen.team ?? []);
   const [editing, setEditing] = useState(false);
   const phaseChange = usePhaseChange();
+  const offen = db?.firmen.find((firma) => firma.id === id);
+  useAnwesenheit(offen ? { art: 'firma', id: offen.id, titel: offen.name } : null);
 
   if (!db) {
     return <div className="page">{error ? <ErrorBox error={error} onRetry={refresh} /> : <Loading />}</div>;
@@ -83,6 +86,7 @@ export function FirmaAktePage() {
     return (
       <div className="page narrow">
         <PageHeader eyebrow="Firma bearbeiten" title={f.name} />
+        <AuchOffen art="firma" id={f.id} />
         <FirmaForm
           initial={toInput(f)}
           listen={db.listen}
@@ -162,6 +166,7 @@ export function FirmaAktePage() {
         }
       />
 
+      <AuchOffen art="firma" id={f.id} />
       <DublettenHinweis firma={f} alle={db.firmen} />
 
       <div className="akte">

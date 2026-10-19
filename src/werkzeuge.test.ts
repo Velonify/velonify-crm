@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { seitentitel, werkzeugFuerPfad } from './werkzeuge';
+import { bereichFuerPfad, seitentitel, werkzeugFuerPfad } from './werkzeuge';
 
 describe('werkzeugFuerPfad', () => {
   it('maps paths to their tool', () => {
@@ -25,5 +25,13 @@ describe('seitentitel', () => {
   it('names the open tool in the browser tab', () => {
     expect(seitentitel(werkzeugFuerPfad('/crm/pipeline')!)).toBe('Velonify CRM');
     expect(seitentitel(werkzeugFuerPfad('/')!)).toBe('Velonify');
+  });
+});
+
+describe('bereichFuerPfad', () => {
+  it('nennt Werkzeug und Seite', () => {
+    expect(bereichFuerPfad('/crm/pipeline')).toBe('CRM · Pipeline');
+    expect(bereichFuerPfad('/crm/firmen/F-1')).toBe('CRM · Firmen');
+    expect(bereichFuerPfad('/einrichtung')).toBe('Einrichtung');
   });
 });

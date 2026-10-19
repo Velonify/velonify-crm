@@ -142,6 +142,16 @@ export const istGeplant = (w: Werkzeug) => !w.pfad;
 /** Browser tab title of a tool, e.g. "Velonify CRM". Home is the platform itself, so it stays "Velonify". */
 export const seitentitel = (w: Werkzeug) => (w.id === 'home' ? 'Velonify' : `Velonify ${w.name}`);
 
+/** Readable name of a page for "Gerade online", e.g. "CRM · Pipeline". */
+export function bereichFuerPfad(pathname: string): string {
+  const w = werkzeugFuerPfad(pathname);
+  if (!w) return pathname.startsWith('/einrichtung') ? 'Einrichtung' : 'Hub';
+  const seite = w.navigation
+    .filter((n) => (n.end ? pathname === n.pfad : pathname === n.pfad || pathname.startsWith(`${n.pfad}/`)))
+    .sort((a, b) => b.pfad.length - a.pfad.length)[0];
+  return seite && seite.label !== w.name ? `${w.name} · ${seite.label}` : w.name;
+}
+
 /**
  * The tool a path belongs to: the one with the longest matching start path. Pages outside every tool
  * (like /einrichtung) return null, so the sidebar can stay on the tool that was open before.

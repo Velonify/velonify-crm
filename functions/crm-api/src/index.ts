@@ -12,6 +12,7 @@ import { dienstkontoToken } from '../../gemeinsam/google';
 import { SheetsClient } from '../../../src/data/sheets/sheetsClient';
 import { slackBenachrichtiger } from '../../../src/data/slack';
 import { leseTeamZuordnung } from '../../../src/data/selectors';
+import { PraesenzRaum, pruefeMeldung } from '../../../src/data/praesenz';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 const DOMAIN = process.env.ALLOWED_DOMAIN ?? 'velonify.de';
@@ -20,7 +21,7 @@ const ERLAUBTE_HERKUNFT = (process.env.ALLOWED_ORIGINS ?? 'https://crm.velonify.
   .map((o) => o.trim())
   .filter(Boolean);
 
-// The hub reloads every two minutes and on focus; 600 calls in ten minutes only stops runaway loops.
+// The hub reloads every two minutes and on focus, open tabs send a heartbeat every 20 s; 600 calls in ten minutes only stops runaway loops.
 const limit = new Limit(600, 10 * 60 * 1000);
 
 /** Who may take the sheet over into Postgres (Einrichtung → Übernahme). */
@@ -51,12 +52,15 @@ function passt(gegeben: unknown, erwartet: string | undefined): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+/** Addresses whose team name is not the start of the address, e.g. lukas@velonify.de=Lugge. */
+const teamZuordnung = leseTeamZuordnung(process.env.TEAM_ZUORDNUNG ?? '');
+
 /** @-mentions also go to Slack as direct messages when the Slack app's token is set (secret SLACK_BOT_TOKEN). */
 const slack = process.env.SLACK_BOT_TOKEN?.trim()
   ? slackBenachrichtiger({
       token: process.env.SLACK_BOT_TOKEN.trim(),
       hub: process.env.HUB_URL || 'https://crm.velonify.de',
-      teamZuordnung: leseTeamZuordnung(process.env.TEAM_ZUORDNUNG ?? ''),
+      teamZuordnung,
     })
   : undefined;
 
@@ -78,6 +82,9 @@ function magnete(): MagnetKonfig {
   };
   return magnetKonfig;
 }
+
+/** Who is in the hub right now: only in memory, which works because crm-api runs as a single instance. */
+const praesenz = new PraesenzRaum();
 
 const erlaubteHerkunft = (origin: string) => ERLAUBTE_HERKUNFT.includes(origin) || /^http:\/\/localhost:\d+$/.test(origin);
 
@@ -154,6 +161,17 @@ functions.http('crmApi', async (req, res) => {
     return void fehler(502, 'Die Anmeldung konnte gerade nicht geprüft werden.');
   }
   if (!limit.erlaubt(email)) return void fehler(429, 'Zu viele Anfragen in kurzer Zeit. Bitte kurz warten.');
+
+  // Heartbeat of an open hub tab: stores where it is and answers with everyone else.
+  if (pfad === '/praesenz') {
+    if (req.method !== 'POST') return void fehler(405, 'Nur POST.');
+    const meldung = pruefeMeldung(req.body);
+    if (!meldung) return void fehler(400, 'Meldung ungültig.');
+    if ('weg' in meldung) praesenz.weg(email, meldung.tab);
+    else praesenz.melde(email, meldung);
+    res.json({ anwesende: praesenz.anwesende(email).map((a) => ({ ...a, name: teamZuordnung.get(a.email) })) });
+    return;
+  }
 
   const start = Date.now();
   if (pfad.startsWith('/admin/')) {
