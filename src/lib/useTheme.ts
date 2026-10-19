@@ -5,6 +5,8 @@ import { flushSync } from 'react-dom';
 export type Theme = 'light' | 'dark';
 
 const KEY = 'velonify-crm.theme';
+/** Window title bar of the installed app: the page ground of each theme (--ground in design/soft.css). */
+const TITELLEISTE: Record<Theme, string> = { light: '#f2eff0', dark: '#110d0f' };
 const dark = () => window.matchMedia('(prefers-color-scheme: dark)');
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -50,6 +52,7 @@ export function useTheme(): [Theme, (theme: Theme) => void] {
   // Layout effect: the attribute must change in the same commit as the sidebar, so the transition captures both.
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme;
+    document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute('content', TITELLEISTE[theme]);
   }, [theme]);
 
   const setTheme = useCallback((next: Theme) => {
