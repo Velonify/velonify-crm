@@ -99,6 +99,8 @@
   --off: 0px;
   --off-s: 0px;
   --off-l: 0px;
+  /* One rhythm for the space between blocks and cards, everywhere. */
+  --abstand: 20px;
   --r-gross: 22px;
   --r-mittel: 16px;
   --r-klein: 12px;
@@ -197,8 +199,8 @@ body {
 .ich-name { font-size: 13px; font-weight: 700; white-space: nowrap; }
 .ich-mail { font-size: 11px; color: var(--ink-muted); white-space: nowrap; }
 
-.soft .shell { display: flex; gap: 18px; align-items: flex-start; max-width: 1560px; margin: 0 auto; }
-.kapseln { position: sticky; top: 90px; z-index: 25; display: flex; flex-direction: column; gap: 10px; flex: none; }
+.soft .shell { display: flex; gap: var(--abstand); align-items: flex-start; max-width: 1560px; margin: 0 auto; }
+.kapseln { position: sticky; top: 76px; z-index: 25; display: flex; flex-direction: column; gap: 10px; flex: none; }
 .kapsel { border-radius: 999px; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
 .kapsel-knopf { position: relative; z-index: 1; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: var(--ink-muted); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: none; transition: background 0.2s, color 0.2s; }
 .kapsel-knopf svg { width: 19px; height: 19px; }
@@ -223,7 +225,7 @@ body {
 }
 .kapsel-knopf[data-tipp]:hover::after, .kapsel-knopf[data-tipp]:focus-visible::after { opacity: 1; transform: translate(0, -50%); }
 .soft .main { flex: 1; min-width: 0; overflow-x: visible; }
-.soft .demo-banner { border-radius: var(--r-mittel); margin: 0 0 18px; padding: 10px 16px; background: var(--espresso); }
+.soft .demo-banner { border-radius: var(--r-mittel); margin: 0 0 var(--abstand); padding: 10px 16px; background: var(--espresso); }
 
 /* Pages: the shell gives the gutter; the old band head becomes a quiet title row. */
 .soft .page { padding: 4px 0 var(--space-5); max-width: none; animation: seite-rein 0.55s cubic-bezier(0.2, 0.75, 0.2, 1) backwards; }
@@ -253,7 +255,7 @@ body {
 .soft .band-zahlen dd { font-family: var(--font-sans); font-weight: 700; letter-spacing: -0.02em; font-size: clamp(22px, 1vw + 14px, 30px); }
 .soft .band-zahlen dt { color: var(--ink-muted); font-size: 12.5px; }
 .soft .band-zahlen .is-warn dd { color: var(--danger); }
-.soft .page > :is(.card, .table-wrap, .hint-box, .alert):not(:last-child) { margin-bottom: 18px; }
+.soft .page > :is(.card, .table-wrap, .hint-box, .alert):not(:last-child) { margin-bottom: var(--abstand); }
 
 /* ─── Surfaces ───────────────────────────────────────────────────────────── */
 .soft :is(.card, .table-wrap, .kpi, .tool, .form fieldset, .uebersicht-gruppe, .uebersicht-filter, .mein-zaehler, .option-block, .board, .kalender-woche, .kunden-karten, .social-inhalte, .link-list) {
@@ -263,18 +265,18 @@ body {
   background-color: var(--raised);
 }
 .soft :is(.board, .kalender-woche, .kunden-karten, .social-inhalte, .link-list) { overflow: hidden; }
-.soft .page > .card + .card { margin-top: 18px; }
+.soft .page > .card + .card { margin-top: var(--abstand); }
 .soft .card { padding: 22px; }
 .soft .card-header h2 { font-size: 15px; font-weight: 700; }
 .soft .count { border: 0; background: var(--sunken); border-radius: 99px; padding: 4px 8px; }
-.soft .akte, .soft .tag-grid { gap: 18px; }
-.soft .akte-main, .soft .akte-side { gap: 18px; }
-.soft .task-card { margin-bottom: 18px; }
+.soft .akte, .soft .tag-grid { gap: var(--abstand); }
+.soft .akte-main, .soft .akte-side { gap: var(--abstand); }
+.soft .task-card { margin-bottom: var(--abstand); }
 .soft .task-card.overdue { box-shadow: inset 4px 0 0 var(--danger), var(--karten-schatten); border-left: 0; }
 .soft .uebersicht-gruppe.is-dringend { box-shadow: inset 0 0 0 1.5px var(--danger), var(--karten-schatten); }
 .soft :is(.uebersicht-gruppe-kopf, .kanban-kopf, .board-column-header, .glocke-kopf, .search-input-row) { border-bottom-width: 1px; border-bottom-color: var(--line); }
 
-.soft .kpis { gap: 18px; margin-bottom: 22px; }
+.soft .kpis { gap: var(--abstand); margin-bottom: 22px; }
 .soft .kpi { padding: 20px 22px; gap: 10px; min-height: 140px; transition: transform 0.35s var(--ease), box-shadow 0.35s; }
 .soft .kpi:hover { transform: translateY(-4px); box-shadow: var(--karten-schatten-hoch); }
 .soft .kpi-label { letter-spacing: 0.02em; text-transform: none; font-size: 12.5px; font-weight: 600; }
@@ -282,7 +284,7 @@ body {
 .soft :is(.kpi.panel, .tool.panel) { background: var(--highlight-karte); color: #fff; }
 .soft :is(.kpi.panel, .tool.panel) :is(.kpi-label, .kpi-sub, .tool-text, .tool-figures) { color: rgb(255 255 255 / 80%); }
 .soft .tool.panel .tool-figures strong { color: #fff; }
-.soft .tools { gap: 18px; margin-bottom: 22px; }
+.soft .tools { gap: var(--abstand); margin-bottom: 22px; }
 .soft .tool { padding: 22px; transition: transform 0.35s var(--ease), box-shadow 0.35s; }
 .soft .tool:hover { transform: translateY(-4px); box-shadow: var(--karten-schatten-hoch); }
 .soft .tool-label { font-family: var(--font-sans); font-weight: 800; text-transform: none; letter-spacing: -0.01em; font-size: 19px; }
@@ -552,7 +554,7 @@ body {
 
 /* ─── Eingang ────────────────────────────────────────────────────────────── */
 .segment-zahl { font-variant-numeric: tabular-nums; opacity: 0.6; margin-left: 4px; }
-.eingang-raster { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
+.eingang-raster { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--abstand); align-items: start; }
 .soft .eingang-liste { padding: 8px; }
 .eingang-eintraege { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .ib { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 12px 14px; border-radius: var(--r-mittel); transition: background 0.15s; animation: ib-rein 0.4s var(--ease) backwards; }
@@ -604,17 +606,18 @@ body {
 /* ─── Home: calm by default ──────────────────────────────────────────────── */
 .start-ruhig { max-width: 1240px; }
 .start-schnell { display: flex; flex-wrap: wrap; gap: 6px; }
-.start-raster { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; align-items: start; }
-.start-rechts { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
-.start-pause { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; margin-top: 18px; }
-.start-mehr { margin-top: 18px; border-radius: var(--r-gross); background: color-mix(in srgb, var(--surface) 55%, transparent); }
-.start-mehr > summary { display: flex; flex-direction: column; gap: 2px; padding: 16px 22px; cursor: pointer; list-style: none; font-weight: 700; border-radius: var(--r-gross); }
+.start-raster { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--abstand); align-items: stretch; }
+.start-raster > .card { height: 100%; }
+.start-rechts { display: flex; flex-direction: column; gap: var(--abstand); min-width: 0; }
+.start-pause { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--abstand); }
+.start-mehr { }
+.start-mehr > summary { display: flex; flex-direction: column; gap: 2px; padding: 16px 22px; cursor: pointer; list-style: none; font-weight: 700; border-radius: var(--r-gross); background: color-mix(in srgb, var(--surface) 55%, transparent); }
 .start-mehr > summary::-webkit-details-marker { display: none; }
 .start-mehr > summary > span:first-child::after { content: ' +'; color: var(--ink-muted); }
 .start-mehr[open] > summary > span:first-child::after { content: ' –'; }
 .start-mehr > summary:hover { background: var(--hover); }
-.start-mehr-raster { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; padding: 4px 12px 12px; align-items: start; }
-.start-tipp { margin-top: 18px; text-align: center; }
+.start-mehr-raster { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--abstand); margin-top: var(--abstand); align-items: start; }
+.start-tipp { text-align: center; }
 .kunden-zeilen { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .kunden-zeile { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 8px; margin: 0 -8px; border-radius: 12px; color: var(--ink); text-decoration: none; }
 .kunden-zeile:hover { background: var(--sunken); text-decoration: none; }
@@ -630,3 +633,26 @@ body {
   .start-raster { grid-template-columns: 1fr; }
 }
 .start-mehr > summary > span + span { font-weight: 500; }
+
+/* ─── Spacing system ─────────────────────────────────────────────────────── */
+/* Pages stack their blocks with one gap; the old per-element margins (26/22/18/8 px) are reset. */
+.soft .page { display: flex; flex-direction: column; gap: var(--abstand); }
+.soft .page > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+.soft .page > .page-header { margin-bottom: 4px !important; }
+/* Filters belong together: the industry chips sit closer under the filter row. */
+.soft .page > .filters + .branchen-filter, .soft .page > .branchen-filter + .pipeline-hint { margin-top: -8px !important; }
+.soft .page > .pipeline-hint { margin-top: -8px !important; }
+/* Card grids and stacks on every page use the same gap. */
+.soft :is(.start-grid, .start-main, .start-side, .tag-grid, .akte, .akte-main, .akte-side, .anfragen, .contact-layout, .contact-spalte, .angebot-layout, .angebot-main, .angebot-side, .uebersicht-seite, .kpis, .tools) { gap: var(--abstand); }
+/* Small inline things directly on the page keep their own width in the column. */
+.soft .page > :is(.segmented, .button, .link-button, a, button, .badge, .chip) { align-self: flex-start; }
+.soft .card-header { margin-bottom: 14px; }
+.soft .demo-banner { margin-bottom: var(--abstand); }
+@media (min-width: 761px) and (max-width: 900px) {
+  .kapseln { top: 128px; }
+}
+/* "Heute dran": every row on the same left edge; overdue rows get a red mark, not an indent. */
+.soft .heute-liste li { grid-template-columns: 92px minmax(0, 1fr) auto; padding: 11px 10px; margin: 0 -10px; border-radius: 12px; border-top-color: var(--line); }
+.soft .heute-liste li:first-child { padding-top: 11px; }
+.soft .heute-liste li.is-ueberfaellig { padding-left: 10px; box-shadow: none; background: var(--danger-soft); }
+.soft .heute-liste li.is-ueberfaellig + li { border-top-color: transparent; }
