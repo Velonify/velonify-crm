@@ -184,6 +184,7 @@ body {
 .werkzeugpill .search-trigger { width: auto; margin: 0; border: 0; border-radius: 999px; padding: 0 8px 0 12px; height: 38px; gap: 10px; background: transparent; color: var(--ink-muted); }
 .werkzeugpill .search-trigger:hover { background: color-mix(in srgb, var(--surface) 70%, transparent); color: var(--ink); }
 .werkzeugpill .search-trigger-label { font-weight: 600; }
+.werkzeugpill .search-trigger > span[aria-hidden='true'] { font-size: 19px; line-height: 1; }
 .werkzeugpill .search-trigger kbd { border-radius: 6px; border-color: var(--line-strong); opacity: 1; color: var(--ink-muted); }
 .werkzeugpill .glocke { position: relative; top: auto; right: auto; z-index: auto; }
 .werkzeugpill .glocke-knopf { width: 38px; height: 38px; border-radius: 50%; border: 0; }
@@ -440,7 +441,12 @@ body {
   .kapseln { position: fixed; top: auto; left: 0; right: 0; bottom: 0; flex-direction: row; justify-content: center; gap: 8px; pointer-events: none; padding: 0 12px calc(12px + env(safe-area-inset-bottom, 0px)); }
   .kapsel { flex-direction: row; pointer-events: auto; overflow-x: auto; scrollbar-width: none; max-width: calc(100vw - 24px); }
   .kapsel-unten, .kapsel:first-child { display: none; }
-  .kapsel-knopf { width: 36px; height: 36px; flex: none; }
+  .kapsel { gap: 2px; padding: 5px; }
+  .kapsel-knopf { width: 32px; height: 32px; flex: none; }
+  .kapsel-knopf svg { width: 17px; height: 17px; }
+  .werkzeugpill .search-trigger { order: 0; margin: 0; padding: 0 10px; }
+  /* Quiet island only on the desktop; on the phone it shows up with a message. */
+  .insel:not(.is-laut) { display: none; }
   .kapsel-knopf[data-tipp]::after { display: none; }
   .insel-huelle { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
   .insel-text { max-width: 58vw; }

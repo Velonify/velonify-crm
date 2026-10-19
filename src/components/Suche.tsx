@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { config, isDemo } from '../config';
 import { CloudFrage, DemoFrage, frageHub, istFrage, type FrageErgebnis } from '../data/frage';
@@ -77,6 +77,9 @@ export const istMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test
 /** Search button for the sidebar plus the ⌘K / Ctrl+K dialog. */
 export function Suche() {
   const [offen, setOffen] = useState(false);
+  const { pathname } = useLocation();
+  // Another page (a shortcut, a link in an answer): the palette belonged to the old one.
+  useEffect(() => setOffen(false), [pathname]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
