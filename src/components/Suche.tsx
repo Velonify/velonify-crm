@@ -2,6 +2,13 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { config, isDemo } from '../config';
+import { CloudFrage, DemoFrage, frageHub, istFrage, type FrageErgebnis } from '../data/frage';
+import { isoDate } from '../data/ids';
+import { errorMessage } from '../lib/errors';
+import { useIch } from '../lib/useIch';
+import { useBlatt } from './Blatt';
+import { WerkzeugIcon } from './Icons';
 import { useCrm } from '../data/CrmContext';
 import type { CrmService } from '../data/crm';
 import { AuthExpiredError } from '../data/errors';
@@ -86,7 +93,7 @@ export function Suche() {
     <>
       <button type="button" className="search-trigger" onClick={() => setOffen(true)} aria-label="Suchen" title={`Suchen (${istMac ? '⌘K' : 'Strg+K'})`}>
         <span aria-hidden="true">⌕</span>
-        <span className="search-trigger-label">Suchen</span>
+        <span className="search-trigger-label">Suchen oder fragen</span>
         <kbd>{istMac ? '⌘K' : 'Strg K'}</kbd>
       </button>
       {/* Rendered at body level, so it follows the page theme, not the sidebar. */}
@@ -95,8 +102,15 @@ export function Suche() {
   );
 }
 
+type FrageStand = { frage: string; laeuft: true } | { frage: string; laeuft: false; ergebnis?: FrageErgebnis; fehler?: string };
+
 function SuchDialog({ onClose }: { onClose(): void }) {
   const { db, service } = useCrm();
+  const { getToken } = useAuth();
+  const [ich] = useIch(db?.listen.team ?? []);
+  const blatt = useBlatt();
+  const [frageStand, setFrageStand] = useState<FrageStand | null>(null);
+  const frageApi = useMemo(() => (isDemo || !config.contactGeneratorUrl ? new DemoFrage() : new CloudFrage(config.contactGeneratorUrl, getToken)), [getToken]);
   const { daten, fehler } = useBereichsdaten(service);
   const navigate = useNavigate();
   const [eingabe, setEingabe] = useState('');
@@ -111,12 +125,30 @@ function SuchDialog({ onClose }: { onClose(): void }) {
     return REIHENFOLGE.map((art) => ({ art, treffer: treffer.filter((t) => t.art === art) })).filter((g) => g.treffer.length > 0);
   }, [db, daten, eingabe]);
   const flach = gruppen.flatMap((g) => g.treffer);
+  // "Frag den Hub" is index -1: first for questions, otherwise reachable with ↑ above the first hit.
+  const fragbar = eingabe.trim().length > 2;
+  const frageZuerst = fragbar && (istFrage(eingabe) || flach.length === 0);
+
+  const fragen = async () => {
+    if (!db || !service) return;
+    const frage = eingabe.trim();
+    setFrageStand({ frage, laeuft: true });
+    try {
+      const ergebnis = await frageHub(frageApi, frage, { db, heute: isoDate(new Date()), ich, todo: () => service.loadTodoDaten() });
+      setFrageStand({ frage, laeuft: false, ergebnis });
+    } catch (err) {
+      setFrageStand({ frage, laeuft: false, fehler: errorMessage(err) });
+    }
+  };
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  useEffect(() => setAktiv(0), [eingabe]);
+  useEffect(() => {
+    setAktiv(frageZuerst ? -1 : 0);
+    setFrageStand(null);
+  }, [eingabe, frageZuerst]);
 
   useEffect(() => {
     listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
@@ -133,7 +165,10 @@ function SuchDialog({ onClose }: { onClose(): void }) {
       setAktiv((i) => Math.min(i + 1, flach.length - 1));
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
-      setAktiv((i) => Math.max(i - 1, 0));
+      setAktiv((i) => Math.max(i - 1, fragbar ? -1 : 0));
+    } else if (event.key === 'Enter' && aktiv === -1 && fragbar) {
+      event.preventDefault();
+      void fragen();
     } else if (event.key === 'Enter' && flach[aktiv]) {
       event.preventDefault();
       oeffne(flach[aktiv]);
@@ -154,7 +189,7 @@ function SuchDialog({ onClose }: { onClose(): void }) {
             value={eingabe}
             onChange={(e) => setEingabe(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Firma, Kunde, To-do, Angebot, Inhalt oder Aktion …"
+            placeholder="Suchen oder fragen, z. B. „Wer braucht heute eine Aktion?“"
             role="combobox"
             aria-expanded={flach.length > 0}
             aria-controls={listId}
@@ -166,11 +201,59 @@ function SuchDialog({ onClose }: { onClose(): void }) {
           <kbd>Esc</kbd>
         </div>
 
+        {fragbar && (
+          <button
+            type="button"
+            className={`frage-zeile${aktiv === -1 ? ' is-active' : ''}`}
+            onMouseMove={() => aktiv !== -1 && setAktiv(-1)}
+            onClick={() => void fragen()}
+          >
+            <span className="frage-zeichen" aria-hidden="true">
+              <WerkzeugIcon id="frage" />
+            </span>
+            <span className="search-text">
+              <span className="search-title">Frag den Hub: „{eingabe.trim()}“</span>
+              <span className="search-details">Claude Haiku liest Pipeline, Fälliges, Firmen und To-dos und antwortet kurz</span>
+            </span>
+            <kbd>↵</kbd>
+          </button>
+        )}
+        {frageStand && (
+          <div className="frage-antwort" aria-live="polite">
+            <span className="eyebrow-klein">Frag den Hub{isDemo ? ' · Demo' : ''}</span>
+            {frageStand.laeuft ? (
+              <span className="frage-tippt" aria-label="Claude denkt nach"><i /><i /><i /></span>
+            ) : frageStand.fehler ? (
+              <p className="frage-fehler">{frageStand.fehler}</p>
+            ) : (
+              <>
+                <p className="frage-text">{frageStand.ergebnis?.text}</p>
+                {frageStand.ergebnis && frageStand.ergebnis.firmen.length > 0 && (
+                  <div className="frage-firmen">
+                    {frageStand.ergebnis.firmen.map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        className="chip"
+                        onClick={() => {
+                          onClose();
+                          blatt.oeffne(f.id);
+                        }}
+                      >
+                        {f.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
         {!db && <p className="search-empty">Daten werden geladen …</p>}
         {eingabe.trim() === '' && <p className="search-empty">Firmen, Kunden, To-dos, Angebote und Social-Inhalte finden oder direkt etwas starten. ↑ ↓ zum Auswählen, Enter zum Öffnen.</p>}
-        {eingabe.trim() !== '' && flach.length === 0 && <p className="search-empty">Nichts gefunden für „{eingabe}“.</p>}
+        {eingabe.trim() !== '' && flach.length === 0 && !fragbar && <p className="search-empty">Nichts gefunden für „{eingabe}“.</p>}
 
-        {flach.length > 0 && (
+        {flach.length > 0 && !frageStand && (
           <ul ref={listRef} id={listId} role="listbox" className="search-results" aria-label="Suchergebnisse">
             {gruppen.map((gruppe) => (
               <li key={gruppe.art} role="presentation">

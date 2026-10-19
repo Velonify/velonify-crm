@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { AnfrageSchema, fehlerText } from './anfrage.js';
 import { Limit, pruefeGoogleToken, ZugriffsFehler } from '../../gemeinsam/auth';
 import { AUSGABE_SCHEMA, nutzerNachricht, SYSTEM_PROMPT } from './prompt.js';
+import { FrageSchema, frageParameter, pruefeVerlauf } from './frage.js';
 
 const MODELL = 'claude-opus-5';
 const AUFWAND = { komplex: 'medium', easy: 'low' } as const;
@@ -18,6 +19,8 @@ const ERLAUBTE_HERKUNFT = (process.env.ALLOWED_ORIGINS ?? 'https://crm.velonify.
 // Reads ANTHROPIC_API_KEY, which Cloud Functions injects from Secret Manager.
 const client = new Anthropic();
 const limit = new Limit(30, 10 * 60 * 1000);
+// One question takes up to a few rounds (tool calls run in the browser), so this limit counts rounds.
+const frageLimit = new Limit(120, 10 * 60 * 1000);
 
 const AusgabeSchema = z.object({
   varianten: z.array(z.object({ betreff: z.string(), text: z.string().min(1) })).min(1),
@@ -53,6 +56,31 @@ functions.http('contactGenerator', async (req, res) => {
     if (error instanceof ZugriffsFehler) return fehler(error.status, error.message);
     console.error('Token-Prüfung fehlgeschlagen', error);
     return fehler(502, 'Die Anmeldung konnte nicht geprüft werden.');
+  }
+
+  if (req.path.replace(/\/$/, '').endsWith('/frage')) {
+    if (!frageLimit.erlaubt(email)) return fehler(429, 'Zu viele Fragen in kurzer Zeit. Bitte in ein paar Minuten erneut versuchen.');
+    const frage = FrageSchema.safeParse(req.body);
+    if (!frage.success) return fehler(400, fehlerText(frage.error));
+    const problem = pruefeVerlauf(frage.data);
+    if (problem) return fehler(400, problem);
+    const tag = new Date().toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    try {
+      const antwort = await client.messages.create(frageParameter(frage.data, tag));
+      if (antwort.stop_reason === 'refusal') return fehler(422, 'Claude hat diese Frage abgelehnt. Bitte anders formulieren.');
+      // Log usage only, never the question or the data.
+      console.log(JSON.stringify({ email, art: 'frage', modell: antwort.model, stop: antwort.stop_reason, usage: antwort.usage }));
+      return res.json({ content: antwort.content, stop_reason: antwort.stop_reason, modell: antwort.model });
+    } catch (error) {
+      if (error instanceof Anthropic.RateLimitError) return fehler(429, 'Claude ist gerade ausgelastet. Bitte gleich noch einmal versuchen.');
+      if (error instanceof Anthropic.AuthenticationError) return fehler(500, 'Der Anthropic-Key ist ungültig. Bitte im Secret Manager prüfen.');
+      if (error instanceof Anthropic.APIError) {
+        console.error(`Anthropic-Fehler ${error.status}`, error.message);
+        return fehler(502, 'Claude ist gerade nicht erreichbar. Bitte erneut versuchen.');
+      }
+      console.error('Unerwarteter Fehler', error);
+      return fehler(500, 'Unerwarteter Fehler.');
+    }
   }
 
   if (!limit.erlaubt(email)) return fehler(429, 'Zu viele Anfragen in kurzer Zeit. Bitte in ein paar Minuten erneut versuchen.');
