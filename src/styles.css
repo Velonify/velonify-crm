@@ -1453,3 +1453,28 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
 .sterne.kritisch { color: var(--danger); }
 .feedback-text { margin: 4px 0; font-size: 13.5px; white-space: pre-line; }
 .feedback-liste .badge { margin-left: 6px; }
+
+/* Gerade online: who else is in the hub and where, in the sidebar; hints on cards, companies and clients they have open. */
+.anwesende { display: flex; flex-direction: column; gap: 2px; padding-bottom: var(--space-2); }
+.anwesend { display: flex; align-items: center; gap: 10px; padding: 6px var(--space-2); color: var(--ink); text-decoration: none; border-left: var(--border-accent) solid transparent; min-width: 0; }
+.anwesend:hover, .anwesend:focus-visible { background: var(--hover); border-left-color: var(--accent); }
+.anwesend-avatar { position: relative; width: 26px; height: 26px; flex: none; display: grid; place-items: center; background: var(--highlight); color: var(--on-highlight); font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.anwesend-avatar::after { content: ''; position: absolute; right: -3px; bottom: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 2px var(--raised); }
+.anwesend-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.anwesend-name { font-weight: 700; font-size: 13px; }
+.anwesend-ort { font-size: 12px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.anwesend-punkt { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; }
+.auch-offen { display: flex; align-items: center; gap: 10px; }
+.auch-offen .anwesend-punkt { background: var(--warn); }
+.karte-offen { display: inline-flex; align-items: center; gap: 5px; padding: 0 6px; height: 20px; font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--warn); background: var(--warn-soft); }
+.karte-offen .anwesend-punkt { width: 6px; height: 6px; background: var(--warn); }
+@media (prefers-reduced-motion: no-preference) {
+  .karte-offen .anwesend-punkt, .auch-offen .anwesend-punkt { animation: anwesend-puls 2s ease-in-out infinite; }
+}
+@keyframes anwesend-puls { 50% { opacity: 0.35; } }
+@media (max-width: 760px) {
+  /* On phones the sidebar is a single bar: only the avatars stay. */
+  .anwesende { flex-direction: row; padding: 0; }
+  .anwesende .nav-abschnitt, .anwesend-text { display: none; }
+  .anwesend { padding: 4px; border-left: 0; }
+}
