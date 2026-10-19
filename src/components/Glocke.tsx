@@ -4,6 +4,7 @@ import { useCrm } from '../data/CrmContext';
 import { ART_LABEL, meine, ungelesene } from '../data/erwaehnungen';
 import { findeTeamMitglied } from '../data/selectors';
 import type { Erwaehnung } from '../data/types';
+import { alsAppInstalliert, setzeAppBadge } from '../lib/appBadge';
 import { formatDateTime, shortUser } from '../lib/format';
 import { useIch } from '../lib/useIch';
 import { MitErwaehnungen } from './Erwaehnungen';
@@ -15,6 +16,7 @@ const ANZAHL = 20;
 /**
  * Bell with the @-mentions of the signed-in person: a counter of the unread ones and a list of the latest.
  * Clicking one opens the place it was written and marks it as read.
+ * In the installed desktop app the unread count also sits on the Dock icon.
  */
 export function Glocke() {
   const { service, db } = useCrm();
@@ -41,7 +43,8 @@ export function Glocke() {
 
   useEffect(() => {
     // Background tabs do not poll; coming back to the tab reads once right away.
-    const sichtbar = () => document.visibilityState === 'visible' && void laden();
+    // The installed app keeps polling while hidden, so the Dock badge stays current.
+    const sichtbar = () => (document.visibilityState === 'visible' || alsAppInstalliert()) && void laden();
     const timer = window.setInterval(sichtbar, NEU_LADEN_MS);
     document.addEventListener('visibilitychange', sichtbar);
     return () => {
@@ -61,6 +64,10 @@ export function Glocke() {
       document.removeEventListener('keydown', taste);
     };
   }, [offen]);
+
+  const ungelesen = alle && ich ? ungelesene(alle, ich).length : 0;
+  useEffect(() => setzeAppBadge(ungelesen), [ungelesen]);
+  useEffect(() => () => setzeAppBadge(0), []);
 
   if (!alle || !ich) return null;
   const liste = meine(alle, ich).slice(0, ANZAHL);
