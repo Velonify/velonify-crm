@@ -140,3 +140,22 @@ export function tageSeitVernetzung(aktivitaeten: readonly Aktivitaet[], dealId: 
   const tag = /^\d{4}-\d{2}-\d{2}$/.test(neueste) ? neueste : isoDate(new Date(neueste));
   return tageZwischen(tag, heute);
 }
+
+/** From this many days without any activity, an open deal counts as resting and is marked on the board. */
+export const RUHT_AB_TAGE = 14;
+
+/**
+ * Days since the last sign of life of a deal: its newest Verlauf entry (deal or company) or its last change.
+ * Null for closed deals – they are meant to rest.
+ */
+export function ruhtSeit(deal: Deal, aktivitaeten: readonly Aktivitaet[], heute: string): number | null {
+  if (isAbgeschlossen(deal.phase)) return null;
+  let neueste = deal.geaendert_am ? deal.geaendert_am.slice(0, 10) : '';
+  for (const a of aktivitaeten) {
+    if (a.deal_id !== deal.id && a.firma_id !== deal.firma_id) continue;
+    const tag = a.datum.slice(0, 10);
+    if (tag > neueste) neueste = tag;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(neueste)) return null;
+  return Math.max(0, tageZwischen(neueste, heute));
+}

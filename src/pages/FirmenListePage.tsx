@@ -1,3 +1,4 @@
+import { useBlatt } from '../components/Blatt';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { BranchenFilter, useBranchenFilter } from '../components/BranchenFilter';
@@ -43,6 +44,7 @@ function compare(a: Zeile, b: Zeile, key: SortKey): number {
 export function FirmenListePage() {
   const { db, loading, error, refresh } = useCrm();
   const navigate = useNavigate();
+  const blatt = useBlatt();
   const [params, setParams] = useSearchParams();
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: 'name', desc: false });
 
@@ -213,7 +215,7 @@ export function FirmenListePage() {
             </thead>
             <tbody>
               {visible.map(({ firma: f, phase }) => (
-                <tr key={f.id} className={f.archiviert ? 'is-archived' : undefined} onClick={() => navigate(`/crm/firmen/${f.id}`)}>
+                <tr key={f.id} className={f.archiviert ? 'is-archived' : undefined} onClick={(e) => (e.metaKey || e.ctrlKey ? navigate(`/crm/firmen/${f.id}`) : blatt.oeffne(f.id))}>
                   <td>
                     <Link to={`/crm/firmen/${f.id}`} className="row-title" onClick={(e) => e.stopPropagation()}>
                       {f.name}

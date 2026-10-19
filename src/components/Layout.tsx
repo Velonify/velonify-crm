@@ -6,6 +6,7 @@ import { useCrm } from '../data/CrmContext';
 import { kundenListe } from '../data/kunden';
 import { useTheme } from '../lib/useTheme';
 import { WERKZEUGE, seitentitel, werkzeugFuerPfad } from '../werkzeuge';
+import { BlattProvider } from './Blatt';
 import { Glocke } from './Glocke';
 import { HubInsel } from './HubInsel';
 import { WerkzeugIcon } from './Icons';
@@ -67,10 +68,16 @@ export function Layout() {
     document.title = seitentitel(werkzeug);
   }, [werkzeug]);
   const { leiste, gleiter } = useGleiter(pathname);
+  // The soft styles also reach what renders outside the frame: side sheet, dialogs and portals on body.
+  useEffect(() => {
+    document.documentElement.classList.add('soft');
+    return () => document.documentElement.classList.remove('soft');
+  }, []);
   const kunden = werkzeug.id === 'kunden' && db ? kundenListe(db) : [];
 
   return (
     <PraesenzProvider>
+      <BlattProvider>
       <div className="app soft">
         {/* First stop for keyboard users: past the bars straight to the content. */}
         <button type="button" className="skip-link" onClick={() => document.getElementById('inhalt')?.focus()}>
@@ -173,6 +180,7 @@ export function Layout() {
         <HubInsel />
         <Tastatur />
       </div>
+      </BlattProvider>
     </PraesenzProvider>
   );
 }
