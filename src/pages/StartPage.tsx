@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { TerminEintrag, useTermine } from '../components/Termine';
 import { useToast } from '../components/Toasts';
-import { Card, ErrorBox, Loading, PageHeader, type BandZahl } from '../components/ui';
+import { Card, ErrorBox, Loading, PageHeader } from '../components/ui';
 import { useCrm } from '../data/CrmContext';
 import { addDays, isoDate } from '../data/ids';
 import { istVorbei, tagesBeginn, termineJeTag } from '../data/kalender';
@@ -13,7 +13,6 @@ import { dateiname } from '../lib/dateiname';
 import { faelligText, formatEuro } from '../lib/format';
 import { useIch } from '../lib/useIch';
 import { useLoad } from '../lib/useLoad';
-import { AnfragenKarte } from '../eingang/AnfragenKarte';
 import { MonsteraKarte } from '../monstera/MonsteraKarte';
 import { WordleKarte } from '../wordle/WordleKarte';
 import { boardVon, faelligkeit, istErledigt, meineAufgaben } from '../data/todos';
@@ -48,14 +47,9 @@ function HeuteDran({ eintraege, heute, bald }: { eintraege: HeuteEintrag[]; heut
         </>
       }
       actions={
-        <>
-          <Link to="/todo/meine" className="button small subtle">
-            Meine Karten
-          </Link>
-          <Link to="/crm" className="button small">
-            Mein Tag
-          </Link>
-        </>
+        <Link to="/eingang" className="button small">
+          Zum Eingang
+        </Link>
       }
     >
       {eintraege.length === 0 ? (
@@ -78,7 +72,7 @@ function HeuteDran({ eintraege, heute, bald }: { eintraege: HeuteEintrag[]; heut
       )}
       {eintraege.length > MAX_AUFGABEN && (
         <p className="hint">
-          Und {eintraege.length - MAX_AUFGABEN} weitere – <Link to="/crm">Mein Tag</Link> · <Link to="/todo/meine">Meine Aufgaben</Link>
+          Und {eintraege.length - MAX_AUFGABEN} weitere im <Link to="/eingang">Eingang</Link> · <Link to="/crm">Mein Tag</Link> · <Link to="/todo/meine">Meine Aufgaben</Link>
         </p>
       )}
     </Card>
@@ -104,7 +98,7 @@ function Kunden({ db, todos, news, heute }: { db: Database; todos?: TodoDaten; n
       }
     >
       {kunden.length === 0 && <p className="muted">Noch keine Kunden.</p>}
-      <ul className="kunden-kacheln">
+      <ul className="kunden-zeilen">
         {kunden.map((f) => {
           const board = todos ? boardVon(todos.boards, f.id) : undefined;
           const karten = board && todos ? todos.aufgaben.filter((a) => a.board_id === board.id && !a.archiviert) : [];
@@ -114,18 +108,16 @@ function Kunden({ db, todos, news, heute }: { db: Database; todos?: TodoDaten; n
           const neueste = news ? ticker(news, f.id, heute).find((n) => !n.alleKunden) : undefined;
           return (
             <li key={f.id}>
-              <Link to={`/kunden/${f.id}`} className="kunden-kachel">
-                <span className="kunden-kachel-kopf">
-                  <span className="kuerzel">{f.kuerzel || '–'}</span>
-                  <span className="kunden-kachel-name">{f.name}</span>
+              <Link to={`/kunden/${f.id}`} className="kunden-zeile" title={neueste ? `Neueste News: ${neueste.titel}` : undefined}>
+                <span className="kunden-zeile-zeichen" aria-hidden="true">{(f.kuerzel || f.name).slice(0, 3)}</span>
+                <span className="kunden-zeile-text">
+                  <strong>{f.name}</strong>
+                  <span className="kunden-zeile-balken" aria-hidden="true">
+                    <span style={{ width: `${anteil}%` }} />
+                  </span>
                 </span>
-                <span className="kunden-kachel-news">{neueste ? neueste.titel : 'Noch keine News'}</span>
-                <span className="fortschritt" aria-hidden="true">
-                  <span style={{ width: `${anteil}%` }} />
-                </span>
-                <span className="kunden-kachel-zahlen">
-                  <span>{offen.length} offen</span>
-                  {ueber > 0 ? <span className="is-warn">{ueber} überfällig</span> : <span>{f.zustaendig || 'niemand zuständig'}</span>}
+                <span className="kunden-zeile-zahl">
+                  {ueber > 0 ? <span className="is-warn">{ueber} überfällig</span> : <span className="muted">{offen.length} offen</span>}
                 </span>
               </Link>
             </li>
@@ -184,20 +176,6 @@ function Pipeline({ db, ich }: { db: Database; ich: string | null }) {
 
 const SCHNELL = ['Neue Firma anlegen', 'Neues Angebot', 'Anschreiben erstellen', 'Shop prüfen'];
 
-function Schnellstart() {
-  return (
-    <Card title="Schnell starten">
-      <div className="schnellstart">
-        {AKTIONEN.filter((a) => SCHNELL.includes(a.titel)).map((a) => (
-          <Link key={a.pfad} to={a.pfad} className="schnell-knopf">
-            {a.titel}
-          </Link>
-        ))}
-      </div>
-      <p className="hint">Alles andere: {istMac ? '⌘K' : 'Strg+K'} drücken und lostippen.</p>
-    </Card>
-  );
-}
 
 function Kalender({ db, heute }: { db: Database; heute: string }) {
   // Today and the next six days: enough to show the next appointment when today is free.
@@ -365,38 +343,58 @@ export function StartPage() {
 
   const stunde = new Date().getHours();
   const begruessung = stunde < 11 ? 'Guten Morgen' : stunde < 18 ? 'Hallo' : 'Guten Abend';
-  const zahlen: BandZahl[] = [
-    { wert: cockpit.eintraege.length, label: cockpit.ueberfaellig > 0 ? `heute dran · ${cockpit.ueberfaellig} überfällig` : 'heute dran', warn: cockpit.ueberfaellig > 0 },
-    ...(cockpit.offeneKarten !== null ? [{ wert: cockpit.offeneKarten, label: ich ? (cockpit.offeneKarten === 1 ? 'meine offene Karte' : 'meine offenen Karten') : cockpit.offeneKarten === 1 ? 'offene Karte' : 'offene Karten' }] : []),
-    { wert: formatEuro(cockpit.pipelineWert), label: ich ? 'meine Pipeline' : 'Pipeline' },
-    ...(cockpit.anfragen !== null ? [{ wert: cockpit.anfragen, label: cockpit.anfragen === 1 ? 'neue Anfrage' : 'neue Anfragen', warn: cockpit.anfragen > 0 }] : []),
+  // One calm sentence instead of a row of numbers: what is due, what is new.
+  const teile = [
+    cockpit.eintraege.length === 0 ? 'Heute ist nichts fällig' : `${cockpit.eintraege.length} ${cockpit.eintraege.length === 1 ? 'Sache ist' : 'Dinge sind'} heute dran${cockpit.ueberfaellig > 0 ? `, ${cockpit.ueberfaellig} davon überfällig` : ''}`,
+    ...(cockpit.anfragen ? [`${cockpit.anfragen} ${cockpit.anfragen === 1 ? 'neue Anfrage' : 'neue Anfragen'}`] : []),
+    `${ich ? 'deine' : 'die'} Pipeline steht bei ${formatEuro(cockpit.pipelineWert)}`,
   ];
+  const satz = `${teile.join(' · ')}.`;
 
   return (
-    <div className="page wide">
+    <div className="page start-ruhig">
       <PageHeader
         eyebrow={new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}
         title={`${begruessung}${ich ? `, ${ich}` : ''}`}
-        zahlen={zahlen}
-        ueberlappen
+        subtitle={satz}
+        actions={
+          <div className="start-schnell" aria-label="Schnell starten">
+            {AKTIONEN.filter((a) => SCHNELL.includes(a.titel)).map((a) => (
+              <Link key={a.pfad} to={a.pfad} className="button small">
+                {a.titel}
+              </Link>
+            ))}
+          </div>
+        }
       />
       {error && <ErrorBox error={error} onRetry={refresh} />}
-      <div className="start-grid">
-        <div className="start-main">
-          <HeuteDran eintraege={cockpit.eintraege} heute={heute} bald={cockpit.bald} />
-          <AnfragenKarte />
-          <Kunden db={db} todos={todos.data} news={kundenDaten.data?.news} heute={heute} />
-          {spiele.data?.monstera && <MonsteraKarte eintraege={spiele.data.monstera} db={db} ich={ich} heute={heute} neuLaden={spiele.reload} />}
-        </div>
-        <div className="start-side">
+      <div className="start-raster">
+        <HeuteDran eintraege={cockpit.eintraege} heute={heute} bald={cockpit.bald} />
+        <div className="start-rechts">
           <Kalender db={db} heute={heute} />
-          <Pipeline db={db} ich={ich} />
-          <Schnellstart />
+          <Kunden db={db} todos={todos.data} news={kundenDaten.data?.news} heute={heute} />
+        </div>
+      </div>
+
+      {(spiele.data?.monstera || spiele.data?.wordle) && (
+        <section className="start-pause" aria-label="Kurze Pause">
+          {spiele.data?.monstera && <MonsteraKarte eintraege={spiele.data.monstera} db={db} ich={ich} heute={heute} neuLaden={spiele.reload} />}
           {spiele.data?.wordle && <WordleKarte ergebnisse={spiele.data.wordle} team={db.listen.team ?? []} ich={ich} heute={heute} />}
+        </section>
+      )}
+
+      <details className="start-mehr">
+        <summary>
+          <span>Mehr: Pipeline, Links und Dateiname</span>
+          <span className="muted small">Kleine Helfer, die nicht jeden Tag gebraucht werden</span>
+        </summary>
+        <div className="start-mehr-raster">
+          <Pipeline db={db} ich={ich} />
           <Links db={db} />
           <Dateiname db={db} heute={heute} />
         </div>
-      </div>
+      </details>
+      <p className="hint start-tipp">Alles andere: {istMac ? '⌘K' : 'Strg+K'} drücken und lostippen oder eine Frage stellen.</p>
     </div>
   );
 }
