@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { config, GOOGLE_SCOPES, isDemo } from '../config';
+import { DEMO_START } from '../data/demo/agentur';
 import { AuthExpiredError } from '../data/errors';
 import { fetchGoogleUser, loadGoogleIdentity, requestToken, revokeToken, type GoogleUser, type TokenInfo } from './google';
 
@@ -25,7 +26,8 @@ interface StoredSession {
   user: GoogleUser;
 }
 
-const DEMO_USER: GoogleUser = { email: 'demo@velonify.de', name: 'Demo' };
+// The demo starts as the managing director of the invented agency (see data/demo/agentur.ts).
+const DEMO_USER: GoogleUser = { email: DEMO_START.email, name: `${DEMO_START.name} ${DEMO_START.nachname}` };
 // sessionStorage: survives a reload, but ends with the browser tab. The token itself expires after an hour anyway.
 const SESSION_KEY = 'velonify-crm.session';
 

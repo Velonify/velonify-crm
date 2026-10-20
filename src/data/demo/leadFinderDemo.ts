@@ -1,3 +1,4 @@
+import { DEMO_START } from './agentur';
 import { BRANCHEN as BRANCHEN_FILTER, type BranchenErgebnis } from '../leadFinder';
 import type { Bereich, Entscheidung, EntscheidungEintrag, LeadDetail, LeadFinderApi, LeadKandidat, LeadStatistik, ListenZeile, PoolKandidat, ZaehlerTag } from '../leadFinder';
 
@@ -138,7 +139,7 @@ export class DemoLeadFinder implements LeadFinderApi {
     const k = this.pruefungen.get(domain);
     if (!k) throw new Error('Diese Domain wurde noch nicht geprüft.');
     const e = this.entscheidungen.get(domain);
-    return { kandidat: this.mitEmail(k), geprueft_am: k.geprueft_am, von: 'demo@velonify.de', entscheidung: e?.entscheidung ?? null, grund: e?.grund ?? null, entschieden_am: e?.am ?? null, entschieden_von: e ? 'demo@velonify.de' : null, firma_id: e?.firma_id ?? null };
+    return { kandidat: this.mitEmail(k), geprueft_am: k.geprueft_am, von: DEMO_START.email, entscheidung: e?.entscheidung ?? null, grund: e?.grund ?? null, entschieden_am: e?.am ?? null, entschieden_von: e ? DEMO_START.email : null, firma_id: e?.firma_id ?? null };
   }
   async details(domains: string[]) {
     return domains.flatMap((d) => (this.pruefungen.has(d) ? [{ ...this.mitEmail(this.pruefungen.get(d)!), branche: this.branchenJe.get(d) ?? null }] : []));

@@ -649,6 +649,12 @@ body {
 .soft .page > :is(.segmented, .button, .link-button, a, button, .badge, .chip) { align-self: flex-start; }
 .soft .card-header { margin-bottom: 14px; }
 .soft .demo-banner { margin-bottom: var(--abstand); }
+.soft .demo-leiste { margin-top: 70px; }
+.demo-leiste { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 18px; }
+.demo-leiste-aktionen { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.demo-leiste select { margin-left: 4px; font: inherit; padding: 3px 6px; border-radius: 8px; border: 1px solid rgb(255 255 255 / 30%); background: rgb(255 255 255 / 10%); color: inherit; }
+.demo-leiste select option { color: #000; }
+.demo-leiste .link-button { color: inherit; text-decoration: underline; }
 @media (min-width: 761px) and (max-width: 900px) {
   .kapseln { top: 128px; }
 }
