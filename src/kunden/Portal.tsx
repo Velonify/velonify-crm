@@ -470,7 +470,7 @@ function BerichtZeile({ bericht: b, firma, aendern, reload, offen, umschalten }:
               </p>
             )}
             {entwurf && daten?.fehler?.map((f) => <span key={f} className="hint-box warn">{f}</span>)}
-            <Field label="Einschätzung von Velonify" hint="Steht oben im Bericht: was im Monat wichtig war und was ihr empfehlt." wide>
+            <Field label="Eure Einschätzung" hint="Steht oben im Bericht: was im Monat wichtig war und was ihr empfehlt." wide>
               <textarea rows={5} value={kommentar} onChange={(e) => setKommentar(e.target.value)} placeholder={`Im ${monatName(b.monat).split(' ')[0]} haben wir … Für ${monatName(naechsterMonat(b.monat)).split(' ')[0]} empfehlen wir …`} />
             </Field>
             <div className="form-actions">
