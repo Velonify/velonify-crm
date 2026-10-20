@@ -365,7 +365,8 @@ body {
 
 /* Dialogs, search, bell */
 .soft .overlay, .soft ~ .overlay { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
-.overlay { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+/* Above the glass bars, the sheet and the island: a modal covers the whole app. */
+.overlay { z-index: 70; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .dialog, .search-dialog, .glocke-panel, .login-card { border: 0 !important; border-radius: var(--r-gross); box-shadow: 0 30px 80px -30px rgb(0 0 0 / 50%) !important; overflow: hidden; }
 .dialog { animation: dialog-rein 0.35s var(--ease) backwards; }
 @keyframes dialog-rein { from { opacity: 0; transform: translateY(10px) scale(0.98); filter: blur(6px); } }

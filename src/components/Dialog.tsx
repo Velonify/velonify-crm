@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type FormEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 interface Props {
   title: ReactNode;
@@ -25,7 +26,10 @@ export function Dialog({ title, children, onClose, onSubmit, submitLabel = 'Spei
     const feld = ref.current?.querySelector<HTMLElement>('.dialog-body :is(input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea)');
     (feld ?? ref.current?.querySelector<HTMLElement>('.dialog-body button, .dialog-actions button, button'))?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !latest.current.busy) latest.current.onClose();
+      if (event.key !== 'Escape') return;
+      // Handled here: the sheet underneath must not close on the same key.
+      event.preventDefault();
+      if (!latest.current.busy) latest.current.onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => {
@@ -62,7 +66,9 @@ export function Dialog({ title, children, onClose, onSubmit, submitLabel = 'Spei
     </>
   );
 
-  return (
+  // Rendered into body: a card that lifts on hover (transform) or a board that clips (overflow)
+  // would otherwise become the frame of the fixed overlay and squeeze the dialog into the column.
+  return createPortal(
     <div className="overlay" role="presentation">
       <div ref={ref} className={`dialog${wide ? ' wide' : ''}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
         {onSubmit ? (
@@ -73,6 +79,7 @@ export function Dialog({ title, children, onClose, onSubmit, submitLabel = 'Spei
           body
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

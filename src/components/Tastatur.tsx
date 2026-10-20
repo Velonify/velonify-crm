@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { istMac } from './Suche';
 
@@ -95,7 +96,7 @@ export function Tastatur() {
 
   if (!offen) return null;
   const mod = istMac ? '⌘' : 'Strg';
-  return (
+  return createPortal(
     <div className="overlay hilfe-overlay" onMouseDown={(e) => e.target === e.currentTarget && setOffen(false)}>
       <div className="dialog hilfe" role="dialog" aria-modal="true" aria-labelledby="hilfe-titel">
         <div className="dialog-header">
@@ -123,6 +124,7 @@ export function Tastatur() {
           <div><span>Öffnen</span><kbd>↵</kbd></div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
