@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { config, isDemo } from '../config';
+import { DEMO_START, teamEmail } from '../data/demo/agentur';
 import { useCrm } from '../data/CrmContext';
 import { HERZSCHLAG_MS, PraesenzRaum, andereBei, ortLink, ortText, type Anwesend, type PraesenzArt, type PraesenzMeldung, type PraesenzObjekt } from '../data/praesenz';
 import { findeTeamMitglied } from '../data/selectors';
@@ -30,8 +31,8 @@ function demoSenden(): Senden {
   const raum = new PraesenzRaum();
   return async (meldung) => {
     if ('weg' in meldung) return [];
-    raum.melde('julian@velonify.de', { ...meldung, tab: 'demo' });
-    return raum.anwesende('demo@velonify.de');
+    raum.melde(teamEmail('Aylin'), { ...meldung, tab: 'demo' });
+    return raum.anwesende(DEMO_START.email);
   };
 }
 

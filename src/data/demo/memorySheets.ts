@@ -56,6 +56,13 @@ export class MemorySheets implements SheetsApi {
     return tab;
   }
 
+  /** Rewrites every text cell, e.g. to retell the sample data as that of the demo agency. */
+  ersetzeText(ersatz: (text: string) => string): void {
+    for (const tab of this.tabs.values()) {
+      for (const row of tab.rows) row.forEach((cell, i) => typeof cell === 'string' && (row[i] = ersatz(cell)));
+    }
+  }
+
   /** Raw access for tests. */
   rows(tab: string): unknown[][] {
     return this.tabs.get(tab)?.rows ?? [];

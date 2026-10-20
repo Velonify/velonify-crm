@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { isDemo } from '../config';
+import { DemoLeiste } from './DemoLeiste';
 import { useCrm } from '../data/CrmContext';
 import { zeigeStart } from '../data/ansicht';
 import { kundenListe } from '../data/kunden';
@@ -87,11 +88,7 @@ export function Layout() {
               </nav>
             )}
             <main className="main" id="inhalt" tabIndex={-1}>
-              {isDemo && (
-                <div className="demo-banner">
-                  <strong>Demo-Modus</strong> Erfundene Beispieldaten, Drive und Kalender sind simuliert. Änderungen gehen beim Neuladen verloren.
-                </div>
-              )}
+              {isDemo && <DemoLeiste />}
               <Seitenrahmen schluessel={pathname}>
                 <Outlet />
               </Seitenrahmen>

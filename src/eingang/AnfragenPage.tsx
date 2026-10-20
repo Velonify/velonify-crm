@@ -42,7 +42,7 @@ export function AnfragenPage() {
       <PageHeader
         eyebrow={eyebrow}
         title="Anfragen"
-        subtitle="Was über das Formular auf velonify.de hereinkommt – hier entscheiden, was daraus wird."
+        subtitle="Was über das Formular auf der Website hereinkommt – hier entscheiden, was daraus wird."
         zahlen={eingang.data ? [{ wert: offen.length, label: 'offen', warn: offen.length > 0 }, { wert: erledigt.length, label: 'erledigt' }] : undefined}
         actions={
           erledigt.length > 0 && (

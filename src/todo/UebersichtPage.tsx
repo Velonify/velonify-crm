@@ -352,7 +352,7 @@ export function UebersichtPage({ nurIch = false }: { nurIch?: boolean }) {
     <div className="page wide">
       <PageHeader
         title={nurIch ? 'Meine Aufgaben' : 'To-Dos'}
-        subtitle={nurIch ? 'Alles, wofür du zuständig bist – über alle Boards' : 'Alle offenen Karten von Velonify und allen Kunden auf einen Blick'}
+        subtitle={nurIch ? 'Alles, wofür du zuständig bist – über alle Boards' : 'Alle offenen Karten, intern und von allen Kunden, auf einen Blick'}
         zahlen={
           data
             ? [

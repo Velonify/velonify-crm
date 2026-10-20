@@ -160,7 +160,7 @@ export function MagnetLeadsPage() {
       <PageHeader
         eyebrow="Lead-Magnete"
         title="Leads"
-        subtitle="Wer sich auf velonify.de/ressourcen für einen Magneten eingetragen hat. Die Mail mit dem Download geht automatisch raus, beim Shop-Roast die Bestätigung – den Report schreibt ihr über „Shop prüfen“. Hier entscheiden, wer ins CRM kommt."
+        subtitle="Wer sich auf der Ressourcen-Seite der Website für einen Magneten eingetragen hat. Die Mail mit dem Download geht automatisch raus, beim Shop-Roast die Bestätigung – den Report schreibt ihr über „Shop prüfen“. Hier entscheiden, wer ins CRM kommt."
         actions={
           <button
             type="button"
