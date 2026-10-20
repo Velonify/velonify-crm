@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { BranchenFilter, useBranchenFilter } from '../components/BranchenFilter';
 import { BranchenNachtrag } from '../components/BranchenNachtrag';
+import { TagFilter, TagListe, useTagFilter } from '../components/TagFilter';
 import { ErrorBox, Loading, PageHeader, PhaseBadge, StatusBadge, TierBadge } from '../components/ui';
 import { brancheLabel, passtBranche, zahlJeBranche } from '../data/branchen';
 import { phaseIndex, STATUS, statusLabel, TIERS } from '../data/constants';
@@ -11,6 +12,7 @@ import { dublettenIndex } from '../data/dubletten';
 import { kontaktName } from '../data/rules';
 import { fortschritt } from '../data/selectors';
 import type { Firma } from '../data/types';
+import { passtTags, zahlJeTag } from '../data/tags';
 import { relativeDays } from '../lib/format';
 import { istZustaendig } from '../data/zustaendig';
 
@@ -59,6 +61,7 @@ export function FirmenListePage() {
     dubletten: params.get('dubletten') === '1',
   };
   const branchen = useBranchenFilter();
+  const tags = useTagFilter();
   const setFilter = (key: keyof typeof filter, value: string) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
@@ -78,7 +81,7 @@ export function FirmenListePage() {
       firma,
       phase: fortschritt(deals.get(firma.id) ?? []),
       // Search also finds a firm by its contacts' names and e-mail addresses.
-      suchtext: [firma.name, firma.domain, firma.kuerzel, firma.ort, firma.quelle, brancheLabel(firma.branche), ...(kontakte.get(firma.id) ?? [])].join(' ').toLowerCase(),
+      suchtext: [firma.name, firma.domain, firma.kuerzel, firma.ort, firma.quelle, brancheLabel(firma.branche), firma.tags, ...(kontakte.get(firma.id) ?? [])].join(' ').toLowerCase(),
     }));
   }, [db]);
 
@@ -86,6 +89,8 @@ export function FirmenListePage() {
 
   // Counts follow the archive switch, so they match what the list can show.
   const zahlenJeBranche = useMemo(() => zahlJeBranche(zeilen.filter((z) => filter.archiv || !z.firma.archiviert).map((z) => z.firma.branche)), [zeilen, filter.archiv]);
+
+  const zahlenJeTag = useMemo(() => zahlJeTag(zeilen.filter((z) => filter.archiv || !z.firma.archiviert).map((z) => z.firma.tags)), [zeilen, filter.archiv]);
 
   const plattformen = useMemo(() => [...new Set(zeilen.map((z) => z.firma.plattform).filter(Boolean))].sort(), [zeilen]);
 
@@ -101,13 +106,14 @@ export function FirmenListePage() {
           (!filter.zustaendig || istZustaendig(f.zustaendig, filter.zustaendig)) &&
           (!filter.dubletten || dubletten.has(f.id)) &&
           passtBranche(branchen.wert, f.branche) &&
+          passtTags(tags.wert, f.tags) &&
           (!q || suchtext.includes(q)),
       )
       .sort((a, b) => compare(a, b, sort.key) * (sort.desc ? -1 : 1));
-  }, [zeilen, filter.q, filter.status, filter.tier, filter.plattform, filter.zustaendig, filter.archiv, filter.dubletten, dubletten, branchen.wert, sort]);
+  }, [zeilen, filter.q, filter.status, filter.tier, filter.plattform, filter.zustaendig, filter.archiv, filter.dubletten, dubletten, branchen.wert, tags.wert, sort]);
 
   const activeCount = zeilen.filter((z) => !z.firma.archiviert).length;
-  const hasFilter = Boolean(filter.q || filter.status || filter.tier || filter.plattform || filter.zustaendig || filter.archiv || filter.dubletten || branchen.wert.wahl.size > 0);
+  const hasFilter = Boolean(filter.q || filter.status || filter.tier || filter.plattform || filter.zustaendig || filter.archiv || filter.dubletten || branchen.wert.wahl.size > 0 || tags.wert.wahl.size > 0);
   const toggleSort = (key: SortKey) =>
     setSort((s) => (s.key === key ? { key, desc: !s.desc } : { key, desc: key === 'score' || key === 'geaendert_am' || key === 'phase' }));
 
@@ -187,6 +193,8 @@ export function FirmenListePage() {
         )}
       </div>
 
+      {db && <TagFilter wert={tags.wert} setze={tags.setze} zahlen={zahlenJeTag} />}
+
       {db && (
         <BranchenFilter wert={branchen.wert} setze={branchen.setze} zahlen={zahlenJeBranche}>
           <BranchenNachtrag />
@@ -230,6 +238,11 @@ export function FirmenListePage() {
                         </span>
                       )}
                     </div>
+                    {f.tags && (
+                      <div className="row-tags">
+                        <TagListe tags={f.tags} max={4} />
+                      </div>
+                    )}
                   </td>
                   <td>
                     <StatusBadge status={f.status} />

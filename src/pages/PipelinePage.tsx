@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useBlatt } from '../components/Blatt';
 import { BranchenFilter, useBranchenFilter } from '../components/BranchenFilter';
 import { BranchenNachtrag } from '../components/BranchenNachtrag';
+import { TagFilter, TagListe, useTagFilter } from '../components/TagFilter';
 import { DealDialog } from '../components/dialogs/DealDialog';
 import { usePhaseChange } from '../components/dialogs/PhaseChange';
 import { VernetzungKnoepfe } from '../components/dialogs/Vernetzung';
@@ -13,6 +14,7 @@ import { brancheLabel, passtBranche, zahlJeBranche } from '../data/branchen';
 import { useCrm } from '../data/CrmContext';
 import { addDays, isoDate } from '../data/ids';
 import { RUHT_AB_TAGE, ruhtSeit, wahrscheinlichkeit } from '../data/selectors';
+import { passtTags, zahlJeTag } from '../data/tags';
 import type { Deal } from '../data/types';
 import { formatDayShort, formatEuro } from '../lib/format';
 import { useIch } from '../lib/useIch';
@@ -28,6 +30,7 @@ export function PipelinePage() {
   const [ziehend, setZiehend] = useState<string | null>(null);
   const [ueber, setUeber] = useState<string | null>(null);
   const branchen = useBranchenFilter();
+  const tags = useTagFilter();
   const phaseChange = usePhaseChange();
   const blatt = useBlatt();
   const offenBei = useOffenBei('firma');
@@ -53,9 +56,10 @@ export function PipelinePage() {
     });
   }, [db, zustaendig, heute]);
   const zahlenJeBranche = useMemo(() => zahlJeBranche(sichtbareDeals.map((x) => x.firma.branche)), [sichtbareDeals]);
+  const zahlenJeTag = useMemo(() => zahlJeTag(sichtbareDeals.map((x) => x.firma.tags)), [sichtbareDeals]);
 
   const spalten = useMemo(() => {
-    const deals = sichtbareDeals.filter((x) => passtBranche(branchen.wert, x.firma.branche));
+    const deals = sichtbareDeals.filter((x) => passtBranche(branchen.wert, x.firma.branche) && passtTags(tags.wert, x.firma.tags));
     return PHASEN.map((phase) => {
       const inPhase = deals
         .filter((x) => x.deal.phase === phase)
@@ -67,7 +71,7 @@ export function PipelinePage() {
         gewichtet: inPhase.reduce((sum, x) => sum + ((x.deal.wert_eur ?? 0) * wahrscheinlichkeit(x.deal)) / 100, 0),
       };
     });
-  }, [sichtbareDeals, branchen.wert]);
+  }, [sichtbareDeals, branchen.wert, tags.wert]);
 
   if (!db) return <div className="page">{error ? <ErrorBox error={error} onRetry={refresh} /> : loading && <Loading />}</div>;
 
@@ -116,6 +120,7 @@ export function PipelinePage() {
         }
       />
       {error && <ErrorBox error={error} onRetry={refresh} />}
+      <TagFilter wert={tags.wert} setze={tags.setze} zahlen={zahlenJeTag} />
       <BranchenFilter wert={branchen.wert} setze={branchen.setze} zahlen={zahlenJeBranche}>
         <BranchenNachtrag />
       </BranchenFilter>
@@ -193,6 +198,11 @@ export function PipelinePage() {
                       {deal.titel}
                     </button>
                     {firma.branche && <div className="row-sub">{brancheLabel(firma.branche)}</div>}
+                    {firma.tags && (
+                      <div className="row-tags">
+                        <TagListe tags={firma.tags} max={3} />
+                      </div>
+                    )}
                     <div className="board-card-meta">
                       <span>{formatEuro(deal.wert_eur)}</span>
                       {deal.zustaendig && (

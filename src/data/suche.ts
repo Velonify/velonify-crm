@@ -96,7 +96,7 @@ export function suche(db: Database, eingabe: string, limitProArt = 6): Treffer[]
   const treffer: Treffer[] = [];
 
   for (const f of db.firmen) {
-    const score = bewerte(woerter, f.name, [f.domain, f.kuerzel, f.ort, f.quelle, f.email_allgemein, f.telefon_allgemein]);
+    const score = bewerte(woerter, f.name, [f.domain, f.kuerzel, f.ort, f.quelle, f.email_allgemein, f.telefon_allgemein, f.tags ?? '']);
     if (score > 0) {
       treffer.push({
         art: 'firma', id: f.id, firmaId: f.id, titel: f.name,

@@ -138,7 +138,7 @@ export function registriereWerkzeuge(server: McpServer, kontext: Kontext): void 
     'suchen',
     {
       title: 'Im CRM suchen',
-      description: 'Sucht Firmen (Name, Domain, Kürzel, Ort), Kontakte (Name, E-Mail, Rolle) und Deals (Titel). Umlaute egal. Liefert IDs für die anderen Werkzeuge.',
+      description: 'Sucht Firmen (Name, Domain, Kürzel, Ort, Tags), Kontakte (Name, E-Mail, Rolle) und Deals (Titel). Umlaute egal. Liefert IDs für die anderen Werkzeuge.',
       inputSchema: { suchbegriff: z.string().min(1), archivierte_zeigen: z.boolean().optional() },
       annotations: lesen,
     },

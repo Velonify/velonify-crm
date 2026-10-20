@@ -17,7 +17,7 @@ export const SCHEMA = {
     columns: [
       'id', 'name', 'domain', 'kuerzel', 'status', 'tier', 'score', 'plattform', 'version', 'eol',
       'ort', 'register', 'ust_id', 'email_allgemein', 'telefon_allgemein', 'tech_info', 'quelle',
-      'zustaendig', 'drive_ordner_id', 'slack_channel', 'notiz', 'archiviert', 'branche', ...META,
+      'zustaendig', 'drive_ordner_id', 'slack_channel', 'notiz', 'archiviert', 'branche', ...META, 'tags',
     ],
     numeric: ['score'],
     boolean: ['archiviert'],

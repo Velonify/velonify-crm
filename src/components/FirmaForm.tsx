@@ -118,6 +118,7 @@ export function FirmaForm({ initial, listen, submitLabel, onSubmit, onCancel, al
             <input id={`${formId}-score`} inputMode="numeric" value={scoreText} onChange={(e) => setScoreText(e.target.value)} placeholder="0–100" />,
           )}
           {field('branche', 'Branche', select('branche', BRANCHEN.map((b) => b.id), brancheLabel))}
+          {field('tags', 'Tags', text('tags', { placeholder: 'z. B. SEO-Lead, Gebiet Dortmund, Zahnarzt' }), 'Durch Komma getrennt. Firmenübersicht und Pipeline filtern danach.', true)}
           {field('quelle', 'Quelle', text('quelle', { placeholder: 'z. B. Magento Lauf 1, Empfehlung' }))}
           {field('plattform', 'Plattform', text('plattform', { placeholder: 'magento2' }))}
           {field('version', 'Version', text('version', { placeholder: '2.4.6' }))}
