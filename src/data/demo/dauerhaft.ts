@@ -4,7 +4,7 @@ import { createDemoBackend, stelleDemoHer, type DemoBackend, type DemoDaten } fr
 import { ladeGespeichert, speichere } from './speicher';
 
 /** Raised when the shape of the sample data changes: older saved copies are then dropped. */
-export const STAND_VERSION = 1;
+export const STAND_VERSION = 2;
 /** Older copies start over, so the dates (all relative to the day of seeding) never look stale. */
 const MAX_ALTER_MS = 14 * 86_400_000;
 const WARTEN_MS = 400;
