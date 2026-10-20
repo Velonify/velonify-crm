@@ -73,7 +73,7 @@ function FirmaBlatt({ ziel, onClose }: { ziel: BlattZiel | null; onClose(): void
   useEffect(() => {
     if (!offen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !document.querySelector('.overlay')) onClose();
+      if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('.overlay')) onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
