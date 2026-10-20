@@ -32,6 +32,13 @@ function parseRange(range: string) {
 
 const isEmpty = (cell: unknown) => cell === undefined || cell === null || cell === '';
 
+/** Everything a MemorySheets holds, as plain data (the demo keeps it in the browser, see dauerhaft.ts). */
+export interface SheetsZustand {
+  title: string;
+  nextSheetId: number;
+  tabs: [string, Tab][];
+}
+
 /**
  * In-memory stand-in for the Google Sheets API. Mirrors the behaviour the app relies on (A1 ranges,
  * trailing empty cells omitted, grid column limits), so demo mode and tests run the real storage code.
@@ -40,6 +47,8 @@ export class MemorySheets implements SheetsApi {
   private readonly tabs = new Map<string, Tab>();
   private nextSheetId = 1;
   readonly title: string;
+  /** Called after every write. */
+  beiAenderung: () => void = () => {};
 
   constructor(title = 'CRM-Datenbank (Demo)', initialTabs: string[] = ['Tabelle1']) {
     this.title = title;
@@ -54,6 +63,17 @@ export class MemorySheets implements SheetsApi {
     const tab = this.tabs.get(name);
     if (!tab) throw new SchemaError(`Tabellenblatt fehlt (${range}). Bitte unter „Einrichtung“ auf „Einrichten“ klicken.`);
     return tab;
+  }
+
+  zustand(): SheetsZustand {
+    return { title: this.title, nextSheetId: this.nextSheetId, tabs: [...this.tabs.entries()] };
+  }
+
+  static aus(zustand: SheetsZustand): MemorySheets {
+    const sheets = new MemorySheets(zustand.title, []);
+    for (const [name, tab] of zustand.tabs) sheets.tabs.set(name, tab);
+    sheets.nextSheetId = zustand.nextSheetId;
+    return sheets;
   }
 
   /** Rewrites every text cell, e.g. to retell the sample data as that of the demo agency. */
@@ -95,6 +115,7 @@ export class MemorySheets implements SheetsApi {
       row.forEach((cell, j) => (target[startCol - 1 + j] = structuredClone(cell)));
     });
     for (let i = 0; i < tab.rows.length; i++) tab.rows[i] ??= [];
+    this.beiAenderung();
   }
 
   async batchUpdateValues(data: ValueWrite[]): Promise<void> {
@@ -107,6 +128,7 @@ export class MemorySheets implements SheetsApi {
     let last = tab.rows.length;
     while (last > 0 && tab.rows[last - 1].every(isEmpty)) last--;
     tab.rows.splice(last, 0, ...structuredClone(values));
+    this.beiAenderung();
   }
 
   async getSpreadsheet(): Promise<SpreadsheetInfo> {
@@ -134,5 +156,6 @@ export class MemorySheets implements SheetsApi {
       }
       // Formatting requests have no effect on stored values.
     }
+    this.beiAenderung();
   }
 }

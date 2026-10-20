@@ -1,8 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { isDemo } from '../config';
-import { DemoLeiste } from './DemoLeiste';
 import { useCrm } from '../data/CrmContext';
 import { kundenListe } from '../data/kunden';
 import { useTheme } from '../lib/useTheme';
@@ -15,6 +14,9 @@ import { PraesenzProvider } from './Praesenz';
 import { Seitenrahmen } from './Seitenrahmen';
 import { Suche } from './Suche';
 import { Tastatur, useHilfe } from './Tastatur';
+
+// The demo's bar, tour and client view only reach the browser in demo mode.
+const DemoLeiste = lazy(() => import('./DemoLeiste').then((m) => ({ default: m.DemoLeiste })));
 
 const navClass = ({ isActive }: { isActive: boolean }) => `subnav-item${isActive ? ' is-active' : ''}`;
 
@@ -167,7 +169,11 @@ export function Layout() {
           </nav>
 
           <main className="main" id="inhalt" tabIndex={-1}>
-            {isDemo && <DemoLeiste />}
+            {isDemo && (
+              <Suspense fallback={null}>
+                <DemoLeiste />
+              </Suspense>
+            )}
             <Seitenrahmen schluessel={pathname}>
               <Outlet />
             </Seitenrahmen>

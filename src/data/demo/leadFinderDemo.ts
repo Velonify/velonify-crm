@@ -82,6 +82,13 @@ const DEMO_BRANCHE: Record<string, string> = {
 const DEMO_WORT: [RegExp, string][] = [[/outdoor|sport/, 'sport'], [/kaffee|tee|wein/, 'lebensmittel'], [/schmuck/, 'schmuck'], [/werkzeug|garten/, 'garten'], [/heimtextil|moebel|deko/, 'wohnen'], [/kosmetik|beauty/, 'beauty'], [/mode|fashion/, 'mode']];
 const demoBranche = (domain: string) => DEMO_BRANCHE[domain.split('-')[0]] ?? DEMO_WORT.find(([muster]) => muster.test(domain))?.[1] ?? BRANCHEN_FILTER.at(-1)!.id;
 
+/** What the demo lead finder has checked and decided, as plain data (the demo keeps it in the browser). */
+export interface LeadFinderZustand {
+  pruefungen: [string, LeadKandidat][];
+  entscheidungen: [string, EntscheidungEintrag & { am: string }][];
+  branchenJe: [string, string][];
+}
+
 export class DemoLeadFinder implements LeadFinderApi {
   private readonly pool = Array.from({ length: 60 }, (_, i) => pool(i));
   private readonly pruefungen = new Map<string, LeadKandidat>();
@@ -94,6 +101,19 @@ export class DemoLeadFinder implements LeadFinderApi {
   }
 
   private warte = () => new Promise((r) => setTimeout(r, this.dauerMs));
+  /** Called after every check and decision. */
+  beiAenderung: () => void = () => {};
+
+  zustand(): LeadFinderZustand {
+    return { pruefungen: [...this.pruefungen], entscheidungen: [...this.entscheidungen], branchenJe: [...this.branchenJe] };
+  }
+
+  stelleHer(zustand: LeadFinderZustand): void {
+    for (const [ziel, eintraege] of [[this.pruefungen, zustand.pruefungen], [this.entscheidungen, zustand.entscheidungen], [this.branchenJe, zustand.branchenJe]] as [Map<string, unknown>, [string, unknown][]][]) {
+      ziel.clear();
+      for (const [k, v] of eintraege) ziel.set(k, v);
+    }
+  }
 
   /** Like the function: an e-mail entered on release fills an Impressum without one. */
   private mitEmail(k: LeadKandidat): LeadKandidat {
@@ -120,6 +140,7 @@ export class DemoLeadFinder implements LeadFinderApi {
     await this.warte();
     const k = kandidat(p, this.pool.findIndex((x) => x.domain === p.domain));
     this.pruefungen.set(p.domain, k);
+    this.beiAenderung();
     return k;
   }
   async backlog() {
@@ -146,6 +167,7 @@ export class DemoLeadFinder implements LeadFinderApi {
   }
   async entscheide(eintraege: EntscheidungEintrag[]) {
     for (const e of eintraege) this.entscheidungen.set(e.domain, { ...e, am: new Date().toISOString() });
+    this.beiAenderung();
   }
   async zaehler(): Promise<ZaehlerTag[]> {
     const heute = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
@@ -169,12 +191,14 @@ export class DemoLeadFinder implements LeadFinderApi {
     const offen = [...(await this.backlog()), ...(await this.manuell())].filter((z, i, alle) => !z.branche && alle.findIndex((x) => x.domain === z.domain) === i);
     const eingeordnet = offen.slice(0, n).map((z) => ({ domain: z.domain, branche: demoBranche(z.domain) }));
     for (const e of eingeordnet) this.branchenJe.set(e.domain, e.branche);
+    this.beiAenderung();
     return { eingeordnet, fehler: 0, offen: offen.length - eingeordnet.length };
   }
   async branchenFuer(domains: string[]): Promise<BranchenErgebnis> {
     await this.warte();
     const eingeordnet = domains.map((domain) => ({ domain, branche: this.branchenJe.get(domain) ?? demoBranche(domain) }));
     for (const e of eingeordnet) this.branchenJe.set(e.domain, e.branche);
+    this.beiAenderung();
     return { eingeordnet, fehler: 0, offen: 0 };
   }
   async importiere() {
@@ -182,3 +206,7 @@ export class DemoLeadFinder implements LeadFinderApi {
     return { crawl_datum: '2026-09-01', crux_monat: 202608 };
   }
 }
+
+let instanz: DemoLeadFinder | null = null;
+/** One demo lead finder for the whole session, so checks and decisions survive switching pages (and are saved with the demo). */
+export const demoLeadFinder = () => (instanz ??= new DemoLeadFinder());

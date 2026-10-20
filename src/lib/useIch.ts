@@ -4,7 +4,7 @@ import { findeTeamMitglied } from '../data/selectors';
 
 const KEY = 'velonify-crm.ich';
 /** Tells the other users of the hook (e.g. the bell) about a new choice. */
-const GEWECHSELT = 'velonify-ich';
+export const ICH_GEWECHSELT = 'velonify-ich';
 
 /** The team member picked in this browser, if any (the service uses it so nobody gets notified about their own mention). */
 export function read(): string | null {
@@ -26,8 +26,8 @@ export function useIch(team: readonly string[]): [string | null, (name: string) 
 
   useEffect(() => {
     const neu = (e: Event) => setGewaehlt((e as CustomEvent<string | null>).detail);
-    window.addEventListener(GEWECHSELT, neu);
-    return () => window.removeEventListener(GEWECHSELT, neu);
+    window.addEventListener(ICH_GEWECHSELT, neu);
+    return () => window.removeEventListener(ICH_GEWECHSELT, neu);
   }, []);
 
   const ich = gewaehlt && team.includes(gewaehlt) ? gewaehlt : user ? findeTeamMitglied(team, user.name, user.email) : null;
@@ -40,7 +40,7 @@ export function useIch(team: readonly string[]): [string | null, (name: string) 
     } catch {
       // Storage blocked: the choice lasts until reload.
     }
-    window.dispatchEvent(new CustomEvent(GEWECHSELT, { detail: name || null }));
+    window.dispatchEvent(new CustomEvent(ICH_GEWECHSELT, { detail: name || null }));
   }, []);
 
   return [ich, setIch];
