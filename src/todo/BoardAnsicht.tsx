@@ -19,7 +19,8 @@ const FILTER: { wert: KartenFilter; label: string }[] = [
   { wert: 'faellig', label: 'Fällig' },
 ];
 
-function KarteInhalt({ aufgabe, heute, kommentare, offenBei = [] }: { aufgabe: Aufgabe; heute: string; kommentare: number; offenBei?: string[] }) {
+/** Face of a card on a kanban board; `board` names the card's board where several are mixed. */
+export function KarteInhalt({ aufgabe, heute, kommentare, offenBei = [], board }: { aufgabe: Aufgabe; heute: string; kommentare: number; offenBei?: string[]; board?: string }) {
   const labels = labelsVon(aufgabe);
   const punkte = checklisteVon(aufgabe);
   const fertig = punkte.filter((p) => p.erledigt).length;
@@ -27,8 +28,9 @@ function KarteInhalt({ aufgabe, heute, kommentare, offenBei = [] }: { aufgabe: A
   const freigabe = freigabeVon(aufgabe);
   return (
     <>
-      {labels.length > 0 && (
+      {(labels.length > 0 || board) && (
         <span className="karte-labels">
+          {board && <span className="kuerzel">{board}</span>}
           {labels.map((l) => (
             <span key={l} className="karte-label">
               {l}
@@ -74,7 +76,7 @@ function KarteInhalt({ aufgabe, heute, kommentare, offenBei = [] }: { aufgabe: A
   );
 }
 
-function SchnellAnlegen({ onAnlegen }: { onAnlegen(titel: string): Promise<void> }) {
+export function SchnellAnlegen({ onAnlegen }: { onAnlegen(titel: string): Promise<void> }) {
   const [offen, setOffen] = useState(false);
   const [titel, setTitel] = useState('');
   const [busy, setBusy] = useState(false);
@@ -290,7 +292,7 @@ export function BoardAnsicht({
   );
 }
 
-function KartenPlatz({ zeigePlatzhalter, children }: { zeigePlatzhalter: boolean; children: ReactNode }) {
+export function KartenPlatz({ zeigePlatzhalter, children }: { zeigePlatzhalter: boolean; children: ReactNode }) {
   return (
     <>
       {zeigePlatzhalter && <li className="karte-platzhalter" aria-hidden="true" />}

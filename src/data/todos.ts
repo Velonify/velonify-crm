@@ -288,3 +288,66 @@ export function boardKurz(board: Pick<Board, 'firma_id' | 'titel'>, firmen: read
   if (!board.firma_id) return 'Intern';
   return firmen.find((f) => f.id === board.firma_id)?.kuerzel || board.titel;
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Overview as a kanban board
+
+export interface KanbanSpalte {
+  /** Column id on a single board; the lower-cased title when the columns of several boards are merged. */
+  key: string;
+  titel: string;
+  erledigt: boolean;
+  karten: Aufgabe[];
+  /** Merged view only: the boards that have this column, when not all of them do. */
+  nurBei?: Board[];
+}
+
+const titelKey = (titel: string) => titel.trim().toLocaleLowerCase('de');
+export const ERLEDIGT_KEY = '#erledigt';
+
+/**
+ * Columns for the overview board. With one board they are that board's columns in its own order, cards sorted as on
+ * the board. With several boards, columns are merged by title like the status grouping: standard columns first, then
+ * the others, the done column last; cards sorted by urgency, and done ones newest first.
+ */
+export function kanbanSpalten(karten: readonly Aufgabe[], boards: readonly Board[], einzeln?: Board): KanbanSpalte[] {
+  const ids = new Set(karten.map((a) => a.id));
+  if (einzeln) {
+    const gruppen = kartenNachSpalte(karten, einzeln);
+    return spaltenVon(einzeln).map((s) => ({ key: s.id, titel: s.titel, erledigt: Boolean(s.erledigt), karten: (gruppen.get(s.id) ?? []).filter((a) => ids.has(a.id)) }));
+  }
+  const aktiv = boards.filter((b) => !b.archiviert);
+  const boardVonKarte = new Map(aktiv.map((b) => [b.id, b]));
+  const spalten = new Map<string, KanbanSpalte & { bei: Set<string> }>();
+  for (const b of aktiv) {
+    for (const s of spaltenVon(b)) {
+      const key = s.erledigt ? ERLEDIGT_KEY : titelKey(s.titel);
+      const spalte = spalten.get(key) ?? { key, titel: s.erledigt ? 'Erledigt' : s.titel, erledigt: Boolean(s.erledigt), karten: [], bei: new Set<string>() };
+      spalte.bei.add(b.id);
+      spalten.set(key, spalte);
+    }
+  }
+  for (const a of karten) {
+    const board = boardVonKarte.get(a.board_id);
+    if (!board) continue;
+    const s = spalteDerKarte(a, board);
+    spalten.get(s.erledigt || istErledigt(a) ? ERLEDIGT_KEY : titelKey(s.titel))?.karten.push(a);
+  }
+  const reihenfolge = STANDARD_SPALTEN.filter((s) => !s.erledigt).map((s) => titelKey(s.titel));
+  const rang = (s: KanbanSpalte) => (s.erledigt ? Infinity : reihenfolge.includes(s.key) ? reihenfolge.indexOf(s.key) : reihenfolge.length);
+  return [...spalten.values()]
+    .sort((a, b) => rang(a) - rang(b) || a.titel.localeCompare(b.titel, 'de'))
+    .map(({ bei, ...s }) => ({
+      ...s,
+      karten: s.erledigt ? [...s.karten].sort((a, b) => b.erledigt_am.localeCompare(a.erledigt_am)) : [...s.karten].sort(nachDringlichkeit),
+      ...(bei.size < aktiv.length ? { nurBei: aktiv.filter((b) => bei.has(b.id)) } : {}),
+    }));
+}
+
+/** The column of `board` a card lands in when dropped on the overview column `key`; undefined if the board has none. */
+export function spalteFuerKey(board: Board, key: string, einzeln: boolean): Spalte | undefined {
+  const spalten = spaltenVon(board);
+  if (einzeln) return spalten.find((s) => s.id === key);
+  if (key === ERLEDIGT_KEY) return erledigtSpalte(spalten);
+  return spalten.find((s) => !s.erledigt && titelKey(s.titel) === key);
+}

@@ -7,8 +7,8 @@ import { addDays, isoDate } from '../data/ids';
 import { kundenListe } from '../data/kunden';
 import { FREIGABE_LABEL, freigabeVon } from '../data/portal';
 import {
-  ALLE, boardKurz, boardVon, brauchtAufmerksamkeit, checklisteVon, faelligkeit, gruppiereKarten, istErledigt, labelsVon, NIEMAND, offeneKarten,
-  passtUebersicht, sortiereBoards, spalteDerKarte, spaltenVon, type Gruppierung,
+  ALLE, boardKurz, boardVon, brauchtAufmerksamkeit, checklisteVon, faelligkeit, gruppiereKarten, istErledigt, kanbanSpalten, kartenNachSpalte, labelsVon,
+  NIEMAND, offeneKarten, passtUebersicht, sortiereBoards, sortierungFuerPosition, spalteDerKarte, spalteFuerKey, spaltenVon, type Gruppierung, type KanbanSpalte,
 } from '../data/todos';
 import type { Aufgabe, Board, Firma } from '../data/types';
 import { kuerzelVon } from '../data/zustaendig';
@@ -16,6 +16,8 @@ import { errorMessage } from '../lib/errors';
 import { faelligText } from '../lib/format';
 import { useIch } from '../lib/useIch';
 import { KarteDialog } from './Dialoge';
+import { UebersichtKanban } from './UebersichtKanban';
+import type { DragZiel } from './useKanbanDrag';
 import { useTodoDaten } from './useTodoDaten';
 
 const ANSICHTEN: { wert: Gruppierung; label: string }[] = [
@@ -36,11 +38,22 @@ function gemerkteAnsicht(): Gruppierung {
   }
 }
 
-function merkeAnsicht(wert: Gruppierung) {
+type Darstellung = 'liste' | 'board';
+const DARSTELLUNG_KEY = 'velonify-crm.todo-darstellung';
+
+function gemerkteDarstellung(): Darstellung {
   try {
-    localStorage.setItem(ANSICHT_KEY, wert);
+    return localStorage.getItem(DARSTELLUNG_KEY) === 'board' ? 'board' : 'liste';
   } catch {
-    // Storage blocked: the view lasts until reload.
+    return 'liste';
+  }
+}
+
+function merke(key: string, wert: string) {
+  try {
+    localStorage.setItem(key, wert);
+  } catch {
+    // Storage blocked: the choice lasts until reload.
   }
 }
 
@@ -197,6 +210,8 @@ export function UebersichtPage({ nurIch = false }: { nurIch?: boolean }) {
   const ansicht: Gruppierung = ansichten.some((a) => a.wert === gewuenscht) ? gewuenscht : 'status';
   const person = nurIch ? ich ?? '' : params.get('person') ?? ALLE;
   const boardId = params.get('board') ?? '';
+  const darstellungParam = params.get('darstellung');
+  const darstellung: Darstellung = darstellungParam === 'board' || darstellungParam === 'liste' ? darstellungParam : gemerkteDarstellung();
   const suche = params.get('q') ?? '';
 
   const setParam = (name: string, wert: string) =>
@@ -260,11 +275,12 @@ export function UebersichtPage({ nurIch = false }: { nurIch?: boolean }) {
       (err) => toast.show(errorMessage(err), 'error'),
     );
   };
-  const anlegen = async (zielBoard: string, titel: string) => {
+  const anlegen = async (zielBoard: string, titel: string, spalteId?: string) => {
     try {
       await aendern((s) =>
         s.saveKarte(zielBoard, {
           titel, beschreibung: '', zustaendig: person && person !== NIEMAND ? person : '', faellig_am: '', labels: '', checkliste: '', sichtbar_kunde: false,
+          ...(spalteId ? { spalte_id: spalteId } : {}),
         }),
       );
       toast.show('Karte angelegt');
@@ -272,6 +288,37 @@ export function UebersichtPage({ nurIch = false }: { nurIch?: boolean }) {
       toast.show(errorMessage(err), 'error');
       throw err;
     }
+  };
+  const einzelBoard = boardId ? boardMap.get(boardId) : undefined;
+  /** Drop on the overview board: on one board at the exact place, across boards only into the column of the same name. */
+  const ablegen = (a: Aufgabe, ziel: DragZiel, zielSpalte: KanbanSpalte) => {
+    const board = boardMap.get(a.board_id);
+    if (!board || !data) return;
+    const spalte = spalteFuerKey(board, ziel.spalteId, Boolean(einzelBoard));
+    if (!spalte) {
+      toast.show(`${boardKurz(board, firmen)} hat keine Spalte „${zielSpalte.titel}“ – Karte bleibt, wo sie ist.`, 'error');
+      return;
+    }
+    const vorher = spalteDerKarte(a, board);
+    let index = Infinity;
+    let sortierung: number | undefined;
+    if (einzelBoard) {
+      // The index counts the visible cards; translate it to the full column, as on the board page.
+      const ganz = (kartenNachSpalte(data.aufgaben, board).get(spalte.id) ?? []).filter((x) => x.id !== a.id);
+      const nachbar = zielSpalte.karten.filter((x) => x.id !== a.id)[ziel.index];
+      index = nachbar ? ganz.indexOf(nachbar) : ganz.length;
+      if (vorher.id === spalte.id && (kartenNachSpalte(data.aufgaben, board).get(spalte.id) ?? []).indexOf(a) === index) return;
+      sortierung = sortierungFuerPosition(ganz, a.id, index);
+    } else if (vorher.id === spalte.id) return;
+    lokal(a.id, {
+      spalte_id: spalte.id,
+      ...(sortierung !== undefined ? { sortierung } : {}),
+      erledigt_am: spalte.erledigt ? a.erledigt_am || new Date().toISOString() : '',
+    });
+    aendern((s) => s.verschiebeKarte(a.id, spalte.id, index)).then(
+      () => vorher.id !== spalte.id && toast.show(`„${a.titel}“ → ${spalte.titel}`),
+      (err) => toast.show(errorMessage(err), 'error'),
+    );
   };
   const boardAnlegen = async (firmaId: string) => {
     setBusy(firmaId || 'intern');
@@ -336,26 +383,44 @@ export function UebersichtPage({ nurIch = false }: { nurIch?: boolean }) {
       {error && <ErrorBox error={error} onRetry={reload} />}
       {!data && !error && <Loading />}
       {data && k && (
-        <div className="uebersicht">
+        <div className={`uebersicht${darstellung === 'board' ? ' is-board' : ''}`}>
           <div className="uebersicht-haupt">
             <div className="uebersicht-filter">
               <div className="uebersicht-filter-zeile">
-                <div className="segmented" role="group" aria-label="Gruppieren nach">
-                  {ansichten.map((a) => (
+                <div className="segmented" role="group" aria-label="Darstellung">
+                  {(['liste', 'board'] as const).map((d) => (
                     <button
-                      key={a.wert}
+                      key={d}
                       type="button"
-                      className={ansicht === a.wert ? 'is-active' : ''}
-                      aria-pressed={ansicht === a.wert}
+                      className={darstellung === d ? 'is-active' : ''}
+                      aria-pressed={darstellung === d}
                       onClick={() => {
-                        merkeAnsicht(a.wert);
-                        setParam('ansicht', a.wert);
+                        merke(DARSTELLUNG_KEY, d);
+                        setParam('darstellung', d);
                       }}
                     >
-                      {a.label}
+                      {d === 'liste' ? 'Liste' : 'Board'}
                     </button>
                   ))}
                 </div>
+                {darstellung === 'liste' && (
+                  <div className="segmented" role="group" aria-label="Gruppieren nach">
+                    {ansichten.map((a) => (
+                      <button
+                        key={a.wert}
+                        type="button"
+                        className={ansicht === a.wert ? 'is-active' : ''}
+                        aria-pressed={ansicht === a.wert}
+                        onClick={() => {
+                          merke(ANSICHT_KEY, a.wert);
+                          setParam('ansicht', a.wert);
+                        }}
+                      >
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <input type="search" className="uebersicht-suche" value={suche} onChange={(e) => setParam('q', e.target.value)} placeholder="Karten durchsuchen" aria-label="Karten durchsuchen" />
               </div>
               {!nurIch && (
@@ -389,7 +454,30 @@ export function UebersichtPage({ nurIch = false }: { nurIch?: boolean }) {
 
             {nurIch && !ich && <p className="muted">Oben auswählen, wer du bist.</p>}
 
-            {dringend.length > 0 && (
+            {darstellung === 'board' && (!nurIch || ich) && (
+              <>
+                {einzelBoard ? (
+                  <p className="muted uebersicht-board-hinweis">
+                    Spalten von {einzelBoard.titel}. <Link to={`/todo/${einzelBoard.id}`}>Board öffnen</Link> für Spalten und Labels.
+                  </p>
+                ) : (
+                  <p className="muted uebersicht-board-hinweis">Spalten aller Boards nach Namen zusammengefasst. Für die Reihenfolge innerhalb einer Spalte oben ein Board wählen.</p>
+                )}
+                <UebersichtKanban
+                  spalten={kanbanSpalten([...sichtbar, ...erledigt], data.boards, einzelBoard)}
+                  einzeln={Boolean(einzelBoard)}
+                  boards={boardMap}
+                  firmen={firmen}
+                  heute={heute}
+                  kommentarZahl={kommentarZahl}
+                  onAblegen={ablegen}
+                  onOeffnen={setOffen}
+                  onAnlegen={einzelBoard ? (spalteId, titel) => anlegen(einzelBoard.id, titel, spalteId) : undefined}
+                />
+              </>
+            )}
+
+            {darstellung === 'liste' && dringend.length > 0 && (
               <section className="uebersicht-gruppe is-dringend" aria-label="Braucht Aufmerksamkeit">
                 <header className="uebersicht-gruppe-kopf">
                   <h2>Braucht Aufmerksamkeit</h2>
@@ -404,7 +492,7 @@ export function UebersichtPage({ nurIch = false }: { nurIch?: boolean }) {
               </section>
             )}
 
-            {gruppen.map((g) => (
+            {darstellung === 'liste' && gruppen.map((g) => (
               <section key={g.id} className={`uebersicht-gruppe is-${ansicht}-${g.id}`} aria-label={g.titel}>
                 <header className="uebersicht-gruppe-kopf">
                   <h2>{g.board ? <Link to={`/todo/${g.board.id}`}>{g.titel}</Link> : g.titel}</h2>
@@ -423,11 +511,11 @@ export function UebersichtPage({ nurIch = false }: { nurIch?: boolean }) {
               </section>
             ))}
 
-            {(!nurIch || ich) && sichtbar.length === 0 && (
+            {darstellung === 'liste' && (!nurIch || ich) && sichtbar.length === 0 && (
               <div className="uebersicht-leer">
                 {alleOffenen.length === 0 ? 'Nichts offen. Schön.' : 'Nichts für diesen Filter.'}
                 {gefiltert && (
-                  <button type="button" className="button small" onClick={() => setParams(new URLSearchParams(ansicht ? { ansicht } : {}), { replace: true })}>
+                  <button type="button" className="button small" onClick={() => setParams(new URLSearchParams({ ansicht, darstellung }), { replace: true })}>
                     Filter zurücksetzen
                   </button>
                 )}
@@ -435,80 +523,82 @@ export function UebersichtPage({ nurIch = false }: { nurIch?: boolean }) {
             )}
           </div>
 
-          <aside className="uebersicht-seite">
-            <section className="card uebersicht-boards">
-              <header className="card-header">
-                <h2>Boards</h2>
-              </header>
-              <ul>
-                {boards.map((b) => {
-                  const karten = alleOffenen.filter((a) => a.board_id === b.id);
-                  const zuViel = karten.filter((a) => faelligkeit(a, heute) === 'ueberfaellig').length;
-                  const spalten = spaltenVon(b).filter((s) => !s.erledigt);
-                  return (
-                    <li key={b.id}>
-                      <Link to={`/todo/${b.id}`} className="uebersicht-board">
-                        <span className="kuerzel">{boardKurz(b, firmen)}</span>
-                        <span className="uebersicht-board-name">{b.firma_id ? firmen.find((f) => f.id === b.firma_id)?.name ?? b.titel : b.titel}</span>
-                        <span className="uebersicht-board-zahl">
-                          {zuViel > 0 && <span className="is-ueberfaellig">{zuViel} überfällig · </span>}
-                          {karten.length} offen
-                        </span>
-                      </Link>
-                      {karten.length > 0 && (
-                        <span className="uebersicht-verteilung" aria-hidden="true">
-                          {spalten.map((s, i) => {
-                            const n = karten.filter((a) => spalteDerKarte(a, b).id === s.id).length;
-                            return n > 0 ? <span key={s.id} className={`stufe-${Math.min(i, 4)}`} style={{ flexGrow: n }} title={`${s.titel}: ${n}`} /> : null;
-                          })}
-                        </span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-              {ohneBoard.length > 0 && (
-                <div className="uebersicht-ohne-board">
-                  <p className="muted">Noch ohne Board</p>
-                  {ohneBoard.map(({ firma }) => (
-                    <button key={firma?.id ?? 'intern'} type="button" className="button small" onClick={() => void boardAnlegen(firma?.id ?? '')} disabled={busy !== ''}>
-                      {busy === (firma?.id ?? 'intern') ? 'Legt an …' : `${firma ? firma.kuerzel || firma.name : 'Velonify intern'} anlegen`}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {erledigt.length > 0 && (
-              <section className="card uebersicht-erledigt">
+          {darstellung === 'liste' && (
+            <aside className="uebersicht-seite">
+              <section className="card uebersicht-boards">
                 <header className="card-header">
-                  <h2>
-                    Erledigt <span className="count">{erledigt.length}</span>
-                  </h2>
+                  <h2>Boards</h2>
                 </header>
-                <p className="muted">Letzte 7 Tage</p>
                 <ul>
-                  {erledigt.slice(0, 12).map((a) => {
-                    const b = boardMap.get(a.board_id)!;
+                  {boards.map((b) => {
+                    const karten = alleOffenen.filter((a) => a.board_id === b.id);
+                    const zuViel = karten.filter((a) => faelligkeit(a, heute) === 'ueberfaellig').length;
+                    const spalten = spaltenVon(b).filter((s) => !s.erledigt);
                     return (
-                      <li key={a.id}>
-                        <input type="checkbox" checked onChange={() => void zurueckholen(a)} aria-label={`„${a.titel}“ wieder öffnen`} />
-                        <span>
-                          <button type="button" className="link-button" onClick={() => setOffen(a)}>
-                            {a.titel}
-                          </button>
-                          <span className="row-sub">
-                            {boardKurz(b, firmen)}
-                            {a.erledigt_von && <> · {a.erledigt_von.split('@')[0]}</>}
+                      <li key={b.id}>
+                        <Link to={`/todo/${b.id}`} className="uebersicht-board">
+                          <span className="kuerzel">{boardKurz(b, firmen)}</span>
+                          <span className="uebersicht-board-name">{b.firma_id ? firmen.find((f) => f.id === b.firma_id)?.name ?? b.titel : b.titel}</span>
+                          <span className="uebersicht-board-zahl">
+                            {zuViel > 0 && <span className="is-ueberfaellig">{zuViel} überfällig · </span>}
+                            {karten.length} offen
                           </span>
-                        </span>
+                        </Link>
+                        {karten.length > 0 && (
+                          <span className="uebersicht-verteilung" aria-hidden="true">
+                            {spalten.map((s, i) => {
+                              const n = karten.filter((a) => spalteDerKarte(a, b).id === s.id).length;
+                              return n > 0 ? <span key={s.id} className={`stufe-${Math.min(i, 4)}`} style={{ flexGrow: n }} title={`${s.titel}: ${n}`} /> : null;
+                            })}
+                          </span>
+                        )}
                       </li>
                     );
                   })}
                 </ul>
+                {ohneBoard.length > 0 && (
+                  <div className="uebersicht-ohne-board">
+                    <p className="muted">Noch ohne Board</p>
+                    {ohneBoard.map(({ firma }) => (
+                      <button key={firma?.id ?? 'intern'} type="button" className="button small" onClick={() => void boardAnlegen(firma?.id ?? '')} disabled={busy !== ''}>
+                        {busy === (firma?.id ?? 'intern') ? 'Legt an …' : `${firma ? firma.kuerzel || firma.name : 'Velonify intern'} anlegen`}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </section>
-            )}
-          </aside>
+
+              {erledigt.length > 0 && (
+                <section className="card uebersicht-erledigt">
+                  <header className="card-header">
+                    <h2>
+                      Erledigt <span className="count">{erledigt.length}</span>
+                    </h2>
+                  </header>
+                  <p className="muted">Letzte 7 Tage</p>
+                  <ul>
+                    {erledigt.slice(0, 12).map((a) => {
+                      const b = boardMap.get(a.board_id)!;
+                      return (
+                        <li key={a.id}>
+                          <input type="checkbox" checked onChange={() => void zurueckholen(a)} aria-label={`„${a.titel}“ wieder öffnen`} />
+                          <span>
+                            <button type="button" className="link-button" onClick={() => setOffen(a)}>
+                              {a.titel}
+                            </button>
+                            <span className="row-sub">
+                              {boardKurz(b, firmen)}
+                              {a.erledigt_von && <> · {a.erledigt_von.split('@')[0]}</>}
+                            </span>
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              )}
+            </aside>
+          )}
         </div>
       )}
       {offen && data && offenesBoard && (
