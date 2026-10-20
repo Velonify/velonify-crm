@@ -5,6 +5,7 @@ import { DealsKarte, KontakteKarte, VerlaufKarte, WiedervorlagenKarte } from '..
 import { DriveKarte, TermineKarte } from '../components/akte/GoogleKarten';
 import { usePhaseChange } from '../components/dialogs/PhaseChange';
 import { brancheLabel } from '../data/branchen';
+import { TagListe } from '../components/TagFilter';
 import { FirmaForm } from '../components/FirmaForm';
 import { useToast } from '../components/Toasts';
 import { AuchOffen, useAnwesenheit } from '../components/Praesenz';
@@ -195,6 +196,7 @@ export function FirmaAktePage() {
             <dl className="items">
               <Item label="Score">{f.score}</Item>
               <Item label="Branche">{brancheLabel(f.branche)}</Item>
+              <Item label="Tags">{f.tags && <TagListe tags={f.tags} />}</Item>
               <Item label="Quelle">{f.quelle}</Item>
               <Item label="Plattform">{[f.plattform, f.version].filter(Boolean).join(' ')}</Item>
               <Item label="Support">{f.eol && (EOL_LABEL[f.eol] ?? f.eol)}</Item>

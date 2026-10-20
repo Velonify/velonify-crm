@@ -284,6 +284,7 @@ export const firmaFelder = {
   register: z.string().optional(),
   ust_id: z.string().optional(),
   notiz: z.string().optional(),
+  tags: z.string().optional().describe('Tags, durch Komma getrennt, z. B. "SEO-Lead, Gebiet Dortmund, Zahnarzt"'),
 };
 
 export const kontaktFelder = {

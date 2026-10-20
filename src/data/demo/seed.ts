@@ -65,7 +65,7 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
     return service.changePhase(dealId, ziel, d.geaendert_am, grund);
   };
 
-  const nordlicht = await firma({ name: 'Nordlicht Outdoor GmbH', domain: 'nordlicht-outdoor.example', tier: 'A', score: 92, plattform: 'magento2', version: '2.4.6', eol: 'eol', ort: 'Hamburg', register: 'HRB 000001 (AG Hamburg)', email_allgemein: 'info@nordlicht-outdoor.example', telefon_allgemein: '040 000000', tech_info: 'ga4, meta_pixel, trustedshops · 812 Katalog-URLs', zustaendig: 'Lugge', branche: 'sport' });
+  const nordlicht = await firma({ name: 'Nordlicht Outdoor GmbH', domain: 'nordlicht-outdoor.example', tier: 'A', score: 92, plattform: 'magento2', version: '2.4.6', eol: 'eol', ort: 'Hamburg', register: 'HRB 000001 (AG Hamburg)', email_allgemein: 'info@nordlicht-outdoor.example', telefon_allgemein: '040 000000', tech_info: 'ga4, meta_pixel, trustedshops · 812 Katalog-URLs', zustaendig: 'Lugge', branche: 'sport', tags: 'Shop-Lead, Gebiet Hamburg' });
   const nk = await kontakt(nordlicht.id, { vorname: 'Mara', nachname: 'Holm', rolle: 'Head of E-Commerce', email: 'mara.holm@nordlicht-outdoor.example', telefon: '040 000001' });
   const nd = await deal(nordlicht.id, { kontakt_id: nk.id, wert_eur: 48000, zustaendig: 'Lugge', naechster_schritt: 'Angebot nachfassen', naechster_schritt_am: addDays(heute, -1) });
   await service.legeLeadOrdnerAn(nordlicht.id, 'NLO');
@@ -94,11 +94,11 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
   await kontakt(alpenglanz.id, { vorname: 'Petra', nachname: 'Huber', rolle: 'Buchhaltung' });
   await service.saveWiedervorlage({ firma_id: alpenglanz.id, deal_id: '', titel: 'Quartalsreport schicken', faellig_am: addDays(heute, -3), zustaendig: 'Johannes' });
 
-  const feldmann = await firma({ name: 'Feldmann Werkzeuge', domain: 'feldmann-werkzeuge.example', tier: 'C', score: 38, plattform: 'magento2', version: '2.4.4', eol: 'eol', ort: 'Stuttgart' });
+  const feldmann = await firma({ name: 'Feldmann Werkzeuge', domain: 'feldmann-werkzeuge.example', tier: 'C', score: 38, plattform: 'magento2', version: '2.4.4', eol: 'eol', ort: 'Stuttgart', tags: 'SEO-Lead, Gebiet Dortmund, Dach' });
   const fd = await deal(feldmann.id, { wert_eur: 12000 });
   await phase(fd.id, 'verloren', 'Kein Budget');
 
-  const seeblick = await firma({ name: 'Seeblick Heimtextil', domain: 'seeblick-heimtextil.example', tier: 'B', score: 58, plattform: 'magento2', version: '2.4.5', eol: 'eol', ort: 'Konstanz', zustaendig: 'Lugge' });
+  const seeblick = await firma({ name: 'Seeblick Heimtextil', domain: 'seeblick-heimtextil.example', tier: 'B', score: 58, plattform: 'magento2', version: '2.4.5', eol: 'eol', ort: 'Konstanz', zustaendig: 'Lugge', tags: 'SEO-Lead, Gebiet Stuttgart, Zahnarzt' });
   const sk = await kontakt(seeblick.id, { vorname: 'Lea', nachname: 'Sommer', rolle: 'Geschäftsführerin', linkedin: 'https://www.linkedin.com/in/lea-sommer-demo' });
   const sd = await deal(seeblick.id, { wert_eur: 22000, zustaendig: 'Lugge' });
   await phase(sd.id, 'qualifiziert');

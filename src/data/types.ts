@@ -32,6 +32,8 @@ export interface Firma extends Meta {
   archiviert: boolean;
   /** Industry id from BRANCHEN (src/data/branchen.ts), empty when unknown. */
   branche: string;
+  /** Free tags, comma-separated (src/data/tags.ts), e.g. "SEO-Lead, Gebiet Dortmund, Zahnarzt". */
+  tags: string;
 }
 export type FirmaInput = Omit<Firma, 'id' | 'archiviert' | MetaKeys>;
 
@@ -921,7 +923,7 @@ export interface Database {
 export const EMPTY_FIRMA_INPUT: FirmaInput = {
   name: '', domain: '', kuerzel: '', status: 'lead', tier: '', score: null, plattform: '', version: '', eol: '',
   ort: '', register: '', ust_id: '', email_allgemein: '', telefon_allgemein: '', tech_info: '', quelle: '',
-  zustaendig: '', drive_ordner_id: '', slack_channel: '', notiz: '', branche: '',
+  zustaendig: '', drive_ordner_id: '', slack_channel: '', notiz: '', branche: '', tags: '',
 };
 
 export const EMPTY_KONTAKT_INPUT: KontaktInput = {

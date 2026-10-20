@@ -641,7 +641,7 @@ body {
 .soft .page > * { margin-top: 0 !important; margin-bottom: 0 !important; }
 .soft .page > .page-header { margin-bottom: 4px !important; }
 /* Filters belong together: the industry chips sit closer under the filter row. */
-.soft .page > .filters + .branchen-filter, .soft .page > .branchen-filter + .pipeline-hint { margin-top: -8px !important; }
+.soft .page > .filters + .branchen-filter, .soft .page > .branchen-filter + .branchen-filter, .soft .page > .branchen-filter + .pipeline-hint { margin-top: -8px !important; }
 .soft .page > .pipeline-hint { margin-top: -8px !important; }
 /* Card grids and stacks on every page use the same gap. */
 .soft :is(.start-grid, .start-main, .start-side, .tag-grid, .akte, .akte-main, .akte-side, .anfragen, .contact-layout, .contact-spalte, .angebot-layout, .angebot-main, .angebot-side, .uebersicht-seite, .kpis, .tools) { gap: var(--abstand); }

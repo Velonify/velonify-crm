@@ -2,6 +2,7 @@ import { normalisiereZustaendig } from './zustaendig';
 import { DuplicateError, ValidationError } from './errors';
 import { isIsoDate } from './ids';
 import type { DealInput, Firma, FirmaInput, KontaktInput, WiedervorlageInput } from './types';
+import { formatTags, parseTags } from './tags';
 
 /** "https://www.Shop.de/impressum" → "shop.de" */
 export function normalizeDomain(input: string): string {
@@ -105,6 +106,7 @@ export function prepareFirma<T extends Partial<FirmaInput>>(changes: T, alle: re
   if (result.drive_ordner_id !== undefined) result.drive_ordner_id = extractDriveFolderId(result.drive_ordner_id);
   if (result.slack_channel !== undefined) result.slack_channel = result.slack_channel.replace(/^#/, '');
   if (result.zustaendig !== undefined) result.zustaendig = normalisiereZustaendig(result.zustaendig);
+  if (result.tags !== undefined) result.tags = formatTags(parseTags(result.tags));
   if (result.score !== undefined && result.score !== null && !Number.isFinite(result.score)) {
     throw new ValidationError('score', 'Score muss eine Zahl sein.');
   }
