@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createDemoBackend } from './demo/seed';
 import { ValidationError } from './errors';
 import {
-  brauchtAufmerksamkeit, checklisteVon, faelligkeit, gruppiereKarten, kartenNachSpalte, meineAufgaben, NIEMAND, offeneKarten, passtUebersicht, neueSpaltenId, prepareKarte, prepareSpalten, sortierungFuerPosition, sortierungZwischen, spaltenVon, STANDARD_SPALTEN,
+  brauchtAufmerksamkeit, checklisteVon, ERLEDIGT_KEY, kanbanSpalten, spalteFuerKey, faelligkeit, gruppiereKarten, kartenNachSpalte, meineAufgaben, NIEMAND, offeneKarten, passtUebersicht, neueSpaltenId, prepareKarte, prepareSpalten, sortierungFuerPosition, sortierungZwischen, spaltenVon, STANDARD_SPALTEN,
 } from './todos';
 import { addDays, isoDate } from './ids';
 import type { Aufgabe } from './types';
@@ -106,5 +106,32 @@ describe('to-do logic', () => {
     expect(brauchtAufmerksamkeit(ueberfaellig, heute)).toBe(true);
     expect(brauchtAufmerksamkeit({ ...ueberfaellig, faellig_am: addDays(heute, 5) }, heute)).toBe(false);
     expect(brauchtAufmerksamkeit({ ...ueberfaellig, faellig_am: '', freigabe: 'aenderung' }, heute)).toBe(true);
+  });
+
+  it('builds kanban columns for the overview', async () => {
+    const { service } = await createDemoBackend(() => 'test@velonify.de');
+    const daten = await service.loadTodoDaten();
+    const offen = offeneKarten(daten.aufgaben, daten.boards);
+    const intern = daten.boards.find((b) => !b.firma_id)!;
+    const kunde = daten.boards.find((b) => b.firma_id)!;
+    await service.saveBoard(kunde.id, kunde.titel, [...STANDARD_SPALTEN.slice(0, 4), { id: 'freigabe', titel: 'Freigabe' }, STANDARD_SPALTEN[4]], kunde.geaendert_am);
+    const boards = (await service.loadTodoDaten()).boards;
+    const neuKunde = boards.find((b) => b.id === kunde.id)!;
+
+    const alle = kanbanSpalten(offen, boards);
+    expect(alle.map((s) => s.titel)).toEqual(['Backlog', 'Diese Woche', 'In Arbeit', 'Wartet auf Kunde', 'Freigabe', 'Erledigt']);
+    expect(alle.find((s) => s.key === 'freigabe')!.nurBei!.map((b) => b.id)).toEqual([kunde.id]);
+    expect(alle[0].nurBei).toBeUndefined();
+    expect(alle.flatMap((s) => s.karten)).toHaveLength(offen.length);
+    expect(alle[1].karten.map((a) => a.titel)).toEqual(['Angebot Nordlicht nachfassen', 'Black-Week-Banner einbauen']);
+
+    const einzeln = kanbanSpalten(offen, boards, intern);
+    expect(einzeln.map((s) => s.key)).toEqual(STANDARD_SPALTEN.map((s) => s.id));
+    expect(einzeln.flatMap((s) => s.karten).every((a) => a.board_id === intern.id)).toBe(true);
+
+    expect(spalteFuerKey(neuKunde, 'freigabe', false)?.id).toBe('freigabe');
+    expect(spalteFuerKey(intern, 'freigabe', false)).toBeUndefined();
+    expect(spalteFuerKey(intern, ERLEDIGT_KEY, false)?.id).toBe('erledigt');
+    expect(spalteFuerKey(intern, 'woche', true)?.id).toBe('woche');
   });
 });
