@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { isDemo } from '../config';
-import { DemoLeiste } from './DemoLeiste';
 import { useCrm } from '../data/CrmContext';
 import { zeigeStart } from '../data/ansicht';
 import { kundenListe } from '../data/kunden';
@@ -13,6 +12,9 @@ import { PraesenzProvider } from './Praesenz';
 import { Seitenleiste } from './Seitenleiste';
 import { Seitenrahmen } from './Seitenrahmen';
 import { Tastatur } from './Tastatur';
+
+// The demo's bar, tour and client view only reach the browser in demo mode.
+const DemoLeiste = lazy(() => import('./DemoLeiste').then((m) => ({ default: m.DemoLeiste })));
 
 const reiterClass = ({ isActive }: { isActive: boolean }) => `reiter-eintrag${isActive ? ' is-active' : ''}`;
 
@@ -88,7 +90,11 @@ export function Layout() {
               </nav>
             )}
             <main className="main" id="inhalt" tabIndex={-1}>
-              {isDemo && <DemoLeiste />}
+              {isDemo && (
+                <Suspense fallback={null}>
+                  <DemoLeiste />
+                </Suspense>
+              )}
               <Seitenrahmen schluessel={pathname}>
                 <Outlet />
               </Seitenrahmen>

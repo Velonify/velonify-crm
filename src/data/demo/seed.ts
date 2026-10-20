@@ -4,17 +4,40 @@ import { EINSTELLUNG } from '../constants';
 import { addDays, isoDate } from '../ids';
 import { SheetStore } from '../sheets/sheetStore';
 import type { KundenFeedback } from '../types';
-import { berichtInhalt, berichtsMonat, monatsZeitraum, type BerichtDaten } from '../monatsbericht';
+import { berichtInhalt, berichtsMonat, monatsZeitraum, naechsterMonat, type BerichtDaten } from '../monatsbericht';
 import { runSetup } from '../sheets/setup';
 import { EMPTY_DEAL_INPUT, EMPTY_FIRMA_INPUT, EMPTY_KONTAKT_INPUT } from '../types';
+import type { CalendarEvent } from '../google/calendar';
+import type { DriveFile } from '../google/drive';
 import { MemoryCalendar, MemoryDrive } from './memoryGoogle';
 import { AGENTUR, teamEmail } from './agentur';
-import { MemorySheets } from './memorySheets';
+import { MemorySheets, type SheetsZustand } from './memorySheets';
 import { fuelleSchaufenster } from './schaufenster';
 
 export interface DemoBackend {
   service: CrmService;
   sheets: MemorySheets;
+  drive: MemoryDrive;
+  calendar: MemoryCalendar;
+}
+
+/** A demo saved earlier (see dauerhaft.ts): sheet, drive and calendar as plain data. */
+export interface DemoDaten {
+  sheets: SheetsZustand;
+  drive: DriveFile[];
+  kalender: CalendarEvent[];
+}
+
+// Calculation sheets live in memory too; their links lead nowhere.
+const kalkulation = () => new MemorySheets('Kalkulation (Demo)');
+
+/** Picks up a demo saved earlier, as it was: no seeding. */
+export function stelleDemoHer(currentUser: () => string, daten: DemoDaten): DemoBackend {
+  const sheets = MemorySheets.aus(daten.sheets);
+  const drive = new MemoryDrive(daten.drive);
+  const calendar = new MemoryCalendar(daten.kalender);
+  const service = new CrmService({ store: new SheetStore(sheets), drive, calendar, currentUser, tabelle: kalkulation });
+  return { service, sheets, drive, calendar };
 }
 
 /**
@@ -50,8 +73,7 @@ export async function createDemoBackend(currentUser: () => string, optionen: { s
     drive,
     calendar,
     currentUser: () => alsEmail ?? (seeding ? 'demo@velonify.de' : currentUser()),
-    // Calculation sheets live in memory too; their links lead nowhere.
-    tabelle: () => new MemorySheets('Kalkulation (Demo)'),
+    tabelle: kalkulation,
   });
   await service.saveEinstellungen({
     [EINSTELLUNG.leadsOrdner]: leads.id,
@@ -372,6 +394,30 @@ export async function createDemoBackend(currentUser: () => string, optionen: { s
   ]);
 
   if (optionen.schaufenster) {
+    // The client view of the public demo shows a released report: the month before, a little weaker.
+    const vormonat = naechsterMonat(monat, -1);
+    const vz = monatsZeitraum(vormonat);
+    const ga4 = daten.zahlen.ga4!;
+    const gsc = daten.zahlen.gsc!;
+    const frueher: BerichtDaten = {
+      ...daten,
+      zahlen: {
+        ...daten.zahlen,
+        ga4: { ...ga4, ...ga4.vorher, vorher: { nutzer: 8120, sitzungen: 11240, umsatz: 37460, transaktionen: 241, conversion_rate: 241 / 11240 }, zeitraum: vz, verlauf: [] },
+        gsc: { ...gsc, ...gsc.vorher, vorher: { klicks: 4180, impressionen: 160200, ctr: 4180 / 160200, position: 17.1 }, zeitraum: vz, verlauf: [] },
+      },
+      erledigt: [{ titel: 'Migration abgeschlossen', datum: `${vormonat}-24` }],
+      meilensteine: [{ titel: 'Migration', datum: `${vormonat}-24` }],
+    };
+    const freigegeben = new Date(Date.now() - 20 * 86_400_000).toISOString();
+    await store.insert('kunden_berichte', [
+      {
+        id: 'MB-DEMO0', firma_id: alpenglanz.id, monat: vormonat, status: 'freigegeben', daten: JSON.stringify(frueher),
+        kommentar: 'Die Migration ist geschafft: Der Umsatz liegt über dem Vormonat, obwohl der Shop zwei Tage im Wartungsmodus war. Als Nächstes nehmen wir uns die mobile Ladezeit vor.',
+        freigegeben_am: freigegeben, freigegeben_von: 'johannes@velonify.de', erstellt_am: freigegeben, erstellt_von: 'kundenportal', geaendert_am: freigegeben, geaendert_von: 'johannes@velonify.de',
+      },
+    ]);
+
     const als = async <T,>(name: string, fn: () => Promise<T>): Promise<T> => {
       const vorher = alsEmail;
       alsEmail = teamEmail(name);
@@ -384,5 +430,5 @@ export async function createDemoBackend(currentUser: () => string, optionen: { s
     await fuelleSchaufenster({ service, sheets, calendar, heute, als });
   }
 
-  return { service, sheets };
+  return { service, sheets, drive, calendar };
 }

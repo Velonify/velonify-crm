@@ -1,0 +1,123 @@
+/* „Als Kunde ansehen“ in the public demo: the client portal's look (flat, warm, square), over the whole hub. */
+.kundenansicht {
+  --ka-ink: #2c0e18;
+  --ka-ink-2: #6b5560;
+  --ka-grund: #f6f3f1;
+  --ka-flaeche: #ffffff;
+  --ka-linie: #e4dcdc;
+  --ka-bordeaux: #6e1f35;
+  --ka-eis: #dcebf2;
+  --ka-gut: #3f6b47;
+  --ka-schlecht: #8f3d33;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  background: var(--ka-grund);
+  color: var(--ka-ink);
+  font-size: 15px;
+  line-height: 1.5;
+  outline: none;
+  animation: ka-rein 0.35s cubic-bezier(0.2, 0.75, 0.2, 1);
+}
+@keyframes ka-rein { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .kundenansicht { animation: none; } }
+html.kundenansicht-offen { overflow: hidden; }
+
+.ka-vorschau { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 18px; padding: 10px 24px; background: var(--espresso, #2c0e18); color: #f3edef; font-size: 13.5px; }
+.ka-vorschau strong { color: var(--eisblau, #bcdbe8); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; margin-right: 4px; }
+.ka-adresse { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; padding: 1px 6px; background: rgb(255 255 255 / 12%); }
+.ka-zurueck { font: inherit; font-weight: 700; padding: 6px 14px; border: 1px solid rgb(255 255 255 / 40%); background: rgb(255 255 255 / 10%); color: inherit; border-radius: 999px; cursor: pointer; }
+.ka-zurueck:hover { background: rgb(255 255 255 / 20%); }
+
+.ka-bar { position: sticky; top: 41px; z-index: 2; background: var(--ka-flaeche); border-bottom: 1px solid var(--ka-linie); }
+.ka-bar-in { max-width: 1120px; margin: 0 auto; padding: 0 24px; height: 60px; display: flex; align-items: center; gap: 28px; }
+.ka-marke { display: flex; align-items: center; gap: 10px; font-size: 13px; letter-spacing: 0.07em; font-weight: 700; white-space: nowrap; }
+.ka-zeichen { width: 16px; height: 16px; background: var(--ka-bordeaux); clip-path: polygon(0 100%, 50% 0, 100% 100%); }
+.ka-kunde { font-size: 14px; letter-spacing: 0; font-weight: 600; color: var(--ka-ink-2); padding-left: 10px; border-left: 1px solid var(--ka-linie); }
+.ka-tabs { display: flex; gap: 4px; height: 100%; flex: 1; }
+.ka-tabs button { all: unset; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 0 12px; font-weight: 600; font-size: 14px; color: var(--ka-ink-2); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.ka-tabs button:hover { color: var(--ka-ink); }
+.ka-tabs button:focus-visible { outline: 2px solid var(--ka-bordeaux); outline-offset: -4px; }
+.ka-tabs button[aria-current='page'] { color: var(--ka-ink); border-bottom-color: var(--ka-bordeaux); }
+.ka-zahl { min-width: 18px; height: 18px; padding: 0 5px; display: inline-grid; place-items: center; background: var(--ka-eis); color: var(--ka-ink); font-size: 11px; font-weight: 800; line-height: 1; }
+.ka-ich { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+.ka-av { width: 30px; height: 30px; display: grid; place-items: center; background: var(--ka-eis); color: var(--ka-ink); font-weight: 800; font-size: 12px; flex: none; }
+.ka-av.ka-team { background: var(--ka-bordeaux); color: #fff; }
+
+.ka-inhalt { flex: 1; }
+.ka-seite { max-width: 1120px; margin: 0 auto; padding: 36px 24px 56px; display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 40px; align-items: start; }
+.ka-haupt { display: grid; gap: 32px; min-width: 0; }
+.ka-kopf { text-transform: none; font-size: clamp(26px, 3.4vw, 34px); font-weight: 500; line-height: 1.2; margin: 0; letter-spacing: -0.01em; }
+.ka-satz { margin: -20px 0 0; font-size: 17px; color: var(--ka-ink-2); max-width: 60ch; }
+.ka-leise { color: var(--ka-ink-2); font-size: 13.5px; }
+.ka-fehler { max-width: 1120px; margin: 24px auto 0; padding: 12px 24px; color: var(--ka-schlecht); }
+.ka-block { display: grid; gap: 12px; }
+.ka-block h2, .ka-spalte h2, .ka-kasten h2 { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0; display: flex; align-items: center; gap: 8px; }
+
+.ka-todo { margin: 0; background: var(--ka-flaeche); border: 1px solid var(--ka-ink); box-shadow: 5px 5px 0 rgb(44 14 24 / 10%); padding: 16px 18px; display: grid; gap: 8px; }
+.ka-todo h3 { margin: 0; font-size: 17px; }
+.ka-todo p { margin: 0; }
+.ka-fertig { display: block; border-color: var(--ka-gut); color: var(--ka-gut); box-shadow: none; }
+.ka-aktionen { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 4px; }
+.ka-btn { font: inherit; font-weight: 700; font-size: 14px; padding: 8px 14px; border: 1px solid var(--ka-bordeaux); background: var(--ka-bordeaux); color: #fff; cursor: pointer; }
+.ka-btn:disabled { opacity: 0.55; cursor: default; }
+.ka-btn.ka-zweit { background: transparent; color: var(--ka-bordeaux); }
+.ka-btn:focus-visible { outline: 2px solid var(--ka-ink); outline-offset: 2px; }
+.ka-notiz { display: grid; gap: 6px; font-weight: 600; font-size: 14px; }
+.ka-notiz textarea { font: inherit; font-weight: 400; padding: 8px 10px; border: 1px solid var(--ka-linie); background: var(--ka-grund); color: var(--ka-ink); resize: vertical; }
+
+.ka-fahrplan { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); background: var(--ka-flaeche); border: 1px solid var(--ka-linie); }
+.ka-fahrplan li { display: grid; gap: 2px; padding: 14px 16px; border-left: 1px solid var(--ka-linie); position: relative; }
+.ka-fahrplan li:first-child { border-left: 0; }
+.ka-punkt { width: 10px; height: 10px; border: 2px solid var(--ka-ink-2); margin-bottom: 6px; }
+.ka-fahrplan .is-erledigt .ka-punkt { background: var(--ka-gut); border-color: var(--ka-gut); }
+.ka-fahrplan .is-aktiv { background: var(--ka-eis); }
+.ka-fahrplan .is-aktiv .ka-punkt { background: var(--ka-bordeaux); border-color: var(--ka-bordeaux); }
+
+.ka-feed { list-style: none; margin: 0; padding: 0; display: grid; }
+.ka-feed li { display: grid; gap: 2px; padding: 12px 0; border-top: 1px solid var(--ka-linie); }
+.ka-feed p { margin: 0; color: var(--ka-ink-2); }
+.ka-art { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: var(--ka-ink-2); }
+.ka-art-meilenstein { color: var(--ka-bordeaux); }
+
+.ka-spalten { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.ka-spalte { display: grid; gap: 10px; }
+.ka-karte { display: grid; gap: 4px; padding: 12px 14px; background: var(--ka-flaeche); border: 1px solid var(--ka-linie); }
+.ka-freigabe { justify-self: start; font-size: 12px; font-weight: 700; padding: 1px 6px; background: var(--ka-eis); }
+.ka-freigabe.is-freigegeben { background: #e4ebe2; color: var(--ka-gut); }
+.ka-freigabe.is-aenderung { background: #f3e3df; color: var(--ka-schlecht); }
+
+.ka-kennzahlen { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1px; background: var(--ka-linie); border: 1px solid var(--ka-linie); }
+.ka-kennzahl { display: grid; gap: 2px; padding: 14px 16px; background: var(--ka-flaeche); }
+.ka-kennzahl b { font-size: 22px; font-weight: 600; }
+.ka-gut { color: var(--ka-gut); font-size: 13px; font-weight: 600; }
+.ka-schlecht { color: var(--ka-schlecht); font-size: 13px; font-weight: 600; }
+.ka-kommentar { margin: 0; padding: 14px 18px; border-left: 3px solid var(--ka-bordeaux); background: var(--ka-flaeche); white-space: pre-line; }
+.ka-kommentar cite { display: block; margin-top: 8px; font-style: normal; font-size: 13px; color: var(--ka-ink-2); }
+
+.ka-dateien { list-style: none; margin: 0; padding: 0; background: var(--ka-flaeche); border: 1px solid var(--ka-linie); }
+.ka-dateien li { display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--ka-linie); }
+.ka-dateien li:first-child { border-top: 0; }
+
+.ka-neben { display: grid; gap: 18px; position: sticky; top: 132px; }
+.ka-kasten { background: var(--ka-flaeche); border: 1px solid var(--ka-linie); padding: 16px 18px; display: grid; gap: 10px; }
+.ka-kasten ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ka-kasten li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.ka-kasten p { margin: 0; }
+
+@media (max-width: 900px) {
+  .ka-seite { grid-template-columns: 1fr; }
+  .ka-neben { position: static; }
+  .ka-spalten { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ka-bar-in { gap: 12px; padding: 0 16px; overflow-x: auto; }
+  .ka-kunde, .ka-ich { display: none; }
+  .ka-vorschau { padding: 10px 16px; }
+  .ka-seite { padding: 24px 16px 40px; }
+}
+@media (max-width: 560px) {
+  .ka-spalten { grid-template-columns: 1fr; }
+  .ka-bar { top: 0; position: static; }
+}
