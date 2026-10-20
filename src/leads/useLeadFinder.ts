@@ -2,19 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { config, isDemo } from '../config';
 import { useCrm } from '../data/CrmContext';
-import { DemoLeadFinder } from '../data/demo/leadFinderDemo';
+import { demoLeadFinder } from '../data/demo/leadFinderDemo';
 import { AuthExpiredError } from '../data/errors';
 import { planeImport } from '../data/importCsv';
 import { BEREICHE, CloudLeadFinder, importZeilen, type Bereich, type EntscheidungEintrag, type LeadFinderApi, type LeadKandidat, type ListenZeile } from '../data/leadFinder';
-
-// One demo instance for the whole session, so decisions survive switching pages.
-let demo: DemoLeadFinder | null = null;
 
 /** The Cloud Function in production, invented shops in demo mode; null while its address is not configured. */
 export function useLeadFinderApi(): LeadFinderApi | null {
   const { getToken } = useAuth();
   return useMemo(() => {
-    if (isDemo) return (demo ??= new DemoLeadFinder());
+    if (isDemo) return demoLeadFinder();
     return config.shopAuditUrl ? new CloudLeadFinder(config.shopAuditUrl, getToken) : null;
   }, [getToken]);
 }

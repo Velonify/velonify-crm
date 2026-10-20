@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { config, GOOGLE_SCOPES, isDemo } from '../config';
-import { DEMO_START } from '../data/demo/agentur';
+import { DEMO_START, DEMO_TEAM } from '../data/demo/agentur';
+import { ICH_GEWECHSELT, read as gemerktesIch } from '../lib/useIch';
 import { AuthExpiredError } from '../data/errors';
 import { fetchGoogleUser, loadGoogleIdentity, requestToken, revokeToken, type GoogleUser, type TokenInfo } from './google';
 
@@ -26,8 +27,12 @@ interface StoredSession {
   user: GoogleUser;
 }
 
-// The demo starts as the managing director of the invented agency (see data/demo/agentur.ts).
-const DEMO_USER: GoogleUser = { email: DEMO_START.email, name: `${DEMO_START.name} ${DEMO_START.nachname}` };
+// The demo starts as the managing director of the invented agency (see data/demo/agentur.ts); picking a role in the
+// demo bar signs in as that person.
+function demoUser(name: string | null): GoogleUser {
+  const p = DEMO_TEAM.find((t) => t.name === name) ?? DEMO_START;
+  return { email: p.email, name: `${p.name} ${p.nachname}` };
+}
 // sessionStorage: survives a reload, but ends with the browser tab. The token itself expires after an hour anyway.
 const SESSION_KEY = 'velonify-crm.session';
 
@@ -55,12 +60,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const initial = useRef(isDemo ? null : readSession());
   const tokenRef = useRef<TokenInfo | null>(initial.current?.token ?? null);
   const [state, setState] = useState<AuthState>(() => {
-    if (isDemo) return { status: 'demo', user: DEMO_USER };
+    if (isDemo) return { status: 'demo', user: demoUser(gemerktesIch()) };
     return initial.current ? { status: 'signedIn', user: initial.current.user } : { status: 'signedOut' };
   });
   const stateRef = useRef(state);
   stateRef.current = state;
   const [googleReady, setGoogleReady] = useState(false);
+
+  useEffect(() => {
+    if (!isDemo) return;
+    const gewechselt = (e: Event) => setState({ status: 'demo', user: demoUser((e as CustomEvent<string | null>).detail) });
+    window.addEventListener(ICH_GEWECHSELT, gewechselt);
+    return () => window.removeEventListener(ICH_GEWECHSELT, gewechselt);
+  }, []);
 
   useEffect(() => {
     if (isDemo) return;
@@ -116,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (tokenRef.current) revokeToken(tokenRef.current.accessToken);
     tokenRef.current = null;
     writeSession(null);
-    setState(isDemo ? { status: 'demo', user: DEMO_USER } : { status: 'signedOut' });
+    setState(isDemo ? { status: 'demo', user: demoUser(gemerktesIch()) } : { status: 'signedOut' });
   }, []);
 
   const userEmail = useCallback(() => {

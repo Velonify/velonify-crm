@@ -12,6 +12,11 @@ describe('Schaufenster der Demo', () => {
     expect(db.firmen.filter((f) => f.status === 'kunde').length).toBeGreaterThanOrEqual(4);
     expect((await service.loadAngebotsDaten()).angebote.length).toBeGreaterThanOrEqual(4);
     expect(ungelesene(await service.loadErwaehnungen(), 'Lena').length).toBeGreaterThanOrEqual(2);
+    // Tags of the agency: kind of lead and region, nothing of Velonify's own territories.
+    const tags = new Set(db.firmen.flatMap((f) => f.tags.split(',').map((t) => t.trim()).filter(Boolean)));
+    expect([...tags].filter((t) => /Gebiet|Zahnarzt|Dach/.test(t))).toEqual([]);
+    expect(['Shop-Lead', 'Performance-Lead', 'Region Nord', 'Region Süd'].every((t) => tags.has(t))).toBe(true);
+    expect(db.firmen.filter((f) => !/Region /.test(f.tags)).map((f) => `${f.name} (${f.ort})`)).toEqual([]);
 
     // No trace of Velonify's own team in any cell.
     const tabs = (await sheets.getSpreadsheet()).sheets!.map((s) => s.properties!.title as string);

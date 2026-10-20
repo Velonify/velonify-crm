@@ -663,3 +663,46 @@ body {
 .soft .heute-liste li:first-child { padding-top: 11px; }
 .soft .heute-liste li.is-ueberfaellig { padding-left: 10px; box-shadow: none; background: var(--danger-soft); }
 .soft .heute-liste li.is-ueberfaellig + li { border-top-color: transparent; }
+
+/* Public demo: welcome with the choice of role, and the guided tour. */
+.demo-willkommen-overlay { z-index: 1100; }
+.demo-willkommen { width: min(860px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; background: var(--surface); color: var(--ink); border-radius: var(--r-gross, 24px); padding: 36px 40px 28px; box-shadow: 0 30px 80px rgb(0 0 0 / 28%); animation: seite-rein 0.5s cubic-bezier(0.2, 0.75, 0.2, 1) backwards; }
+.demo-willkommen h2 { font-size: clamp(24px, 1.2vw + 18px, 32px); line-height: 1.15; margin: 6px 0 10px; }
+.demo-willkommen-marke { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+.demo-willkommen-text { margin: 0 0 24px; color: var(--ink-2, var(--muted)); max-width: 62ch; font-size: 15.5px; }
+.demo-rollen { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.demo-rolle { all: unset; box-sizing: border-box; cursor: pointer; display: grid; align-content: start; gap: 4px; padding: 20px; border-radius: var(--r-mittel, 16px); border: 1px solid var(--line); background: var(--sunken); transition: transform 0.2s cubic-bezier(0.2, 0.75, 0.2, 1), border-color 0.2s, box-shadow 0.2s; }
+.demo-rolle:hover { transform: translateY(-2px); border-color: var(--line-strong); box-shadow: 0 10px 24px rgb(0 0 0 / 8%); }
+.demo-rolle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.demo-rolle-avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; margin-bottom: 10px; background: var(--espresso); color: var(--eisblau); font-weight: 700; font-size: 14px; letter-spacing: 0.04em; }
+.demo-rolle-titel { font-weight: 700; font-size: 17px; }
+.demo-rolle-person { font-size: 13.5px; color: var(--muted); }
+.demo-rolle-text { margin-top: 8px; font-size: 14px; line-height: 1.45; }
+.demo-willkommen-fuss { margin: 20px 0 0; font-size: 13px; color: var(--muted); }
+@media (max-width: 760px) {
+  .demo-willkommen { padding: 24px 20px 20px; }
+  .demo-rollen { grid-template-columns: 1fr; }
+}
+
+.demo-tour { position: fixed; right: 24px; bottom: 24px; z-index: 1050; width: min(380px, calc(100vw - 32px)); padding: 16px 18px 14px; border-radius: var(--r-mittel, 18px); color: var(--ink); box-shadow: 0 18px 48px rgb(0 0 0 / 18%); animation: seite-rein 0.45s cubic-bezier(0.2, 0.75, 0.2, 1) backwards; }
+.demo-tour h2 { font-size: 18px; margin: 8px 0 6px; }
+.demo-tour p { margin: 0 0 8px; font-size: 14px; line-height: 1.5; }
+.demo-tour-kopf { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.demo-tour-marke { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.demo-tour-zu { all: unset; cursor: pointer; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; font-size: 18px; color: var(--muted); }
+.demo-tour-zu:hover { background: var(--hover); color: var(--ink); }
+.demo-tour-zu:focus-visible { outline: 2px solid var(--accent); }
+.demo-tour-punkte { list-style: none; display: flex; gap: 5px; margin: 10px 0 0; padding: 0; }
+.demo-tour-punkte li { flex: 1; height: 4px; border-radius: 2px; background: var(--line); transition: background 0.3s; }
+.demo-tour-punkte li.is-fertig { background: var(--line-strong); }
+.demo-tour-punkte li.is-jetzt { background: var(--accent); }
+.demo-tour-tipp { padding: 8px 10px; border-radius: 10px; background: var(--sunken); }
+.demo-tour-fuss { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.demo-tour-luecke { flex: 1; }
+.demo-leiste .link-button:disabled { opacity: 0.5; }
+@media (prefers-reduced-motion: reduce) {
+  .demo-tour, .demo-willkommen { animation: none; }
+  .demo-rolle { transition: none; }
+}
+.demo-leiste label { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: inherit; font-weight: 400; color: inherit; }
+.soft .demo-leiste select { width: auto; min-height: 0; padding: 3px 26px 3px 8px; font-size: 13.5px; }
