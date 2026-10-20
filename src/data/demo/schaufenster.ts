@@ -37,7 +37,8 @@ export async function fuelleSchaufenster(args: {
     if (von >= 0) for (const z of zeilen) if (z[von] === teamEmail('Lena')) z[von] = teamEmail('Tim');
   }
   // Both writes went around the service: read again so its snapshot knows the new names.
-  await service.load();
+  // The base seed tags a few leads with Velonify's own territories (dentists in Dortmund …): the agency tags its way.
+  for (const f of (await service.load()).firmen) await service.updateFirma(f.id, { tags: demoTags(f.ort, 'Shopify-Migration') }, f.geaendert_am);
 
   const tage = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
 
@@ -59,6 +60,7 @@ export async function fuelleSchaufenster(args: {
         zustaendig,
         notiz: f.anlass,
         email_allgemein: `info@${f.slug}.example`,
+        tags: demoTags(f.ort, f.titel),
         ...(f.kuerzel ? { kuerzel: f.kuerzel, slack_channel: `client-${f.kuerzel.toLowerCase()}-general` } : {}),
       });
       const [vorname, nachname, rolle] = f.kontakt;
@@ -248,6 +250,25 @@ const VERLAUF: Partial<Record<Phase, { typ: string; text: (f: DemoFirma) => stri
   gewonnen: [MAIL, MEETING, ANGEBOT, ZUSAGE],
   verloren: [MAIL, ABSAGE],
 };
+
+const REGION: Record<string, string> = Object.fromEntries(
+  (
+    [
+      ['Nord', 'Hamburg Kiel Flensburg Husum Westerland Rostock Bremen Cuxhaven Lüneburg Celle Hannover Verden'],
+      ['West', 'Köln Düsseldorf Duisburg Solingen Münster Bielefeld Paderborn'],
+      ['Mitte', 'Kassel Göttingen Erfurt Weimar'],
+      ['Ost', 'Berlin Dresden Leipzig'],
+      ['Süd', 'München Stuttgart Konstanz Freiburg Heidelberg Mannheim Nürnberg Bamberg Augsburg Garmisch-Partenkirchen Innsbruck'],
+    ] as const
+  ).flatMap(([region, orte]) => orte.split(' ').map((ort) => [ort, region])),
+);
+
+/** Tags the agency gives its firms: the kind of lead and the region, so the tag filter has something to show. */
+export function demoTags(ort: string, titel: string): string {
+  const art = /retainer|ads|black-week/i.test(titel) ? (/seo/i.test(titel) ? 'SEO-Lead' : 'Performance-Lead') : 'Shop-Lead';
+  const region = REGION[ort];
+  return region ? `${art}, Region ${region}` : art;
+}
 
 const FIRMEN: DemoFirma[] = [
   // Prospects that just came in from the lead finder
