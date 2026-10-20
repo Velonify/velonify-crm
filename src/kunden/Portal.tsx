@@ -17,6 +17,7 @@ import { hatQuelle, liesDaten, prepareTracking, trackingVon, veraenderung, type 
 import { einstellungenVon, KANAELE, KANAL_LABEL, RHYTHMUS_LABEL, UPDATE_RHYTHMEN, type PortalEinstellungen } from '../data/portalBenachrichtigung';
 import { useAuth } from '../auth/AuthContext';
 import { config, isDemo } from '../config';
+import { oeffneKundenansicht } from '../components/demo/demo';
 import { berichteVon, berichtsMonat, liesBericht, monatName, naechsterMonat } from '../data/monatsbericht';
 import type { KundenBericht } from '../data/types';
 import { AMPEL_LABEL, ANLASS_LABEL, feedbackVon, sterneText, zufriedenheit } from '../data/feedback';
@@ -487,7 +488,8 @@ function BerichtZeile({ bericht: b, firma, aendern, reload, offen, umschalten }:
                   {laeuft === 'rechnen' ? 'Rechnet … (bis 1 Min.)' : 'Neu berechnen'}
                 </button>
               )}
-              <AlsKundeAnsehen firma={firma} ziel={`bericht/${b.monat}`} label="Im Portal ansehen ↗" />
+              {/* The demo shows the portal as the client sees it, without drafts. */}
+              {!(isDemo && entwurf) && <AlsKundeAnsehen firma={firma} ziel={`bericht/${b.monat}`} label="Im Portal ansehen ↗" />}
               {!entwurf && (
                 <button type="button" className="button small subtle" onClick={() => freigeben(false)} disabled={laeuft !== ''}>
                   Zurückziehen
@@ -621,7 +623,14 @@ function AlsKundeAnsehen({ firma, ziel = '', label = 'Portal öffnen ↗' }: { f
   const { getToken } = useAuth();
   const toast = useToast();
   const [laeuft, setLaeuft] = useState(false);
-  if (isDemo || !config.kundenportalApiUrl) return null;
+  // The public demo has no portal function: the client's view opens right in the hub, from the demo's data.
+  if (isDemo)
+    return (
+      <button type="button" className="button small" onClick={() => oeffneKundenansicht(firma.id, ziel.startsWith('bericht') ? 'berichte' : 'start')} title="Zeigt das Kundenportal so, wie der Kunde es sieht.">
+        {ziel ? label.replace(' ↗', '') : 'Als Kunde ansehen'}
+      </button>
+    );
+  if (!config.kundenportalApiUrl) return null;
 
   const oeffnen = async () => {
     // Open the tab right away: browsers block windows that open only after an await.

@@ -8,6 +8,17 @@ const fakeId = (prefix: string) => `${prefix}${(++counter).toString(36)}${Math.r
 /** In-memory drive for demo mode and tests. Links point nowhere. */
 export class MemoryDrive implements DriveApi {
   private readonly files = new Map<string, DriveFile>();
+  /** Called after every change. */
+  beiAenderung: () => void = () => {};
+
+  constructor(dateien: DriveFile[] = []) {
+    for (const file of dateien) this.files.set(file.id, file);
+  }
+
+  /** All files as plain data (the demo keeps them in the browser). */
+  zustand(): DriveFile[] {
+    return [...this.files.values()];
+  }
 
   add(name: string, parentId: string | null, mimeType = FOLDER_MIME): DriveFile {
     const file: DriveFile = {
@@ -18,6 +29,7 @@ export class MemoryDrive implements DriveApi {
       modifiedTime: new Date().toISOString(),
     };
     this.files.set(file.id, file);
+    this.beiAenderung();
     return file;
   }
 
@@ -50,6 +62,7 @@ export class MemoryDrive implements DriveApi {
     const file = this.files.get(fileId);
     if (!file) throw new NotFoundError();
     file.parents = [...(file.parents ?? []).filter((p) => p !== fromParentId), toParentId];
+    this.beiAenderung();
     return { ...file };
   }
 
@@ -74,11 +87,18 @@ function alsTermin(daten: TerminDaten, bisher?: CalendarEvent) {
 
 /** In-memory calendar for demo mode and tests. No invitations are sent. */
 export class MemoryCalendar implements CalendarApi {
-  readonly events: CalendarEvent[] = [];
+  readonly events: CalendarEvent[];
+  /** Called after every change. */
+  beiAenderung: () => void = () => {};
+
+  constructor(events: CalendarEvent[] = []) {
+    this.events = events;
+  }
 
   async createEvent(daten: TerminDaten): Promise<CalendarEvent> {
     const event: CalendarEvent = { id: fakeId('evt'), abgesagt: false, bearbeitbar: true, ...alsTermin(daten) };
     this.events.push(event);
+    this.beiAenderung();
     return { ...event };
   }
 
@@ -86,12 +106,14 @@ export class MemoryCalendar implements CalendarApi {
     const event = this.events.find((e) => e.id === bisher.id);
     if (!event) throw new NotFoundError('Den Termin gibt es nicht mehr.');
     Object.assign(event, alsTermin(daten, event));
+    this.beiAenderung();
     return { ...event };
   }
 
   async deleteEvent(bisher: CalendarEvent): Promise<void> {
     const index = this.events.findIndex((e) => e.id === bisher.id);
     if (index >= 0) this.events.splice(index, 1);
+    this.beiAenderung();
   }
 
   async findEvents(email: string, von: string, bis: string): Promise<CalendarEvent[]> {
