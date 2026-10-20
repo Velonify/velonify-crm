@@ -643,6 +643,11 @@ body {
 .soft .page > :is(.segmented, .button, .link-button, a, button, .badge, .chip) { align-self: flex-start; }
 .soft .card-header { margin-bottom: 14px; }
 .soft .demo-banner { margin-bottom: var(--abstand); }
+.demo-leiste { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 18px; }
+.demo-leiste-aktionen { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.demo-leiste select { margin-left: 4px; font: inherit; padding: 3px 6px; border-radius: 8px; border: 1px solid var(--line-strong); background: transparent; color: inherit; }
+.demo-leiste select option { color: #000; }
+.demo-leiste .link-button { color: inherit; text-decoration: underline; }
 /* "Heute dran": every row on the same left edge; overdue rows get a red mark, not an indent. */
 .soft .heute-liste li { grid-template-columns: 92px minmax(0, 1fr) auto; padding: 11px 10px; margin: 0 -10px; border-radius: 12px; border-top-color: var(--line); }
 .soft .heute-liste li:first-child { padding-top: 11px; }

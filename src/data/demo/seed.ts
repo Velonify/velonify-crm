@@ -8,7 +8,9 @@ import { berichtInhalt, berichtsMonat, monatsZeitraum, type BerichtDaten } from 
 import { runSetup } from '../sheets/setup';
 import { EMPTY_DEAL_INPUT, EMPTY_FIRMA_INPUT, EMPTY_KONTAKT_INPUT } from '../types';
 import { MemoryCalendar, MemoryDrive } from './memoryGoogle';
+import { AGENTUR, teamEmail } from './agentur';
 import { MemorySheets } from './memorySheets';
+import { fuelleSchaufenster } from './schaufenster';
 
 export interface DemoBackend {
   service: CrmService;
@@ -18,13 +20,15 @@ export interface DemoBackend {
 /**
  * Builds demo mode: an in-memory sheet, drive and calendar driven by the real CrmService,
  * filled with invented companies on the reserved .example TLD. This repo is public – never real leads here.
+ * `schaufenster` turns it into the public demo: an invented agency with a full pipeline (see schaufenster.ts);
+ * tests run without it on the small Velonify set.
  */
-export async function createDemoBackend(currentUser: () => string): Promise<DemoBackend> {
+export async function createDemoBackend(currentUser: () => string, optionen: { schaufenster?: boolean } = {}): Promise<DemoBackend> {
   const sheets = new MemorySheets();
   await runSetup(sheets);
 
   const drive = new MemoryDrive();
-  const shared = drive.add('Velonify', null);
+  const shared = drive.add(optionen.schaufenster ? AGENTUR.name : 'Velonify', null);
   const sales = drive.add('02_Sales', shared.id);
   const leads = drive.add('01_Leads', sales.id);
   const proposals = drive.add('02_Proposals', sales.id);
@@ -39,12 +43,13 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
 
   // Seed data is attributed to a demo user; afterwards to whoever uses the demo.
   let seeding = true;
+  let alsEmail: string | null = null;
   const calendar = new MemoryCalendar();
   const service = new CrmService({
     store: new SheetStore(sheets),
     drive,
     calendar,
-    currentUser: () => (seeding ? 'demo@velonify.de' : currentUser()),
+    currentUser: () => alsEmail ?? (seeding ? 'demo@velonify.de' : currentUser()),
     // Calculation sheets live in memory too; their links lead nowhere.
     tabelle: () => new MemorySheets('Kalkulation (Demo)'),
   });
@@ -365,6 +370,19 @@ export async function createDemoBackend(currentUser: () => string): Promise<Demo
     ...(fertigeKarte ? [fb(6, { anlass: 'karte', bezug_id: fertigeKarte.id, bezug_titel: fertigeKarte.titel, sterne: 3, text: 'Ergebnis gut, hat aber eine Woche länger gedauert als geplant.', gemeldet_am: new Date(Date.now() - 6 * 86_400_000).toISOString() })] : []),
     fb(12, { text: 'Könnt ihr im Monatsbericht auch die Newsletter-Zahlen zeigen?' }),
   ]);
+
+  if (optionen.schaufenster) {
+    const als = async <T,>(name: string, fn: () => Promise<T>): Promise<T> => {
+      const vorher = alsEmail;
+      alsEmail = teamEmail(name);
+      try {
+        return await fn();
+      } finally {
+        alsEmail = vorher;
+      }
+    };
+    await fuelleSchaufenster({ service, sheets, calendar, heute, als });
+  }
 
   return { service, sheets };
 }
