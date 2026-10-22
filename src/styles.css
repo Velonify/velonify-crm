@@ -712,6 +712,8 @@ input[type='checkbox']:indeterminate::before { transform: scale(1); height: 3px;
 .board-card.is-dragging { opacity: 0.4; }
 .board-card-top { display: flex; justify-content: space-between; gap: 6px; align-items: flex-start; }
 .board-card-top .row-title { font-size: 14px; line-height: 1.35; }
+.board-card-website { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--ink-muted); text-decoration: none; }
+.board-card-website:hover { color: var(--ink); text-decoration: underline; }
 .board-card-title { font-size: 13.5px; margin-top: 2px; }
 .board-card-meta { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
 .board-card .next-step { font-size: 12.5px; }
