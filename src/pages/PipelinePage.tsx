@@ -16,7 +16,7 @@ import { addDays, isoDate } from '../data/ids';
 import { RUHT_AB_TAGE, ruhtSeit, wahrscheinlichkeit } from '../data/selectors';
 import { passtTags, zahlJeTag } from '../data/tags';
 import type { Deal } from '../data/types';
-import { formatDayShort, formatEuro } from '../lib/format';
+import { domainLabel, formatDayShort, formatEuro, websiteUrl } from '../lib/format';
 import { useIch } from '../lib/useIch';
 import { istZustaendig, kuerzelVon } from '../data/zustaendig';
 
@@ -194,6 +194,18 @@ export function PipelinePage() {
                       </Link>
                       {firma.tier && <TierBadge tier={firma.tier} />}
                     </div>
+                    {firma.domain && (
+                      <a
+                        className="board-card-website"
+                        href={websiteUrl(firma.domain)}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        draggable={false}
+                        title="Website in neuem Tab öffnen"
+                      >
+                        {domainLabel(firma.domain)} ↗
+                      </a>
+                    )}
                     <button type="button" className="link-button board-card-title" onClick={() => setDialog({ deal })}>
                       {deal.titel}
                     </button>

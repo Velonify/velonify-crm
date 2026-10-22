@@ -46,7 +46,10 @@ export function shortUser(email: string): string {
   return email.split('@')[0] || '–';
 }
 
-export const websiteUrl = (domain: string) => `https://${domain}`;
+export const websiteUrl = (domain: string) => (/^https?:\/\//i.test(domain) ? domain : `https://${domain}`);
+
+/** Domain ohne Protokoll und abschließenden Schrägstrich, zum Anzeigen. */
+export const domainLabel = (domain: string) => domain.replace(/^https?:\/\//i, '').replace(/\/$/, '');
 
 export const numberOrNull = (text: string): number | null => {
   const trimmed = text.trim().replace(/\./g, '').replace(',', '.');
