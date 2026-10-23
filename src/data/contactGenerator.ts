@@ -1,3 +1,4 @@
+import { AGENTUR } from './demo/agentur';
 import { AuthExpiredError } from './errors';
 import { kanalInfo, type GeneratorAnfrage, type Variante } from './anschreiben';
 
@@ -47,7 +48,7 @@ export class DemoGenerator implements GeneratorApi {
     const texte = [
       `${gruss} ${ihr} Shop ${anfrage.firma.domain || anfrage.firma.name} ist mir aufgefallen${system ? ` – er läuft noch auf ${system}` : ''}. Wir helfen Händlern bei „${titel}“. Passt ein kurzer Austausch?`,
       `${gruss} kurze Frage zu ${anfrage.firma.name}: Ist „${titel}“ bei ${du ? 'euch' : 'Ihnen'} gerade ein Thema? ${anfrage.aufhaenger || 'Wir haben dazu ein paar konkrete Ideen.'}`,
-      `${gruss} ich bin ${anfrage.absender.vorname} von Velonify. ${nutzen || `Bei „${titel}“ können wir ${du ? 'euch' : 'Sie'} entlasten.`} Wäre ein 15-minütiges Gespräch interessant?`,
+      `${gruss} ich bin ${anfrage.absender.vorname} von ${AGENTUR.name}. ${nutzen || `Bei „${titel}“ können wir ${du ? 'euch' : 'Sie'} entlasten.`} Wäre ein 15-minütiges Gespräch interessant?`,
     ];
     return texte.map((text, i) => ({
       betreff: anfrage.kanal === 'email' ? [`${titel} für ${anfrage.firma.name}`, `Frage zu ${anfrage.firma.domain || anfrage.firma.name}`, 'Kurzer Gedanke zu Ihrem Shop'][i] : '',

@@ -48,7 +48,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
     leereLadeCache();
     if (isDemo) {
       // Sample data and the in-memory store only reach the browser in demo mode.
-      import('./demo/seed').then(({ createDemoBackend }) => createDemoBackend(userEmail)).then(
+      import('./demo/seed').then(({ createDemoBackend }) => createDemoBackend(userEmail, { schaufenster: true })).then(
         (demo) => !cancelled && setBackend(demo),
         (err: Error) => !cancelled && (setError(err), setLoading(false)),
       );
