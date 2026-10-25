@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { istMac } from './Suche';
+import { seiteBrauchtTasten } from '../lib/eigeneTasten';
 
 /** Two-key jumps: G, then the letter. */
 export const SPRUENGE: { taste: string; ziel: string; label: string }[] = [
@@ -46,7 +47,7 @@ const tippt = (ziel: EventTarget | null) =>
   ziel instanceof HTMLElement && (ziel.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ziel.tagName));
 const dialogOffen = () => !!document.querySelector('.overlay, .search-overlay, .blatt.is-offen');
 
-/** Global keys: ? help, / search, C new lead, G + letter to jump. Nothing fires while typing or in a dialog. */
+/** Global keys: ? help, / search, C new lead, G + letter to jump. Nothing fires while typing, in a dialog or on a page that needs every key. */
 export function Tastatur() {
   const navigate = useNavigate();
   const [offen, setOffen] = useHilfe();
@@ -54,7 +55,7 @@ export function Tastatur() {
   useEffect(() => {
     let gSeit = 0;
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || tippt(e.target)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || tippt(e.target) || seiteBrauchtTasten()) return;
       if (e.key === 'Escape' && hilfeOffen) {
         setOffen(false);
         return;

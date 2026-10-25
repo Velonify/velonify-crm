@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useCrm } from '../data/CrmContext';
 import { ortLink, ortText } from '../data/praesenz';
 import { kuerzelVon } from '../data/zustaendig';
+import { seiteBrauchtTasten } from '../lib/eigeneTasten';
 import { WerkzeugIcon } from './Icons';
 import { nameVon, useAnwesende } from './Praesenz';
 import { useInselToasts, type Toast } from './Toasts';
@@ -30,7 +31,7 @@ export function HubInsel() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || tippt(e.target)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || tippt(e.target) || seiteBrauchtTasten()) return;
       if (e.key.toLowerCase() !== 'z') return;
       const mitAktion = [...toasts].reverse().find((t) => t.aktion);
       if (!mitAktion) return;

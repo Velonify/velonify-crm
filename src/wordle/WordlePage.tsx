@@ -5,6 +5,7 @@ import { useCrm } from '../data/CrmContext';
 import { isoDate } from '../data/ids';
 import type { WordleErgebnis } from '../data/types';
 import { MAX_VERSUCHE, muster, normalisiere, raetselNummer, rangliste, tastenFarben, teilenText, wortDesTages, WORT_LAENGE } from '../data/wordle';
+import { useEigeneTasten } from '../lib/eigeneTasten';
 import { errorMessage } from '../lib/errors';
 import { useIch } from '../lib/useIch';
 import { MiniMuster, Spielbrett, Tastatur } from './Spielbrett';
@@ -117,6 +118,9 @@ function Spiel({ tag, spieler, ergebnis, onGespeichert }: { tag: string; spieler
   useEffect(() => setZuKurz(false), [eingabe]);
 
   const taste = useCallback((t: string) => !fertig && dispatch({ typ: 'taste', taste: t, loesung }), [fertig, loesung]);
+
+  // Every letter is a guess here: the hub's shortcuts (C, G, /, ? …) stay quiet while the game is open.
+  useEigeneTasten();
 
   // Physical keyboard, unless someone is typing into a field.
   useEffect(() => {

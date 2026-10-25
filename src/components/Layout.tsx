@@ -45,7 +45,7 @@ export function Layout() {
   useEffect(() => setMenue(false), [pathname]);
 
   const kunden = gefunden?.id === 'kunden' && db ? kundenListe(db) : [];
-  const reiter = gefunden ? gefunden.navigation.filter((n) => !n.versteckt && (n.pfad !== '/wort' || zeigeStart(ansicht, 'wort'))) : [];
+  const reiter = gefunden ? gefunden.navigation.filter((n) => !n.versteckt && (n.pfad !== '/wort' || zeigeStart(ansicht, 'wort') || pathname === '/wort')) : [];
 
   return (
     <PraesenzProvider>
