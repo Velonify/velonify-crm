@@ -1,6 +1,7 @@
 import { useMemo, useState, type DragEvent, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useBlatt } from '../components/Blatt';
+import { FilterKlappe } from '../components/FilterKlappe';
 import { BranchenFilter, useBranchenFilter } from '../components/BranchenFilter';
 import { BranchenNachtrag } from '../components/BranchenNachtrag';
 import { TagFilter, TagListe, useTagFilter } from '../components/TagFilter';
@@ -110,9 +111,6 @@ export function PipelinePage() {
                 </option>
               ))}
             </select>
-            <Link to="/crm/linkedin" className="button">
-              Lead aus LinkedIn
-            </Link>
             <button type="button" className="button primary" onClick={() => setDialog({})}>
               Deal anlegen
             </button>
@@ -120,10 +118,12 @@ export function PipelinePage() {
         }
       />
       {error && <ErrorBox error={error} onRetry={refresh} />}
-      <TagFilter wert={tags.wert} setze={tags.setze} zahlen={zahlenJeTag} />
-      <BranchenFilter wert={branchen.wert} setze={branchen.setze} zahlen={zahlenJeBranche}>
-        <BranchenNachtrag />
-      </BranchenFilter>
+      <FilterKlappe aktiv={tags.wert.wahl.size + branchen.wert.wahl.size}>
+        <TagFilter wert={tags.wert} setze={tags.setze} zahlen={zahlenJeTag} />
+        <BranchenFilter wert={branchen.wert} setze={branchen.setze} zahlen={zahlenJeBranche}>
+          <BranchenNachtrag />
+        </BranchenFilter>
+      </FilterKlappe>
       <p className="muted small pipeline-hint">
         Karten zwischen Spalten ziehen oder die Phase auf der Karte wählen. Gewonnen und Verloren zeigen die letzten {ABGESCHLOSSEN_TAGE} Tage.
       </p>

@@ -20,11 +20,12 @@ import { phaseLabel } from '../data/constants';
 import { istOffen } from '../data/eingang';
 import { ticker } from '../data/kunden';
 import { AKTIONEN } from '../data/suche';
-import { istMac } from '../components/Suche';
 import { useEingang } from '../eingang/useEingang';
 import { useKundenDaten } from '../kunden/useKundenDaten';
 import { useTodoDaten } from '../todo/useTodoDaten';
 import { istZustaendig } from '../data/zustaendig';
+import { zeigeStart } from '../data/ansicht';
+import { useAnsicht } from '../lib/useAnsicht';
 
 const MAX_AUFGABEN = 5;
 
@@ -308,6 +309,8 @@ export function StartPage() {
   const kundenDaten = useKundenDaten();
   const eingang = useEingang();
   const [ich] = useIch(db?.listen.team ?? []);
+  const { ansicht } = useAnsicht();
+  const zeige = (b: Parameters<typeof zeigeStart>[1]) => zeigeStart(ansicht, b);
   const heute = isoDate(new Date());
 
   const cockpit = useMemo(() => {
@@ -351,50 +354,56 @@ export function StartPage() {
   ];
   const satz = `${teile.join(' · ')}.`;
 
+  const rechts = zeige('kalender') || zeige('kunden');
+  const helfer = [zeige('pipeline'), zeige('links'), zeige('dateiname')].some(Boolean);
+
   return (
     <div className="page start-ruhig">
       <PageHeader
-        eyebrow={new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}
         title={`${begruessung}${ich ? `, ${ich}` : ''}`}
         subtitle={satz}
         actions={
-          <div className="start-schnell" aria-label="Schnell starten">
-            {AKTIONEN.filter((a) => SCHNELL.includes(a.titel)).map((a) => (
-              <Link key={a.pfad} to={a.pfad} className="button small">
-                {a.titel}
-              </Link>
-            ))}
-          </div>
+          zeige('schnellstart') ? (
+            <div className="start-schnell" aria-label="Schnell starten">
+              {AKTIONEN.filter((a) => SCHNELL.includes(a.titel)).map((a) => (
+                <Link key={a.pfad} to={a.pfad} className="button small">
+                  {a.titel}
+                </Link>
+              ))}
+            </div>
+          ) : undefined
         }
       />
       {error && <ErrorBox error={error} onRetry={refresh} />}
-      <div className="start-raster">
-        <HeuteDran eintraege={cockpit.eintraege} heute={heute} bald={cockpit.bald} />
-        <div className="start-rechts">
-          <Kalender db={db} heute={heute} />
-          <Kunden db={db} todos={todos.data} news={kundenDaten.data?.news} heute={heute} />
+      {(zeige('heute') || rechts) && (
+        <div className={`start-raster${zeige('heute') && rechts ? '' : ' is-einspaltig'}`}>
+          {zeige('heute') && <HeuteDran eintraege={cockpit.eintraege} heute={heute} bald={cockpit.bald} />}
+          {rechts && (
+            <div className="start-rechts">
+              {zeige('kalender') && <Kalender db={db} heute={heute} />}
+              {zeige('kunden') && <Kunden db={db} todos={todos.data} news={kundenDaten.data?.news} heute={heute} />}
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
-      {(spiele.data?.monstera || spiele.data?.wordle) && (
+      {((zeige('monstera') && spiele.data?.monstera) || (zeige('wort') && spiele.data?.wordle)) && (
         <section className="start-pause" aria-label="Kurze Pause">
-          {spiele.data?.monstera && <MonsteraKarte eintraege={spiele.data.monstera} db={db} ich={ich} heute={heute} neuLaden={spiele.reload} />}
-          {spiele.data?.wordle && <WordleKarte ergebnisse={spiele.data.wordle} team={db.listen.team ?? []} ich={ich} heute={heute} />}
+          {zeige('monstera') && spiele.data?.monstera && <MonsteraKarte eintraege={spiele.data.monstera} db={db} ich={ich} heute={heute} neuLaden={spiele.reload} />}
+          {zeige('wort') && spiele.data?.wordle && <WordleKarte ergebnisse={spiele.data.wordle} team={db.listen.team ?? []} ich={ich} heute={heute} />}
         </section>
       )}
 
-      <details className="start-mehr">
-        <summary>
-          <span>Mehr: Pipeline, Links und Dateiname</span>
-          <span className="muted small">Kleine Helfer, die nicht jeden Tag gebraucht werden</span>
-        </summary>
+      {helfer && (
         <div className="start-mehr-raster">
-          <Pipeline db={db} ich={ich} />
-          <Links db={db} />
-          <Dateiname db={db} heute={heute} />
+          {zeige('pipeline') && <Pipeline db={db} ich={ich} />}
+          {zeige('links') && <Links db={db} />}
+          {zeige('dateiname') && <Dateiname db={db} heute={heute} />}
         </div>
-      </details>
-      <p className="hint start-tipp">Alles andere: {istMac ? '⌘K' : 'Strg+K'} drücken und lostippen oder eine Frage stellen.</p>
+      )}
+      <p className="hint start-tipp">
+        Mehr auf die Startseite holen oder ausblenden: <Link to="/einstellungen#einst-start">Einstellungen</Link>
+      </p>
     </div>
   );
 }

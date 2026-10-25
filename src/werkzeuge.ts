@@ -8,8 +8,8 @@ export interface Werkzeug {
   pfad?: string;
   /** Further path prefixes that belong to the tool, for tools whose start path is "/". */
   bereiche?: string[];
-  /** Sidebar entries shown while this tool is open. */
-  navigation: { label: string; pfad: string; end?: boolean }[];
+  /** Pages of the tool, shown as tabs above the page. `versteckt` pages keep their name but get no tab (reached via buttons). */
+  navigation: { label: string; pfad: string; end?: boolean; versteckt?: boolean }[];
 }
 
 /** The tools of the company page, in the order of the tool switcher. */
@@ -25,7 +25,7 @@ export const WERKZEUGE: Werkzeug[] = [
       { label: 'Übersicht', pfad: '/', end: true },
       { label: 'Eingang', pfad: '/eingang' },
       { label: 'Kalender', pfad: '/kalender' },
-      { label: 'Anfragen', pfad: '/anfragen' },
+      { label: 'Anfragen', pfad: '/anfragen', versteckt: true },
       { label: 'Wort des Tages', pfad: '/wort' },
     ],
   },
@@ -37,11 +37,11 @@ export const WERKZEUGE: Werkzeug[] = [
     pfad: '/crm',
     navigation: [
       { label: 'Mein Tag', pfad: '/crm', end: true },
-      { label: 'Anfragen', pfad: '/crm/anfragen' },
       { label: 'Pipeline', pfad: '/crm/pipeline' },
       { label: 'Firmen', pfad: '/crm/firmen' },
-      { label: 'Aus LinkedIn', pfad: '/crm/linkedin' },
-      { label: 'Import', pfad: '/crm/import' },
+      { label: 'Anfragen', pfad: '/crm/anfragen' },
+      { label: 'Aus LinkedIn', pfad: '/crm/linkedin', versteckt: true },
+      { label: 'Import', pfad: '/crm/import', versteckt: true },
     ],
   },
   {
@@ -71,7 +71,7 @@ export const WERKZEUGE: Werkzeug[] = [
     pfad: '/angebote',
     navigation: [
       { label: 'Angebote', pfad: '/angebote', end: true },
-      { label: 'Neues Angebot', pfad: '/angebote/neu' },
+      { label: 'Neues Angebot', pfad: '/angebote/neu', versteckt: true },
       { label: 'Leistungen', pfad: '/angebote/leistungen' },
     ],
   },
@@ -95,7 +95,7 @@ export const WERKZEUGE: Werkzeug[] = [
     pfad: '/audit',
     navigation: [
       { label: 'Übersicht', pfad: '/audit', end: true },
-      { label: 'Domain prüfen', pfad: '/audit/neu' },
+      { label: 'Domain prüfen', pfad: '/audit/neu', versteckt: true },
     ],
   },
   {
@@ -137,6 +137,58 @@ export const WERKZEUGE: Werkzeug[] = [
     ],
   },
 ];
+
+/** What a sidebar entry counts: open items in the inbox, CRM items due today, my cards due today. */
+export type LeistenZahl = 'eingang' | 'heute' | 'todo';
+
+export interface LeistenEintrag {
+  /** Tool the entry opens; switching the tool off in the view settings hides the entry. */
+  werkzeug: string;
+  label: string;
+  pfad: string;
+  icon: string;
+  zahl?: LeistenZahl;
+}
+
+/**
+ * The sidebar: one line per tool with its name, grouped like the work. The inbox gets its own line because it is
+ * where the day starts, even though it lives in Home.
+ */
+export const LEISTE: { titel?: string; eintraege: LeistenEintrag[] }[] = [
+  {
+    eintraege: [
+      { werkzeug: 'home', label: 'Home', pfad: '/', icon: 'home' },
+      { werkzeug: 'home', label: 'Eingang', pfad: '/eingang', icon: 'eingang', zahl: 'eingang' },
+      { werkzeug: 'todo', label: 'To-Dos', pfad: '/todo', icon: 'todo', zahl: 'todo' },
+    ],
+  },
+  {
+    titel: 'Vertrieb',
+    eintraege: [
+      { werkzeug: 'crm', label: 'CRM', pfad: '/crm', icon: 'crm', zahl: 'heute' },
+      { werkzeug: 'angebote', label: 'Angebote', pfad: '/angebote', icon: 'angebote' },
+      { werkzeug: 'contact', label: 'Contact Generator', pfad: '/contact', icon: 'contact' },
+      { werkzeug: 'audit', label: 'Shop-Audit', pfad: '/audit', icon: 'audit' },
+      { werkzeug: 'leads', label: 'Lead-Finder', pfad: '/leads', icon: 'leads' },
+      { werkzeug: 'magnete', label: 'Lead-Magnete', pfad: '/magnete', icon: 'magnete' },
+    ],
+  },
+  {
+    titel: 'Kunden & Marketing',
+    eintraege: [
+      { werkzeug: 'kunden', label: 'Kunden', pfad: '/kunden', icon: 'kunden' },
+      { werkzeug: 'social', label: 'Social Media', pfad: '/social', icon: 'social' },
+    ],
+  },
+];
+
+/** The entry for a path: the inbox has its own line, everything else goes by tool. */
+export function leistenEintragFuerPfad(pathname: string): LeistenEintrag | null {
+  const alle = LEISTE.flatMap((g) => g.eintraege);
+  if (pathname === '/eingang' || pathname.startsWith('/eingang/')) return alle.find((e) => e.pfad === '/eingang') ?? null;
+  const w = werkzeugFuerPfad(pathname);
+  return w ? (alle.find((e) => e.werkzeug === w.id) ?? null) : null;
+}
 
 export const istGeplant = (w: Werkzeug) => !w.pfad;
 
