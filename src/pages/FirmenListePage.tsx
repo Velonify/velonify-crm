@@ -1,6 +1,7 @@
 import { useBlatt } from '../components/Blatt';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { FilterKlappe } from '../components/FilterKlappe';
 import { BranchenFilter, useBranchenFilter } from '../components/BranchenFilter';
 import { BranchenNachtrag } from '../components/BranchenNachtrag';
 import { TagFilter, TagListe, useTagFilter } from '../components/TagFilter';
@@ -125,8 +126,8 @@ export function FirmenListePage() {
         subtitle={db ? `${visible.length} von ${activeCount} aktiven Firmen` : undefined}
         actions={
           <>
-            <Link to="/crm/import" className="button">
-              CSV importieren
+            <Link to="/crm/linkedin" className="button">
+              Aus LinkedIn
             </Link>
             <Link to="/crm/firmen/neu" className="button primary">
               Firma anlegen
@@ -191,14 +192,18 @@ export function FirmenListePage() {
             Filter zurücksetzen
           </button>
         )}
+        <Link to="/crm/import" className="link-button filters-ende">
+          CSV importieren
+        </Link>
       </div>
 
-      {db && <TagFilter wert={tags.wert} setze={tags.setze} zahlen={zahlenJeTag} />}
-
       {db && (
-        <BranchenFilter wert={branchen.wert} setze={branchen.setze} zahlen={zahlenJeBranche}>
-          <BranchenNachtrag />
-        </BranchenFilter>
+        <FilterKlappe aktiv={tags.wert.wahl.size + branchen.wert.wahl.size}>
+          <TagFilter wert={tags.wert} setze={tags.setze} zahlen={zahlenJeTag} />
+          <BranchenFilter wert={branchen.wert} setze={branchen.setze} zahlen={zahlenJeBranche}>
+            <BranchenNachtrag />
+          </BranchenFilter>
+        </FilterKlappe>
       )}
 
       {!db && loading && <Loading label="Firmen werden geladen …" />}

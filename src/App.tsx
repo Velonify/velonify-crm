@@ -28,6 +28,7 @@ const AnfragenPage = seite(() => import('./eingang/AnfragenPage'), 'AnfragenPage
 const EingangPage = seite(() => import('./eingang/EingangPage'), 'EingangPage');
 const DatenPage = seite(() => import('./pages/DatenPage'), 'DatenPage');
 const EinrichtungPage = seite(() => import('./pages/EinrichtungPage'), 'EinrichtungPage');
+const EinstellungenPage = seite(() => import('./pages/EinstellungenPage'), 'EinstellungenPage');
 const FirmaAktePage = seite(() => import('./pages/FirmaAktePage'), 'FirmaAktePage');
 const FirmaNeuPage = seite(() => import('./pages/FirmaNeuPage'), 'FirmaNeuPage');
 const FirmenListePage = seite(() => import('./pages/FirmenListePage'), 'FirmenListePage');
@@ -131,6 +132,7 @@ export function App() {
                 <Route path="liste" element={<MagnetePage />} />
                 <Route path="roast/:id" element={<RoastPage />} />
               </Route>
+              <Route path="einstellungen" element={<EinstellungenPage />} />
               <Route path="einrichtung" element={<EinrichtungPage />} />
               <Route path="einrichtung/daten" element={<DatenPage />} />
               <Route path="einrichtung/daten/:tab" element={<DatenPage />} />

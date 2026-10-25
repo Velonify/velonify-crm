@@ -17,6 +17,7 @@ const PFADE: Record<string, string> = {
   frage: 'M10 2.5l1.7 4.8 4.8 1.7-4.8 1.7L10 15.5l-1.7-4.8L3.5 9l4.8-1.7z',
   rueckgaengig: 'M7 12 3 8l4-4M3 8h9a4.5 4.5 0 0 1 0 9H9',
   haken: 'M4 10.5l4 4 8-9',
+  regler: 'M3 5h7M14 5h3M3 10h2M9 10h8M3 15h9M16 15h1M12 3v4M7 8v4M14 13v4',
   eingang: 'M2.5 11h4.5l1.5 2.5h3L13 11h4.5M2.5 11 5 4h10l2.5 7v5h-15z',
 };
 

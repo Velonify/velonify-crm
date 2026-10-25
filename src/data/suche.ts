@@ -38,7 +38,8 @@ export const AKTIONEN: { titel: string; pfad: string; woerter: string }[] = [
   { titel: 'Mein Tag', pfad: '/crm', woerter: 'heute wiedervorlagen fällig' },
   { titel: 'Pipeline', pfad: '/crm/pipeline', woerter: 'deals phasen' },
   { titel: 'Kalender', pfad: '/kalender', woerter: 'termine meet' },
-  { titel: 'Einrichtung', pfad: '/einrichtung', woerter: 'setup einstellungen tabs' },
+  { titel: 'Einstellungen', pfad: '/einstellungen', woerter: 'ansicht startseite seitenleiste ausblenden design dunkel hell abmelden' },
+  { titel: 'Einrichtung', pfad: '/einrichtung', woerter: 'setup drive team links tabs' },
 ];
 
 /** Actions and tools for the palette; with an empty query all of them, so the palette is useful before typing. */

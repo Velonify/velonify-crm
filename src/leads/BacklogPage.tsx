@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { FilterKlappe } from '../components/FilterKlappe';
 import { BranchenFilter, useBranchenFilter } from '../components/BranchenFilter';
 import { MailLink } from '../components/MailLink';
 import { ErrorBox, Loading, PageHeader } from '../components/ui';
@@ -151,11 +152,13 @@ export function BacklogPage() {
             </select>
           </div>
 
-          <BranchenFilter wert={branchen.wert} setze={branchen.setze} zahlen={zahlenJeBranche}>
-            {einordnung.fehler
-              ? `Branchen konnten nicht eingeordnet werden: ${einordnung.fehler}`
-              : einordnung.laeuft && `Branchen werden eingeordnet, noch ${einordnung.offen.toLocaleString('de-DE')} Shops …`}
-          </BranchenFilter>
+          <FilterKlappe aktiv={branchen.wert.wahl.size}>
+            <BranchenFilter wert={branchen.wert} setze={branchen.setze} zahlen={zahlenJeBranche}>
+              {einordnung.fehler
+                ? `Branchen konnten nicht eingeordnet werden: ${einordnung.fehler}`
+                : einordnung.laeuft && `Branchen werden eingeordnet, noch ${einordnung.offen.toLocaleString('de-DE')} Shops …`}
+            </BranchenFilter>
+          </FilterKlappe>
 
           <div className="lead-leiste">
             <span className="muted small">{gewaehlt.length > 0 ? `${gewaehlt.length} ausgewählt` : 'Shops auswählen, dann entscheiden.'}</span>
