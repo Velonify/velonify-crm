@@ -13,7 +13,8 @@ async function store(person = 'test@velonify.de') {
   return { s: new PostgresStore(pool, () => person), pg };
 }
 
-describe('PostgresStore', () => {
+// Migrating a fresh PGlite database takes several seconds on CI runners.
+describe('PostgresStore', { timeout: 60_000 }, () => {
   it('has exactly the columns of SCHEMA after all migrations', async () => {
     const { pg } = await testDb();
     for (const schema of TABELLEN) {
