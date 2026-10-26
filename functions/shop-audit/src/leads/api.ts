@@ -4,6 +4,7 @@ import { backlogSql, brancheTabelleSql, branchenVonSql, detailSql, detailsSql, E
 import { mergeSql, neuesteQuellenSql, poolTabelleSql, prioViewSql } from './pool-sql.js';
 import { nutzerNachrichtBranche, startseitenAuszug, type BrancheId } from './branche.js';
 import { ladeStartseite, pruefeKandidat, type Abhaengigkeiten, type Kandidat, type PoolDaten } from './pruefen.js';
+import { fuelleMarkt, marktPoolSql, MarktFuellenSchema } from './markt.js';
 
 /** The little of BigQuery the lead routes need; faked in tests. */
 export interface Bq {
@@ -55,7 +56,7 @@ const Schemas = {
   }),
 } as const;
 
-export const ROUTEN = ['naechste', 'pruefen', 'backlog', 'manuell', 'detail', 'details', 'entscheiden', 'statistik', 'zaehler', 'branchen', 'import', 'einrichten'] as const;
+export const ROUTEN = ['naechste', 'pruefen', 'backlog', 'manuell', 'detail', 'details', 'entscheiden', 'statistik', 'zaehler', 'branchen', 'import', 'einrichten', 'marktpool', 'marktfuellen'] as const;
 export type Route = (typeof ROUTEN)[number];
 
 export interface Kontext {
@@ -224,6 +225,29 @@ export async function leadRoute(route: Route, body: unknown, ctx: Kontext): Prom
       await bq.query(prioViewSql(dataset));
       for (const sql of tabellenSql(dataset)) await bq.query(sql);
       return { crawl_datum: quellen.crawl_datum, crux_monat: quellen.crux_monat };
+    }
+    case 'marktpool': {
+      // Lead-Markt for hub tenants: German Shopify shops from the same crawl (~9 GB scan).
+      const [quellen] = await bq.query<{ crawl_datum: string; crux_monat: number }>(neuesteQuellenSql());
+      if (!quellen?.crawl_datum) throw new AnfrageFehler('Kein vollständiger HTTP-Archive-Crawl gefunden.', 502);
+      await bq.query(marktPoolSql(dataset), { crawl: { typ: 'DATE', wert: quellen.crawl_datum }, crux: quellen.crux_monat });
+      const [zahl] = await bq.query<{ shops: number; mit_helpdesk: number }>(`SELECT COUNT(*) AS shops, COUNTIF(helpdesk) AS mit_helpdesk FROM \`${dataset}.markt_pool\``);
+      return { crawl_datum: quellen.crawl_datum, crux_monat: quellen.crux_monat, ...zahl };
+    }
+    case 'marktfuellen': {
+      // Checks the next Shopify shops and returns the usable ones; the hub stores them in crm-api's Lead-Markt.
+      const einordnen = ctx.einordnen;
+      return fuelleMarkt(parse(MarktFuellenSchema, body), {
+        bq,
+        dataset,
+        pruefDeps: ctx.pruefDeps,
+        branche: einordnen
+          ? async (domain, firma) => {
+              const home = await ladeStartseite(domain, ctx.pruefDeps.laden);
+              return (await einordnen(nutzerNachrichtBranche(domain, firma, startseitenAuszug(home)))).branche;
+            }
+          : undefined,
+      });
     }
   }
 }
