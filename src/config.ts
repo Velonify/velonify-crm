@@ -1,14 +1,24 @@
 const env = import.meta.env;
 
+/**
+ * The hub for tenants (app.velonify.de): the same app, built with VITE_MANDANTEN=1 and the tenants' own OAuth client.
+ * Login with any whitelisted Google account, data in the tenant's own database, no Drive/Sheets/Calendar.
+ */
+export const mandantenModus = env.VITE_MANDANTEN === '1';
+const crmApi = (env.VITE_CRM_API_URL || '').replace(/\/$/, '');
+
 export const config = {
   googleClientId: env.VITE_GOOGLE_CLIENT_ID || '',
   allowedDomain: (env.VITE_ALLOWED_DOMAIN || 'velonify.de').toLowerCase(),
   /** Cloud Function of the Contact Generator */
-  contactGeneratorUrl: env.VITE_CONTACT_GENERATOR_URL || '',
+  // Tenants reach Claude only through crm-api, which checks their tool switches and counts the KI quota.
+  contactGeneratorUrl: mandantenModus ? (crmApi ? `${crmApi}/ki/contact` : '') : env.VITE_CONTACT_GENERATOR_URL || '',
   /** Cloud Function of the shop audit */
-  shopAuditUrl: env.VITE_SHOP_AUDIT_URL || '',
+  shopAuditUrl: mandantenModus ? (crmApi ? `${crmApi}/ki/audit` : '') : env.VITE_SHOP_AUDIT_URL || '',
   /** Cloud Function crm-api in front of Postgres: all hub data goes through it. */
   crmApiUrl: env.VITE_CRM_API_URL || '',
+  /** Who sees the admin tool "Plattform" (crm-api checks again with its own ADMINS). */
+  admins: (env.VITE_ADMINS || 'lukas@velonify.de,julian@velonify.de').split(',').map((a: string) => a.trim().toLowerCase()),
   /** Cloud Function kundenportal; with it the "Portal" tab can open the client's portal as a read-only preview. */
   kundenportalApiUrl: (env.VITE_KUNDENPORTAL_API_URL || '').replace(/\/$/, ''),
   /** The client portal itself */
@@ -24,7 +34,7 @@ export const isDemo = !config.googleClientId || !config.crmApiUrl;
 //   created by the app, so drive.file would not see them. Full drive would also cover the Sheets API; the spreadsheets
 //   scope stays anyway until that has been tried live.
 // - Calendar: Meet appointments.
-export const GOOGLE_SCOPES = [
+export const GOOGLE_SCOPES = mandantenModus ? ['openid', 'email', 'profile'] : [
   'openid',
   'email',
   'profile',

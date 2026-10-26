@@ -506,6 +506,9 @@ export class PlattformStore {
     const status = eingabe.status ?? bisher?.status ?? 'test';
     if (!['test', 'aktiv', 'nur_lesen', 'gesperrt'].includes(status)) throw new PlattformFehler('Unbekannter Status.');
     const testStart = eingabe.test_start ?? bisher?.test_start ?? heute;
+    // A new package brings its own quotas unless they are given; otherwise the old values stay.
+    const paketWechsel = !bisher || bisher.paket !== paket;
+    const alt = paketWechsel ? undefined : bisher;
     const neu: Mandant = {
       ...(bisher ?? ({} as Mandant)),
       id: eingabe.id,
@@ -515,9 +518,9 @@ export class PlattformStore {
       test_start: testStart,
       test_ende: eingabe.test_ende ?? bisher?.test_ende ?? plusTage(testStart, TEST_TAGE - 1),
       funktionen: eingabe.funktionen ?? bisher?.funktionen ?? {},
-      lead_kontingent: eingabe.lead_kontingent ?? bisher?.lead_kontingent ?? PAKETE[paket].leads,
-      lead_zeitraum: eingabe.lead_zeitraum ?? bisher?.lead_zeitraum ?? (paket === 'test' ? 'gesamt' : 'monat'),
-      ki_kontingent: eingabe.ki_kontingent ?? bisher?.ki_kontingent ?? PAKETE[paket].ki,
+      lead_kontingent: eingabe.lead_kontingent ?? alt?.lead_kontingent ?? PAKETE[paket].leads,
+      lead_zeitraum: eingabe.lead_zeitraum ?? alt?.lead_zeitraum ?? (paket === 'test' ? 'gesamt' : 'monat'),
+      ki_kontingent: eingabe.ki_kontingent ?? alt?.ki_kontingent ?? PAKETE[paket].ki,
       notiz: eingabe.notiz ?? bisher?.notiz ?? '',
     };
     if (!neu.name) throw new PlattformFehler('Der Mandant braucht einen Namen.');

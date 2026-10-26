@@ -37,6 +37,15 @@ describe('PlattformStore', () => {
     expect(await plattform.zugang('fremd@example.com')).toBeNull();
   });
 
+  it('gives a booked package its own quotas, counted per month', async () => {
+    const { plattform } = await aufbau();
+    const pro = await plattform.speichereMandant({ id: 'vennie', status: 'aktiv', paket: 'pro' }, 'lukas@velonify.de');
+    expect(pro).toMatchObject({ status: 'aktiv', paket: 'pro', lead_kontingent: 150, lead_zeitraum: 'monat', ki_kontingent: 500 });
+    // Changing something else keeps hand-set quotas.
+    await plattform.speichereMandant({ id: 'vennie', lead_kontingent: 200 }, 'lukas@velonify.de');
+    expect(await plattform.speichereMandant({ id: 'vennie', notiz: 'Rechnung 2026/51' }, 'lukas@velonify.de')).toMatchObject({ lead_kontingent: 200, notiz: 'Rechnung 2026/51' });
+  });
+
   it('refuses Velonify addresses and addresses of another tenant', async () => {
     const { plattform } = await aufbau();
     await plattform.speichereMandant({ id: 'andere', name: 'Andere' }, 'lukas@velonify.de');

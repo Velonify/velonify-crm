@@ -20,7 +20,7 @@ import {
   type KategorieStatus,
   type ManuellZiel,
 } from '../data/angebote';
-import { isDemo } from '../config';
+import { isDemo, mandantenModus } from '../config';
 import { useCrm } from '../data/CrmContext';
 import { EINSTELLUNG, isAbgeschlossen } from '../data/constants';
 import { spreadsheetFileUrl } from '../data/google/drive';
@@ -591,7 +591,8 @@ function AngebotFormular({ daten, db, angebot, aendern }: { daten: AngebotsDaten
               </button>
             </div>
           </section>
-          <KalkulationKarte angebot={angebot} db={db} dirty={dirty} aendern={aendern} />
+          {/* The calculation is a Google Sheet; tenants have no Sheets access. */}
+          {!mandantenModus && <KalkulationKarte angebot={angebot} db={db} dirty={dirty} aendern={aendern} />}
         </aside>
       </div>
     </div>

@@ -14,6 +14,7 @@ import type { CrmService } from '../data/crm';
 import { AuthExpiredError } from '../data/errors';
 import { befehle, suche, sucheBereiche, type Bereichsdaten, type Treffer, type TrefferArt } from '../data/suche';
 import { WERKZEUGE } from '../werkzeuge';
+import { useMandant } from '../plattform/MandantContext';
 
 const ART_LABEL: Record<TrefferArt, string> = {
   firma: 'Firmen', kunde: 'Kunden', kontakt: 'Kontakte', deal: 'Deals', karte: 'To-dos', angebot: 'Angebote',
@@ -118,15 +119,16 @@ function SuchDialog({ onClose }: { onClose(): void }) {
   const navigate = useNavigate();
   const [eingabe, setEingabe] = useState('');
   const [aktiv, setAktiv] = useState(0);
+  const { erlaubt } = useMandant();
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
   // Grouped for display, flat for keyboard navigation.
   const gruppen = useMemo(() => {
-    const treffer = [...(db ? [...suche(db, eingabe), ...sucheBereiche(db, daten, eingabe)] : []), ...befehle(eingabe, WERKZEUGE)];
+    const treffer = [...(db ? [...suche(db, eingabe), ...sucheBereiche(db, daten, eingabe)] : []), ...befehle(eingabe, WERKZEUGE.filter((w) => erlaubt(w.id)))];
     return REIHENFOLGE.map((art) => ({ art, treffer: treffer.filter((t) => t.art === art) })).filter((g) => g.treffer.length > 0);
-  }, [db, daten, eingabe]);
+  }, [db, daten, eingabe, erlaubt]);
   const flach = gruppen.flatMap((g) => g.treffer);
   // "Frag den Hub" is index -1: first for questions, otherwise reachable with ↑ above the first hit.
   const fragbar = eingabe.trim().length > 2;

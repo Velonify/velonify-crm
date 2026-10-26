@@ -64,7 +64,7 @@ export function loadGoogleIdentity(): Promise<void> {
  * Opens the Google popup. Must be called synchronously from a click handler (after loadGoogleIdentity resolved),
  * otherwise browsers block the popup.
  */
-export function requestToken(options: { clientId: string; scopes: string[]; domain: string; loginHint?: string }): Promise<TokenInfo> {
+export function requestToken(options: { clientId: string; scopes: string[]; domain?: string; loginHint?: string }): Promise<TokenInfo> {
   const oauth2 = window.google?.accounts?.oauth2;
   if (!oauth2) return Promise.reject(new Error('Google-Anmeldung ist noch nicht geladen. Bitte kurz warten.'));
 

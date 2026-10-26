@@ -1495,3 +1495,38 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
 .kanban-nur-bei { margin-left: auto; font-size: 11px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kanban-hinweis { margin: 0; padding: 6px 12px 0; font-size: 12px; }
 .karte-labels .kuerzel { font-size: 10px; }
+
+/* Velonify Hub für Mandanten: Test-Leiste, Pakete, Lead-Markt, Admin-Werkzeug „Plattform“ */
+.mandant-leiste { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-2); padding: 10px 16px; margin-bottom: var(--space-2); background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-klein, 10px); font-size: 14px; }
+.mandant-leiste.is-warn { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+.mandant-leiste-knoepfe { display: flex; align-items: center; gap: var(--space-1); }
+.mandant-leiste-hinweis { color: var(--ink-muted); font-size: 13px; }
+.paket-raster { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--space-2); margin-bottom: var(--space-2); }
+.paket-karte { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: var(--space-2); background: var(--raised); border: 1.5px solid var(--line); border-radius: var(--r-klein, 10px); color: var(--ink); font: inherit; cursor: pointer; }
+.paket-karte:hover { border-color: var(--line-strong); }
+.paket-karte.is-aktiv { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.paket-karte ul { margin: 4px 0 0; padding-left: 18px; font-size: 13.5px; color: var(--ink-muted); }
+.paket-name { font-weight: 700; font-size: 17px; display: flex; gap: 8px; align-items: center; }
+.paket-marke { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.paket-preis { font-weight: 600; }
+.skala { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: var(--space-1) 0 var(--space-2); }
+.skala-ende { font-size: 12.5px; color: var(--ink-muted); }
+.skala-punkt { min-width: 34px; height: 34px; border: 1.5px solid var(--line); border-radius: 8px; background: var(--raised); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+.skala-punkt.is-aktiv { border-color: var(--accent); background: var(--accent); color: var(--on-accent, #fff); }
+.bedingungen { padding-left: 18px; display: grid; gap: 8px; }
+.leer-hinweis { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); max-width: 520px; margin: var(--space-6) auto; }
+.leer-hinweis svg { width: 32px; height: 32px; color: var(--ink-muted); }
+.gesperrt-filter svg, .filters .button svg { width: 15px; height: 15px; vertical-align: -2px; }
+.erfolg-karte { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); background: var(--ok-soft); }
+.erfolg-karte p { margin: 0; }
+.kontingent-leer { background: var(--warn-soft); }
+.markt-tabelle td { vertical-align: top; }
+.markt-aktion { text-align: right; white-space: nowrap; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: var(--space-3); margin-bottom: var(--space-3); }
+.liste-schlicht { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.liste-schlicht p { margin: 4px 0 0; }
+.code { white-space: pre-wrap; font-size: 12.5px; background: var(--hover); padding: var(--space-2); border-radius: 8px; overflow-x: auto; }
+.table tr.is-archiviert td { opacity: 0.5; }
+.gesundheit { font-weight: 700; }
+.gesundheit.is-warn { color: var(--warn); }
+.gesundheit.is-gut { color: var(--ok); }

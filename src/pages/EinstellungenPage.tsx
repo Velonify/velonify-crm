@@ -11,6 +11,7 @@ import { useAnsicht } from '../lib/useAnsicht';
 import { useIch } from '../lib/useIch';
 import { useTheme } from '../lib/useTheme';
 import { LEISTE, WERKZEUGE } from '../werkzeuge';
+import { useMandant } from '../plattform/MandantContext';
 
 const ABSCHNITTE = [
   { id: 'leiste', titel: 'Seitenleiste' },
@@ -51,7 +52,8 @@ export function EinstellungenPage() {
   const { ansicht, setze, fehler } = useAnsicht();
   const [theme, setTheme] = useTheme();
   const [, setHilfe] = useHilfe();
-  const werkzeuge = LEISTE.flatMap((g) => g.eintraege).filter((e, i, alle) => e.werkzeug !== 'home' && alle.findIndex((x) => x.werkzeug === e.werkzeug) === i);
+  const { erlaubt } = useMandant();
+  const werkzeuge = LEISTE.flatMap((g) => g.eintraege).filter((e, i, alle) => e.werkzeug !== 'home' && erlaubt(e.werkzeug) && alle.findIndex((x) => x.werkzeug === e.werkzeug) === i);
 
   const werkzeugAn = (id: string, an: boolean) =>
     setze({ ausgeblendet: an ? ansicht.ausgeblendet.filter((w) => w !== id) : [...new Set([...ansicht.ausgeblendet, id])] });

@@ -136,6 +136,25 @@ export const WERKZEUGE: Werkzeug[] = [
       { label: 'Magnete', pfad: '/magnete/liste' },
     ],
   },
+  {
+    id: 'leadmarkt',
+    name: 'Lead-Markt',
+    kurz: 'Leads',
+    beschreibung: 'Geprüfte Shopify-Shops mit Helpdesk, Technik und Größe: ansehen, gezielt freischalten, ins CRM übernehmen',
+    pfad: '/leadmarkt',
+    navigation: [{ label: 'Lead-Markt', pfad: '/leadmarkt', end: true }],
+  },
+  {
+    id: 'plattform',
+    name: 'Plattform',
+    kurz: 'Plattform',
+    beschreibung: 'Tester und Kunden des Hubs: Zugänge, Laufzeit, Funktionen, Nutzung, Feedback und der Lead-Markt',
+    pfad: '/plattform',
+    navigation: [
+      { label: 'Mandanten', pfad: '/plattform', end: true },
+      { label: 'Lead-Markt', pfad: '/plattform/markt' },
+    ],
+  },
 ];
 
 /** What a sidebar entry counts: open items in the inbox, CRM items due today, my cards due today. */
@@ -170,6 +189,7 @@ export const LEISTE: { titel?: string; eintraege: LeistenEintrag[] }[] = [
       { werkzeug: 'contact', label: 'Contact Generator', pfad: '/contact', icon: 'contact' },
       { werkzeug: 'audit', label: 'Shop-Audit', pfad: '/audit', icon: 'audit' },
       { werkzeug: 'leads', label: 'Lead-Finder', pfad: '/leads', icon: 'leads' },
+      { werkzeug: 'leadmarkt', label: 'Lead-Markt', pfad: '/leadmarkt', icon: 'leads' },
       { werkzeug: 'magnete', label: 'Lead-Magnete', pfad: '/magnete', icon: 'magnete' },
     ],
   },
@@ -179,6 +199,10 @@ export const LEISTE: { titel?: string; eintraege: LeistenEintrag[] }[] = [
       { werkzeug: 'kunden', label: 'Kunden', pfad: '/kunden', icon: 'kunden' },
       { werkzeug: 'social', label: 'Social Media', pfad: '/social', icon: 'social' },
     ],
+  },
+  {
+    titel: 'Velonify Hub',
+    eintraege: [{ werkzeug: 'plattform', label: 'Plattform', pfad: '/plattform', icon: 'plattform' }],
   },
 ];
 
@@ -192,8 +216,8 @@ export function leistenEintragFuerPfad(pathname: string): LeistenEintrag | null 
 
 export const istGeplant = (w: Werkzeug) => !w.pfad;
 
-/** Browser tab title of a tool, e.g. "Velonify CRM". Home is the platform itself, so it stays "Velonify". */
-export const seitentitel = (w: Werkzeug) => (w.id === 'home' ? 'Velonify' : `Velonify ${w.name}`);
+/** Browser tab title of a tool, e.g. "Velonify CRM". Home is the platform itself, so it stays "Velonify" ("Velonify Hub" for tenants). */
+export const seitentitel = (w: Werkzeug, mandant = false) => (w.id === 'home' ? (mandant ? 'Velonify Hub' : 'Velonify') : `${mandant ? 'Hub' : 'Velonify'} ${w.name}`);
 
 /** Readable name of a page for "Gerade online", e.g. "CRM · Pipeline". */
 export function bereichFuerPfad(pathname: string): string {
