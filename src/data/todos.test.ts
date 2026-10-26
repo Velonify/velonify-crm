@@ -46,6 +46,17 @@ describe('to-do logic', () => {
     expect(faelligkeit({ faellig_am: '2026-10-13', erledigt_am: '2026-10-13T10:00:00Z' }, heute)).toBe('ohne');
   });
 
+  it('creates free boards next to the internal one, which stays "intern"', async () => {
+    const { service } = await createDemoBackend(() => 'test@velonify.de');
+    await service.load();
+    const intern = await service.boardFuer('');
+    const vertrieb = await service.neuesBoard(' Vertrieb ');
+    expect(vertrieb).toMatchObject({ firma_id: '', titel: 'Vertrieb' });
+    expect((await service.boardFuer('')).id).toBe(intern.id);
+    await expect(service.neuesBoard('vertrieb')).rejects.toThrow(/gibt es schon/);
+    await expect(service.neuesBoard('  ')).rejects.toThrow(ValidationError);
+  });
+
   it('moves cards, marks them done in the done column and keeps cards of removed columns', async () => {
     const { service } = await createDemoBackend(() => 'test@velonify.de');
     const db = await service.load();

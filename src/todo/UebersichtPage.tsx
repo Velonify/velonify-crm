@@ -1,13 +1,15 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Dialog } from '../components/Dialog';
 import { useToast } from '../components/Toasts';
-import { ErrorBox, Loading, PageHeader } from '../components/ui';
+import { useMandant } from '../plattform/MandantContext';
+import { ErrorBox, FormError, Loading, PageHeader } from '../components/ui';
 import { useCrm } from '../data/CrmContext';
 import { addDays, isoDate } from '../data/ids';
 import { kundenListe } from '../data/kunden';
 import { FREIGABE_LABEL, freigabeVon } from '../data/portal';
 import {
-  ALLE, boardKurz, boardVon, brauchtAufmerksamkeit, checklisteVon, faelligkeit, gruppiereKarten, istErledigt, kanbanSpalten, kartenNachSpalte, labelsVon,
+  ALLE, boardKurz, internesBoardTitel, boardVon, brauchtAufmerksamkeit, checklisteVon, faelligkeit, gruppiereKarten, istErledigt, kanbanSpalten, kartenNachSpalte, labelsVon,
   NIEMAND, offeneKarten, passtUebersicht, sortiereBoards, sortierungFuerPosition, spalteDerKarte, spalteFuerKey, spaltenVon, type Gruppierung, type KanbanSpalte,
 } from '../data/todos';
 import type { Aufgabe, Board, Firma } from '../data/types';
@@ -320,6 +322,20 @@ export function UebersichtPage({ nurIch = false }: { nurIch?: boolean }) {
       (err) => toast.show(errorMessage(err), 'error'),
     );
   };
+  const mandantName = useMandant().sicht?.mandant.name ?? null;
+  const [neuesBoard, setNeuesBoard] = useState<string | null>(null);
+  const [boardFehler, setBoardFehler] = useState<unknown>();
+  const freiesBoardAnlegen = async () => {
+    if (neuesBoard === null) return;
+    setBoardFehler(undefined);
+    try {
+      const board = await aendern((s) => s.neuesBoard(neuesBoard));
+      setNeuesBoard(null);
+      navigate(`/todo/${board.id}`);
+    } catch (err) {
+      setBoardFehler(err);
+    }
+  };
   const boardAnlegen = async (firmaId: string) => {
     setBusy(firmaId || 'intern');
     try {
@@ -365,7 +381,11 @@ export function UebersichtPage({ nurIch = false }: { nurIch?: boolean }) {
             : undefined
         }
         actions={
-          nurIch && (
+          !nurIch ? (
+            <button type="button" className="button" onClick={() => setNeuesBoard('')}>
+              Neues Board
+            </button>
+          ) : (
             <label className="ich-auswahl">
               Ich bin
               <select value={ich ?? ''} onChange={(e) => setIch(e.target.value)}>
@@ -380,6 +400,16 @@ export function UebersichtPage({ nurIch = false }: { nurIch?: boolean }) {
           )
         }
       />
+      {neuesBoard !== null && (
+        <Dialog title="Neues Board" onClose={() => setNeuesBoard(null)} onSubmit={freiesBoardAnlegen} submitLabel="Anlegen">
+          <label className="field wide">
+            <span className="field-label">Name</span>
+            <input value={neuesBoard} onChange={(e) => setNeuesBoard(e.target.value)} placeholder="z. B. Vertrieb, Onboarding, Marketing" required />
+          </label>
+          <p className="field-hint">Ein Board ohne Kunde, mit den üblichen Spalten. Kunden-Boards entstehen weiter über „… anlegen“ beim Kunden.</p>
+          <FormError error={boardFehler} />
+        </Dialog>
+      )}
       {error && <ErrorBox error={error} onRetry={reload} />}
       {!data && !error && <Loading />}
       {data && k && (
@@ -561,7 +591,7 @@ export function UebersichtPage({ nurIch = false }: { nurIch?: boolean }) {
                     <p className="muted">Noch ohne Board</p>
                     {ohneBoard.map(({ firma }) => (
                       <button key={firma?.id ?? 'intern'} type="button" className="button small" onClick={() => void boardAnlegen(firma?.id ?? '')} disabled={busy !== ''}>
-                        {busy === (firma?.id ?? 'intern') ? 'Legt an …' : `${firma ? firma.kuerzel || firma.name : 'Velonify intern'} anlegen`}
+                        {busy === (firma?.id ?? 'intern') ? 'Legt an …' : `${firma ? firma.kuerzel || firma.name : internesBoardTitel(mandantName)} anlegen`}
                       </button>
                     ))}
                   </div>

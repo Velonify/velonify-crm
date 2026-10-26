@@ -8,7 +8,7 @@ import { BRANCHEN, brancheLabel } from '../data/branchen';
 import { PlattformApiFehler, type MarktFilter, type MarktSeite } from './api';
 import { useMandant } from './MandantContext';
 import { BuchenDialog } from './MandantLeiste';
-import { HELPDESK_AUSWAHL, ladezeitLabel, regionLabel, REGIONEN, reichweiteLabel } from './marktText';
+import { HELPDESK_AUSWAHL, ladezeitLabel, regionLabel, REGIONEN, reichweiteLabel, zahlartLabel } from './marktText';
 
 /**
  * Lead-Markt of a tenant: anonymous previews of checked Shopify shops, 25 per page from the server. "Freischalten"
@@ -192,7 +192,7 @@ export function LeadMarktPage() {
                   <td className="small">
                     {v.shopify_plus ? <strong>Shopify Plus</strong> : 'Shopify'}
                     {v.email_tools.length > 0 && <div className="muted">{v.email_tools.join(', ')}</div>}
-                    {v.zahlarten.length > 0 && <div className="muted">{v.zahlarten.slice(0, 4).join(', ')}</div>}
+                    {v.zahlarten.length > 0 && <div className="muted">{v.zahlarten.slice(0, 4).map(zahlartLabel).join(', ')}</div>}
                   </td>
                   <td className="markt-aktion">
                     <button type="button" className="button small primary" disabled={!kannFreischalten || frei !== null} onClick={() => void freischalten(id)}>

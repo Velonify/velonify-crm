@@ -13,11 +13,33 @@ import { behandle, behandleDaten } from '../functions/crm-api/src/routen';
 const crm = await testDb({ plattform: true });
 const hub = await testDb();
 const plattform = new PlattformStore(crm.pool);
-await plattform.speichereMandant({ id: 'vennie', name: 'vennie', test_start: new Date(Date.now() - 21 * 86_400_000).toISOString().slice(0, 10) }, 'lukas@velonify.de');
-await plattform.speichereZugang({ email: 'leon@vennie.tech', mandant_id: 'vennie', name: 'Leon Vorschau', rolle: 'inhaber' });
+// VORSCHAU_ECHT=1: the real tenant settings and the real Lead-Markt from crm (read only, via your IAM user), so the
+// preview looks exactly like the tenant's hub. Unlocking in the preview only writes to the in-memory copy.
+const echt = process.env.VORSCHAU_ECHT === '1';
+const echterMarkt = echt ? await ladeEcht() : null;
+await plattform.speichereMandant(
+  echterMarkt?.mandant ?? { id: 'vennie', name: 'vennie', test_start: new Date(Date.now() - 21 * 86_400_000).toISOString().slice(0, 10) },
+  'lukas@velonify.de',
+);
+await plattform.speichereZugang({ email: 'leon@vennie.tech', mandant_id: 'vennie', name: echt ? 'Leon' : 'Leon Vorschau', rolle: 'inhaber' });
+if (echterMarkt) await plattform.marktAufnehmen(echterMarkt.eintraege);
+
+async function ladeEcht() {
+  const { verbinde } = await import('../db/verbindung');
+  const v = await verbinde({ instanz: 'velonify-apps:europe-west3:velonify-db', datenbank: 'crm', nutzer: process.env.DB_NUTZER ?? 'lukas@velonify.de', max: 1 });
+  try {
+    await v.pool.exec('SET ROLE crm_owner');
+    const quelle = new PlattformStore(v.pool);
+    const mandant = await quelle.mandant('vennie');
+    const { rows } = await v.pool.query<{ domain: string; vorschau: never; daten: never }>('SELECT domain, vorschau, daten FROM plattform_lead_markt WHERE aktiv AND koeder_fuer IS NULL');
+    return { mandant: mandant ? { ...mandant, bedingungen_am: undefined } : null, eintraege: rows };
+  } finally {
+    await v.schliessen();
+  }
+}
 const branchen = ['mode', 'beauty', 'sport', 'wohnen', 'lebensmittel', 'tiere'];
 const helpdesks = [['Zendesk'], ['Gorgias'], [], ['Freshdesk'], ['Zendesk'], ['Tidio'], []];
-await plattform.marktAufnehmen(
+if (!echt) await plattform.marktAufnehmen(
   Array.from({ length: 34 }, (_, i) => ({
     domain: `vorschau-shop-${i + 1}.example`,
     vorschau: {

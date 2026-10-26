@@ -13,6 +13,8 @@ export const STANDARD_SPALTEN: Spalte[] = [
 ];
 
 export const INTERNES_BOARD_TITEL = 'Velonify intern';
+/** Name of the internal board: "Velonify intern", in a tenant's hub "<tenant> intern". */
+export const internesBoardTitel = (firma?: string | null) => (firma ? `${firma} intern` : INTERNES_BOARD_TITEL);
 /** Cards due within this many days count as "fällig" in filters and on Home. */
 export const BALD_FAELLIG_TAGE = 2;
 
@@ -283,9 +285,9 @@ export function gruppiereKarten(
     .map((g) => ({ ...g, karten: [...g.karten].sort(nachDringlichkeit) }));
 }
 
-/** Short name of a board for tight spots: the client's Kürzel, "Intern" for the internal board. */
+/** Short name of a board for tight spots: the client's Kürzel, "Intern" for the internal board, the name of a free board. */
 export function boardKurz(board: Pick<Board, 'firma_id' | 'titel'>, firmen: readonly Firma[]): string {
-  if (!board.firma_id) return 'Intern';
+  if (!board.firma_id) return board.titel && !/(^|\s)intern$/i.test(board.titel.trim()) ? board.titel : 'Intern';
   return firmen.find((f) => f.id === board.firma_id)?.kuerzel || board.titel;
 }
 

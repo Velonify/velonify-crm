@@ -216,8 +216,8 @@ export function leistenEintragFuerPfad(pathname: string): LeistenEintrag | null 
 
 export const istGeplant = (w: Werkzeug) => !w.pfad;
 
-/** Browser tab title of a tool, e.g. "Velonify CRM". Home is the platform itself, so it stays "Velonify" ("Velonify Hub" for tenants). */
-export const seitentitel = (w: Werkzeug, mandant = false) => (w.id === 'home' ? (mandant ? 'Velonify Hub' : 'Velonify') : `${mandant ? 'Hub' : 'Velonify'} ${w.name}`);
+/** Browser tab title of a tool, e.g. "Velonify CRM", in a tenant's hub "vennie Hub · CRM". Home is the platform itself. */
+export const seitentitel = (w: Werkzeug, marke?: string) => (marke ? (w.id === 'home' ? marke : `${marke} · ${w.name}`) : w.id === 'home' ? 'Velonify' : `Velonify ${w.name}`);
 
 /** Readable name of a page for "Gerade online", e.g. "CRM · Pipeline". */
 export function bereichFuerPfad(pathname: string): string {

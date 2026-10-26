@@ -1,3 +1,4 @@
+import { mandantenModus } from '../config';
 /** Personal view settings: which tools sit in the rail, what the start page shows, how busy pages are. */
 
 /** Sections of the start page that can be switched on and off. */
@@ -28,14 +29,17 @@ export interface Ansicht {
   aufmerksamkeit: boolean;
 }
 
-/** Calm by default: what is due today, the calendar and the clients. Everything else is opt-in. */
+/**
+ * Calm by default: what is due today, the calendar and the clients. Everything else is opt-in – except in the tenants'
+ * hub, where the team games are on from the start: pilots should see the hub is made for a team.
+ */
 export const START_STANDARD: Record<StartBereich, boolean> = {
   heute: true,
   kalender: true,
   kunden: true,
   pipeline: false,
-  monstera: false,
-  wort: false,
+  monstera: mandantenModus,
+  wort: mandantenModus,
   links: false,
   dateiname: false,
   schnellstart: false,
