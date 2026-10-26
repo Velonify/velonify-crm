@@ -221,9 +221,16 @@ export function MandantPage() {
         <Koeder mandantId={m.id} onAngelegt={laden} />
       </Card>
 
-      <Card title="Einrichtung der Datenbank">
-        <p className="small">Einmal pro Mandant, bevor sich jemand anmeldet (Cloud SQL Studio als lukas@velonify.de, Datenbank „postgres“), danach Migrationen:</p>
-        <pre className="code">{`CREATE DATABASE hub_${m.id};
+      <Card title="Datenbank">
+        {detail.datenbank ? (
+          <p className="small">hub_{m.id} ist eingerichtet.</p>
+        ) : (
+          <>
+            <p className="alert">Die Datenbank fehlt noch, ohne sie kommt niemand hinein. Sag Lukas’ Claude Bescheid, es legt sie an.</p>
+            <details>
+              <summary>Selbst anlegen</summary>
+              <p className="small">In Cloud SQL Studio als lukas@velonify.de, Datenbank „postgres“, danach Migrationen:</p>
+              <pre className="code">{`CREATE DATABASE hub_${m.id};
 REVOKE ALL ON DATABASE hub_${m.id} FROM PUBLIC;
 GRANT CONNECT, TEMPORARY ON DATABASE hub_${m.id} TO "crm-api@velonify-crm.iam";
 GRANT CONNECT ON DATABASE hub_${m.id} TO "lukas@velonify.de", "julian@velonify.de";
@@ -235,6 +242,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE crm_owner IN SCHEMA public GRANT SELECT, INSER
 ALTER DEFAULT PRIVILEGES FOR ROLE crm_owner IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO "crm-api@velonify-crm.iam";
 
 npm run db:migrieren -- hub_${m.id}`}</pre>
+            </details>
+          </>
+        )}
       </Card>
     </div>
   );

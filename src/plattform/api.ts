@@ -58,6 +58,8 @@ export interface MandantDetail {
   feedback: { anlass: string; email: string; wert: number | null; text: string; am: string }[];
   freigaben: { domain: string; firma_id: string; koeder: boolean; von: string; am: string }[];
   werkzeuge_genutzt: { werkzeug: string; aufrufe: number }[];
+  /** Whether hub_<id> exists on velonify-db. */
+  datenbank: boolean;
 }
 
 export interface MarktStatistik {

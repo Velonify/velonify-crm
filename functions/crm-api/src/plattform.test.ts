@@ -58,6 +58,8 @@ describe('crm-api für Mandanten', { timeout: 60_000 }, () => {
     const detail = await plattform.mandantDetail('vennie');
     expect(detail.nutzung.map((n) => (n as { art: string }).art)).toContain('bewegung');
     expect(detail.feedback).toHaveLength(1);
+    // The test database has no hub_vennie, so the admin page asks for it.
+    expect(detail.datenbank).toBe(false);
     expect(meldungen.at(-1)).toMatch(/Feedback von Leon \(vennie, tag14, 4\): Gute Leads/);
   });
 
