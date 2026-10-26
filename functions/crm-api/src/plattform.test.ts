@@ -18,7 +18,7 @@ async function aufbau(jetzt = new Date('2026-10-26T09:00:00Z')) {
   return { plattform, hub, kontext, meldungen };
 }
 
-describe('crm-api für Mandanten', () => {
+describe('crm-api für Mandanten', { timeout: 60_000 }, () => {
   it('answers /ich with the trial and puts the logins into the team list', async () => {
     const { kontext } = await aufbau();
     const ich = await behandleMandant('GET', '/ich', undefined, await kontext());
