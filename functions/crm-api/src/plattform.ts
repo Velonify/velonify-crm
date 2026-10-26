@@ -84,6 +84,7 @@ export async function behandleMandant(methode: string, pfad: string, body: unkno
       }
       case '/leadmarkt/freischalten': {
         if (!istObjekt(body) || typeof body.id !== 'string') return fehler(400, 'Lead fehlt.');
+        if (!mandant.bedingungen_am) return fehler(409, 'Bitte bestätigt erst die Testbedingungen.');
         const { firma_id, neu, koeder } = await plattform.freischalten(zugang, mandant, body.id, ctx.pool);
         if (koeder) await ctx.melde?.(`Achtung: ${mandant.name} (${zugang.email}) hat den Köder-Lead ${koeder} freigeschaltet. Mails an diese Adresse kommen von dort.`);
         return { status: 200, daten: { firma_id, neu } };
