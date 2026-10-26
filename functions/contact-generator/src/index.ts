@@ -2,7 +2,7 @@ import * as functions from '@google-cloud/functions-framework';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { AnfrageSchema, fehlerText } from './anfrage.js';
-import { Limit, pruefeGoogleToken, ZugriffsFehler } from '../../gemeinsam/auth';
+import { Limit, plattformPerson, pruefeGoogleToken, ZugriffsFehler } from '../../gemeinsam/auth';
 import { AUSGABE_SCHEMA, nutzerNachricht, SYSTEM_PROMPT } from './prompt.js';
 import { FrageSchema, frageParameter, pruefeVerlauf } from './frage.js';
 
@@ -48,7 +48,11 @@ functions.http('contactGenerator', async (req, res) => {
   if (!CLIENT_ID) return fehler(500, 'GOOGLE_CLIENT_ID ist nicht gesetzt.');
 
   let email: string;
-  try {
+  // Tenants of the hub come through crm-api, which checked their login and quota; they only get these paths.
+  const mandant = plattformPerson((name) => req.get(name));
+  if (mandant && !/^\/?$|^\/frage\/?$/.test(req.path)) return fehler(403, 'Nur für Velonify.');
+  if (mandant) email = mandant;
+  else try {
     const token = (req.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
     if (!token) return fehler(401, 'Nicht angemeldet.');
     email = await pruefeGoogleToken(token, { clientId: CLIENT_ID, domain: DOMAIN });

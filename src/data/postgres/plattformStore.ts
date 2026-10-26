@@ -299,7 +299,7 @@ export class PlattformStore {
    * Unlocks one shop for a tenant: checks access and quota, records the release and writes firm, contact, deal and a
    * history entry into the tenant's own database, all in the platform transaction (a failed copy rolls it back).
    */
-  async freischalten(zugang: Zugang, m: Mandant, marktId: string, mandantDb: DbPool): Promise<{ firma_id: string; neu: boolean }> {
+  async freischalten(zugang: Zugang, m: Mandant, marktId: string, mandantDb: DbPool): Promise<{ firma_id: string; neu: boolean; koeder: string | null }> {
     if (zugriff(m, this.heute()) !== 'voll') throw new PlattformFehler('Der Testzeitraum ist abgelaufen. Leads lassen sich erst nach der Buchung wieder freischalten.', 403);
     if (!aktiveWerkzeuge(m).includes('leadmarkt')) throw new PlattformFehler('Der Lead-Markt ist für euch nicht freigeschaltet.', 403);
     if (!/^\d{1,18}$/.test(marktId)) throw new PlattformFehler('Unbekannter Lead.', 404);
@@ -320,7 +320,7 @@ export class PlattformStore {
         [eintrag.domain, m.id],
       );
       const eigene = vorhanden.find((v) => v.mandant_id === m.id);
-      if (eigene?.firma_id) return { firma_id: eigene.firma_id, neu: false };
+      if (eigene?.firma_id) return { firma_id: eigene.firma_id, neu: false, koeder: null };
       if (vorhanden.length > 0) throw new PlattformFehler('Dieser Lead ist gerade an jemand anderen gegangen.', 409);
       if (!koeder) {
         const { rows: velonify } = await tx.query('SELECT 1 FROM firmen WHERE lower(domain) = $1 LIMIT 1', [eintrag.domain]);
@@ -348,7 +348,8 @@ export class PlattformStore {
         zugang.email,
       ]);
       await tx.query('INSERT INTO plattform_nutzung (mandant_id, email, art, detail) VALUES ($1, $2, $3, $4)', [m.id, zugang.email, koeder ? 'koeder' : 'lead', eintrag.domain]);
-      return { firma_id: firmaId, neu: true };
+      // `koeder` is for crm-api's alert only and must never reach the tenant.
+      return { firma_id: firmaId, neu: true, koeder: koeder ? eintrag.domain : null };
     });
   }
 
@@ -396,6 +397,15 @@ export class PlattformStore {
       { id: newId(ID_PREFIX.aktivitaeten), firma_id: firmaId, kontakt_id: '', deal_id: '', typ: 'system', datum: am, text: 'Aus dem Lead-Markt freigeschaltet', von: zugang.email, kalender_termin_id: '' },
     ]);
     return firmaId;
+  }
+
+  /** First names of the tenant's active logins, for the team list in its database. */
+  async teamNamen(mandantId: string): Promise<string[]> {
+    const { rows } = await this.db.query<{ name: string | null; email: string }>(
+      'SELECT name, email FROM plattform_zugaenge WHERE mandant_id = $1 AND aktiv ORDER BY angelegt_am',
+      [mandantId],
+    );
+    return rows.map((z) => (z.name?.trim().split(/\s+/)[0] || z.email.split('@')[0]).replace(/^./, (c) => c.toUpperCase()));
   }
 
   async feedback(m: Mandant, email: string, anlass: FeedbackAnlass, wert: number | null, text: string): Promise<void> {
@@ -594,13 +604,5 @@ export class PlattformStore {
       FROM plattform_lead_markt m`);
     const z = rows[0] ?? {};
     return { gesamt: Number(z.gesamt ?? 0), frei: Number(z.frei ?? 0), mit_helpdesk: Number(z.mit_helpdesk ?? 0), vergeben: Number(z.vergeben ?? 0), koeder: Number(z.koeder ?? 0) };
-  }
-
-  /** Domains unlocked by tenants: Velonify's lead finder shows them as taken. */
-  async vergebeneDomains(): Promise<{ domain: string; mandant: string }[]> {
-    const { rows } = await this.db.query<{ domain: string; mandant: string }>(
-      'SELECT f.domain, m.name AS mandant FROM plattform_lead_freigaben f JOIN plattform_mandanten m ON m.id = f.mandant_id WHERE NOT f.koeder',
-    );
-    return rows;
   }
 }

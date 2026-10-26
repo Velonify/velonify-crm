@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 
 export class ZugriffsFehler extends Error {
   constructor(
@@ -26,17 +26,19 @@ interface Optionen {
 }
 
 const MAX_CACHE_MS = 5 * 60 * 1000;
-const cache = new Map<string, { email: string; bis: number }>();
+const cache = new Map<string, { email: string; client: string; bis: number }>();
 
 /**
- * Checks the Google access token the app already holds for Sheets and Drive: it must belong to one of our OAuth clients
- * and to a verified @velonify.de address. Results are cached briefly so a regenerate does not ask Google again.
+ * Checks a Google access token against Google's tokeninfo: it must belong to one of the given OAuth clients and to a
+ * verified address. Returns the address and the client it was issued for, without looking at the domain – for crm-api,
+ * which lets in Velonify (own domain) and the tenants of the hub (whitelisted addresses, their own client).
+ * Results are cached briefly so a regenerate does not ask Google again.
  */
-export async function pruefeGoogleToken(token: string, optionen: Optionen): Promise<string> {
+export async function pruefeGoogleKonto(token: string, optionen: Omit<Optionen, 'domain'>): Promise<{ email: string; client: string }> {
   const jetzt = optionen.jetzt?.() ?? Date.now();
   const schluessel = createHash('sha256').update(token).digest('hex');
   const bekannt = cache.get(schluessel);
-  if (bekannt && bekannt.bis > jetzt) return bekannt.email;
+  if (bekannt && bekannt.bis > jetzt) return { email: bekannt.email, client: bekannt.client };
 
   const antwort = await (optionen.fetch ?? fetch)(
     `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(token)}`,
@@ -45,17 +47,26 @@ export async function pruefeGoogleToken(token: string, optionen: Optionen): Prom
   const info = (await antwort.json()) as TokenInfo;
 
   const clients = optionen.clientId.split(',').map((id) => id.trim()).filter(Boolean);
-  if (!clients.some((id) => info.aud === id || info.azp === id)) {
-    throw new ZugriffsFehler(401, 'Das Token gehört nicht zur Velonify-App.');
-  }
+  const client = clients.find((id) => info.aud === id || info.azp === id);
+  if (!client) throw new ZugriffsFehler(401, 'Das Token gehört nicht zur Velonify-App.');
   const email = (info.email ?? '').toLowerCase();
   const verifiziert = info.email_verified === true || info.email_verified === 'true';
-  if (!verifiziert || !email.endsWith(`@${optionen.domain.toLowerCase()}`)) {
-    throw new ZugriffsFehler(403, `Nur für Konten mit @${optionen.domain}.`);
-  }
+  if (!verifiziert || !email) throw new ZugriffsFehler(403, 'Die E-Mail-Adresse des Google-Kontos ist nicht bestätigt.');
 
   const gueltigMs = Number(info.expires_in ?? 0) * 1000;
-  cache.set(schluessel, { email, bis: jetzt + Math.min(gueltigMs, MAX_CACHE_MS) });
+  cache.set(schluessel, { email, client, bis: jetzt + Math.min(gueltigMs, MAX_CACHE_MS) });
+  return { email, client };
+}
+
+/**
+ * Checks the Google access token the app already holds for Sheets and Drive: it must belong to one of our OAuth clients
+ * and to a verified @velonify.de address.
+ */
+export async function pruefeGoogleToken(token: string, optionen: Optionen): Promise<string> {
+  const { email } = await pruefeGoogleKonto(token, optionen);
+  if (!email.endsWith(`@${optionen.domain.toLowerCase()}`)) {
+    throw new ZugriffsFehler(403, `Nur für Konten mit @${optionen.domain}.`);
+  }
   return email;
 }
 
@@ -78,4 +89,18 @@ export class Limit {
     this.aufrufe.set(email, juengste);
     return true;
   }
+}
+
+/**
+ * A request crm-api forwards for a tenant of the hub (Contact Generator, Shop-Audit): crm-api has checked the login and
+ * counted the KI quota, and vouches with the shared secret PLATTFORM_TOKEN. Returns the tenant's address, or null when
+ * the request did not come that way.
+ */
+export function plattformPerson(header: (name: string) => string | undefined, geheim = process.env.PLATTFORM_TOKEN): string | null {
+  const gegeben = header('x-velonify-plattform');
+  const person = (header('x-velonify-person') ?? '').trim().toLowerCase();
+  if (!geheim?.trim() || !gegeben || !person.includes('@')) return null;
+  const a = createHash('sha256').update(gegeben).digest();
+  const b = createHash('sha256').update(geheim.trim()).digest();
+  return timingSafeEqual(a, b) ? person : null;
 }
