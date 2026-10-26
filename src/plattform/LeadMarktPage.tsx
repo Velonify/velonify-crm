@@ -15,7 +15,7 @@ import { HELPDESK_AUSWAHL, ladezeitLabel, regionLabel, REGIONEN, reichweiteLabel
  * takes one lead of the quota and copies the shop with its contact into the tenant's CRM.
  */
 export function LeadMarktPage() {
-  const { api, sicht, neuLaden } = useMandant();
+  const { api, sicht, neuLaden, zeigeBedingungen } = useMandant();
   const { refresh } = useCrm();
   const { show } = useToast();
   const navigate = useNavigate();
@@ -48,6 +48,10 @@ export function LeadMarktPage() {
   const setze = (aenderung: Partial<MarktFilter>) => setFilter((f) => ({ ...f, ...aenderung, seite: aenderung.seite ?? 1 }));
 
   const freischalten = async (id: string) => {
+    if (!mandant.bedingungen_am) {
+      zeigeBedingungen(true);
+      return;
+    }
     setFrei(id);
     try {
       const { firma_id, neu } = await api.freischalten(id);
@@ -56,6 +60,7 @@ export function LeadMarktPage() {
       await laden();
     } catch (err) {
       if (err instanceof PlattformApiFehler && err.status === 402) setBuchen(err.message);
+      else if (err instanceof PlattformApiFehler && err.status === 409) zeigeBedingungen(true);
       else show(err instanceof Error ? err.message : String(err), 'error');
       await laden();
     } finally {

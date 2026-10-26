@@ -27,6 +27,15 @@ describe('crm-api für Mandanten', { timeout: 60_000 }, () => {
     expect((kern.daten as { listen: { team: string[] } }).listen.team).toEqual(['Leon']);
   });
 
+  it('unlocks leads only after someone confirmed the trial terms for the team', async () => {
+    const { kontext, meldungen } = await aufbau();
+    expect((await behandleMandant('POST', '/leadmarkt/freischalten', { id: 'L-1' }, await kontext())).status).toBe(409);
+    expect((await behandleMandant('POST', '/bedingungen', {}, await kontext())).status).toBe(200);
+    expect(meldungen.at(-1)).toMatch(/leon@vennie.tech hat die Testbedingungen bestätigt/);
+    // Past the terms check: an unknown lead is the next thing that stops it.
+    expect((await behandleMandant('POST', '/leadmarkt/freischalten', { id: 'L-1' }, await kontext())).status).not.toBe(409);
+  });
+
   it('keeps the data view and Velonify routes closed', async () => {
     const { kontext } = await aufbau();
     expect((await behandleMandant('GET', '/tabelle/firmen', undefined, await kontext())).status).toBe(403);

@@ -12,6 +12,9 @@ interface MandantContextValue {
   /** Whether a tool shows up: tenants get what their package and switches allow, Velonify everything but the Lead-Markt. */
   erlaubt(werkzeug: string): boolean;
   istAdmin: boolean;
+  /** The trial terms dialog: open on arrival, closable with "Später", reopened when someone unlocks a lead. */
+  bedingungenOffen: boolean;
+  zeigeBedingungen(offen: boolean): void;
 }
 
 const MandantContext = createContext<MandantContextValue | null>(null);
@@ -25,6 +28,7 @@ export function MandantProvider({ children }: { children: ReactNode }) {
   const api = useMemo(() => new MandantApi(getToken), [getToken]);
   const [sicht, setSicht] = useState<MandantSicht | null>(null);
   const [fehler, setFehler] = useState<{ text: string; status?: number } | null>(null);
+  const [bedingungenOffen, zeigeBedingungen] = useState(true);
 
   const neuLaden = useCallback(async () => {
     if (!mandantenModus) return;
@@ -54,7 +58,10 @@ export function MandantProvider({ children }: { children: ReactNode }) {
     },
     [sicht, istAdmin],
   );
-  const value = useMemo(() => ({ sicht, api, neuLaden, erlaubt, istAdmin }), [sicht, api, neuLaden, erlaubt, istAdmin]);
+  const value = useMemo(
+    () => ({ sicht, api, neuLaden, erlaubt, istAdmin, bedingungenOffen, zeigeBedingungen }),
+    [sicht, api, neuLaden, erlaubt, istAdmin, bedingungenOffen],
+  );
 
   if (mandantenModus && !sicht) {
     return (

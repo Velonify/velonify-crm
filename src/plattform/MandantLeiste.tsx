@@ -181,11 +181,11 @@ export function FeedbackDialog({ anlass, onClose }: { anlass: FeedbackAnlass; on
   );
 }
 
-/** The trial terms, confirmed once per tenant before the first lead is unlocked. */
+/** The trial terms, confirmed once per tenant before the first lead is unlocked; until then everyone may look around. */
 function BedingungenDialog() {
-  const { api, sicht, neuLaden } = useMandant();
+  const { api, sicht, neuLaden, bedingungenOffen, zeigeBedingungen } = useMandant();
   const [busy, setBusy] = useState(false);
-  if (!sicht || sicht.mandant.bedingungen_am) return null;
+  if (!sicht || sicht.mandant.bedingungen_am || !bedingungenOffen) return null;
   const bestaetigen = async () => {
     setBusy(true);
     try {
@@ -196,7 +196,7 @@ function BedingungenDialog() {
     }
   };
   return (
-    <Dialog title={`Willkommen im ${sicht.mandant.name} Hub`} onClose={() => undefined} onSubmit={bestaetigen} submitLabel="Verstanden, los geht’s" busy={busy}>
+    <Dialog title={`Willkommen im ${sicht.mandant.name} Hub`} onClose={() => zeigeBedingungen(false)} onSubmit={bestaetigen} submitLabel="Verstanden, los geht’s" cancelLabel="Später" busy={busy}>
       <p>Schön, dass ihr den Hub testet. Drei Dinge vorab:</p>
       <ul className="bedingungen">
         <li>
@@ -207,7 +207,9 @@ function BedingungenDialog() {
         </li>
         <li>Was ihr selbst anlegt, gehört euch. Eure Daten liegen in einer eigenen Datenbank, die niemand sonst sieht.</li>
       </ul>
-      <p className="field-hint">Mit „Verstanden“ bestätigst du diese Testbedingungen für {sicht.mandant.name}.</p>
+      <p className="field-hint">
+        Mit „Verstanden“ bestätigst du diese Testbedingungen für das ganze Team von {sicht.mandant.name}. Umsehen geht auch ohne, vor dem ersten Lead fragen wir noch einmal.
+      </p>
     </Dialog>
   );
 }

@@ -8,13 +8,14 @@ interface Props {
   /** When set, the dialog is a form and Enter submits. */
   onSubmit?: () => void | Promise<void>;
   submitLabel?: string;
+  cancelLabel?: string;
   busy?: boolean;
   wide?: boolean;
   /** Extra buttons on the left of the footer, e.g. "Archivieren". */
   extraActions?: ReactNode;
 }
 
-export function Dialog({ title, children, onClose, onSubmit, submitLabel = 'Speichern', busy = false, wide = false, extraActions }: Props) {
+export function Dialog({ title, children, onClose, onSubmit, submitLabel = 'Speichern', cancelLabel, busy = false, wide = false, extraActions }: Props) {
   const titleId = useId();
   const ref = useRef<HTMLDivElement>(null);
   const latest = useRef({ busy, onClose });
@@ -55,7 +56,7 @@ export function Dialog({ title, children, onClose, onSubmit, submitLabel = 'Spei
       <footer className="dialog-actions">
         <div className="dialog-extra">{extraActions}</div>
         <button type="button" className="button" onClick={onClose} disabled={busy}>
-          {onSubmit ? 'Abbrechen' : 'Schließen'}
+          {cancelLabel ?? (onSubmit ? 'Abbrechen' : 'Schließen')}
         </button>
         {onSubmit && (
           <button type="submit" className="button primary" disabled={busy}>
