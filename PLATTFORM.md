@@ -55,7 +55,13 @@ Danach crm-api, shop-audit und contact-generator wie in ihren READMEs bauen und 
 - **crm-api:** `--set-env-vars` + `MANDANTEN_CLIENT_ID=<aus 1.>,CONTACT_GENERATOR_URL=<URL>,SHOP_AUDIT_URL=<URL>,ALLOWED_ORIGINS=https://crm.velonify.de,https://app.velonify.de,https://velonify.github.io` und `--set-secrets` + `PLATTFORM_TOKEN=plattform-token:latest`
 - **shop-audit** und **contact-generator:** `--set-secrets` + `PLATTFORM_TOKEN=plattform-token:latest`, `ALLOWED_ORIGINS` braucht app.velonify.de nicht (Mandanten kommen über crm-api).
 
-Lead-Markt-Pool einmal aufbauen: Hub → Plattform → Lead-Markt → „Pool neu aufbauen“, dann „Auffüllen“.
+Lead-Markt-Pool einmal aufbauen: Hub → Plattform → Lead-Markt → „Pool neu aufbauen“, dann „Auffüllen“. Ohne Hub geht beides auch lokal:
+
+```bash
+cd functions/shop-audit
+npx tsx scripts/markt-lokal.ts pool
+ANTHROPIC_API_KEY=$(gcloud secrets versions access latest --secret=anthropic-api-key --project=velonify-crm) npx tsx scripts/markt-lokal.ts fuellen 40 helpdesk
+```
 
 ### 4. app.velonify.de
 
@@ -111,7 +117,7 @@ jobs:
 ## Einen Tester aufnehmen
 
 1. Hub → Plattform → **Mandant anlegen** (Kennung, Paket Test, Google-Adresse des Inhabers). Der Test läuft ab heute 30 Tage.
-2. Datenbank `hub_<kennung>` anlegen und migrieren (Befehle auf der Seite des Mandanten).
+2. Datenbank anlegen und migrieren: `npx tsx scripts/mandant-db.ts <kennung>`, dann `npm run db:migrieren -- hub_<kennung>` (oder die SQL-Befehle auf der Seite des Mandanten).
 3. Lead-Markt: mindestens dreimal so viele freie Shops wie das Kontingent; optional 1–2 Köder-Leads mit einer eigenen Domain.
 4. Link schicken: **https://app.velonify.de** – Anmeldung mit genau dem eingetragenen Google-Konto.
 
