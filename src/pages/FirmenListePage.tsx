@@ -15,6 +15,7 @@ import { fortschritt } from '../data/selectors';
 import type { Firma } from '../data/types';
 import { passtTags, zahlJeTag } from '../data/tags';
 import { relativeDays } from '../lib/format';
+import { mandantenModus } from '../config';
 import { istZustaendig } from '../data/zustaendig';
 
 type SortKey = 'name' | 'status' | 'phase' | 'tier' | 'score' | 'branche' | 'ort' | 'zustaendig' | 'geaendert_am';
@@ -126,9 +127,12 @@ export function FirmenListePage() {
         subtitle={db ? `${visible.length} von ${activeCount} aktiven Firmen` : undefined}
         actions={
           <>
-            <Link to="/crm/linkedin" className="button">
-              Aus LinkedIn
-            </Link>
+            {/* LinkedIn profiles are read through Apify on Velonify's account: not for tenants. */}
+            {!mandantenModus && (
+              <Link to="/crm/linkedin" className="button">
+                Aus LinkedIn
+              </Link>
+            )}
             <Link to="/crm/firmen/neu" className="button primary">
               Firma anlegen
             </Link>

@@ -59,12 +59,15 @@ export interface PaketInfo {
   werkzeuge: string[];
 }
 
-/** Tools a tenant can ever get. Lead-Finder, Lead-Magnete and Social Media are Velonify's own and stay with us. */
-export const MANDANTEN_WERKZEUGE = ['home', 'crm', 'todo', 'kunden', 'angebote', 'contact', 'audit', 'leadmarkt'] as const;
+/**
+ * Tools a tenant can ever get. Lead-Finder, Lead-Magnete and Social Media are Velonify's own and stay with us; Kunden
+ * (client hub with Drive folders and the client portal) needs Google Drive and its own portal per tenant and follows later.
+ */
+export const MANDANTEN_WERKZEUGE = ['home', 'crm', 'todo', 'angebote', 'contact', 'audit', 'leadmarkt'] as const;
 
 export const PAKETE: Record<Paket, PaketInfo> = {
   test: { id: 'test', name: 'Test', preis: '30 Tage kostenlos', personen: 3, leads: 40, ki: 150, werkzeuge: [...MANDANTEN_WERKZEUGE] },
-  basis: { id: 'basis', name: 'Basis', preis: '149 € im Monat', personen: 3, leads: 0, ki: 50, werkzeuge: ['home', 'crm', 'todo', 'kunden', 'angebote'] },
+  basis: { id: 'basis', name: 'Basis', preis: '149 € im Monat', personen: 3, leads: 0, ki: 50, werkzeuge: ['home', 'crm', 'todo', 'angebote'] },
   pro: { id: 'pro', name: 'Pro', preis: '349 € im Monat', personen: 10, leads: 150, ki: 500, werkzeuge: [...MANDANTEN_WERKZEUGE] },
   agentur: { id: 'agentur', name: 'Agentur', preis: 'ab 699 € im Monat', personen: null, leads: 400, ki: 1500, werkzeuge: [...MANDANTEN_WERKZEUGE] },
 };

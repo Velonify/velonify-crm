@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { isDemo } from '../config';
+import { isDemo, mandantenModus } from '../config';
+import { Gesperrt, MandantLeiste } from '../plattform/MandantLeiste';
+import { useMandant } from '../plattform/MandantContext';
 import { useCrm } from '../data/CrmContext';
 import { zeigeStart } from '../data/ansicht';
 import { kundenListe } from '../data/kunden';
@@ -30,8 +32,25 @@ export function Layout() {
   }, [gefunden]);
   const werkzeug = gefunden ?? zuletzt;
   useEffect(() => {
-    document.title = seitentitel(werkzeug);
+    document.title = seitentitel(werkzeug, mandantenModus);
   }, [werkzeug]);
+  const { erlaubt, api, sicht } = useMandant();
+  // Tenants: which tool was opened, once per tool and session, for the usage in the admin tool.
+  useEffect(() => {
+    if (!sicht || !gefunden) return;
+    const schluessel = `velonify-hub.genutzt.${gefunden.id}`;
+    try {
+      if (sessionStorage.getItem(schluessel)) return;
+      sessionStorage.setItem(schluessel, '1');
+    } catch {
+      return;
+    }
+    void api.nutzung(gefunden.id).catch(() => undefined);
+  }, [sicht, gefunden, api]);
+  // Pages of a tool that is off (tenant package, admin tool) and Velonify-only pages are closed, not just hidden.
+  const gesperrt =
+    (gefunden && !erlaubt(gefunden.id)) ||
+    (mandantenModus && (pathname.startsWith('/einrichtung') || pathname === '/kalender' || pathname.startsWith('/crm/linkedin') || pathname.startsWith('/kunden')));
   // The soft styles also reach what renders outside the frame: side sheet, dialogs and portals on body.
   useEffect(() => {
     document.documentElement.classList.add('soft');
@@ -48,7 +67,7 @@ export function Layout() {
   useEffect(() => setMenue(false), [pathname]);
 
   const kunden = gefunden?.id === 'kunden' && db ? kundenListe(db) : [];
-  const reiter = gefunden ? gefunden.navigation.filter((n) => !n.versteckt && (n.pfad !== '/wort' || zeigeStart(ansicht, 'wort') || pathname === '/wort')) : [];
+  const reiter = gefunden ? gefunden.navigation.filter((n) => !n.versteckt && !(mandantenModus && ['/kalender', '/crm/anfragen'].includes(n.pfad)) && (n.pfad !== '/wort' || zeigeStart(ansicht, 'wort') || pathname === '/wort')) : [];
 
   return (
     <PraesenzProvider>
@@ -67,7 +86,7 @@ export function Layout() {
               <span className="brand-zeichen">
                 <img src="./zeichen-eisblau.png" alt="" />
               </span>
-              <span className="brand-wort">Velonify</span>
+              <span className="brand-wort">{mandantenModus ? 'Velonify Hub' : 'Velonify'}</span>
             </Link>
           </header>
 
@@ -95,9 +114,8 @@ export function Layout() {
                   <DemoLeiste />
                 </Suspense>
               )}
-              <Seitenrahmen schluessel={pathname}>
-                <Outlet />
-              </Seitenrahmen>
+              {mandantenModus && <MandantLeiste />}
+              <Seitenrahmen schluessel={pathname}>{gesperrt ? <Gesperrt titel={gefunden?.name ?? 'Nicht verfügbar'} /> : <Outlet />}</Seitenrahmen>
             </main>
           </div>
 

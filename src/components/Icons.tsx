@@ -19,6 +19,8 @@ const PFADE: Record<string, string> = {
   haken: 'M4 10.5l4 4 8-9',
   regler: 'M3 5h7M14 5h3M3 10h2M9 10h8M3 15h9M16 15h1M12 3v4M7 8v4M14 13v4',
   eingang: 'M2.5 11h4.5l1.5 2.5h3L13 11h4.5M2.5 11 5 4h10l2.5 7v5h-15z',
+  plattform: 'M3 3h14v5H3zM3 12h14v5H3zM6 5.5h1M6 14.5h1',
+  schloss: 'M5 9h10v8H5zM7 9V6a3 3 0 0 1 6 0v3',
 };
 
 export function WerkzeugIcon({ id }: { id: string }) {

@@ -14,6 +14,8 @@ import { useIch } from '../lib/useIch';
 import { useTheme } from '../lib/useTheme';
 import { useTodoDaten } from '../todo/useTodoDaten';
 import { LEISTE, leistenEintragFuerPfad, type LeistenZahl } from '../werkzeuge';
+import { mandantenModus } from '../config';
+import { useMandant } from '../plattform/MandantContext';
 import { Glocke } from './Glocke';
 import { WerkzeugIcon } from './Icons';
 import { Suche } from './Suche';
@@ -63,7 +65,8 @@ export function Seitenleiste({ offen }: { offen: boolean }) {
   const { pathname } = useLocation();
   const zahlen = useZahlen();
   const aktiv = leistenEintragFuerPfad(pathname);
-  const gruppen = LEISTE.map((g) => ({ ...g, eintraege: g.eintraege.filter((e) => !ansicht.ausgeblendet.includes(e.werkzeug)) })).filter((g) => g.eintraege.length > 0);
+  const { erlaubt } = useMandant();
+  const gruppen = LEISTE.map((g) => ({ ...g, eintraege: g.eintraege.filter((e) => erlaubt(e.werkzeug) && !ansicht.ausgeblendet.includes(e.werkzeug)) })).filter((g) => g.eintraege.length > 0);
 
   return (
     <aside className={`seitenleiste glass${offen ? ' is-offen' : ''}`} aria-label="Navigation">
@@ -72,7 +75,7 @@ export function Seitenleiste({ offen }: { offen: boolean }) {
           <span className="brand-zeichen">
             <img src="./zeichen-eisblau.png" alt="" />
           </span>
-          <span className="brand-wort">Velonify</span>
+          <span className="brand-wort">{mandantenModus ? 'Velonify Hub' : 'Velonify'}</span>
         </Link>
         <Glocke />
       </div>

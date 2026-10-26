@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { config } from '../config';
+import { config, mandantenModus } from '../config';
 import { useTheme } from '../lib/useTheme';
 
 export function LoginPage() {
@@ -23,17 +23,17 @@ export function LoginPage() {
           <span className="wordmark">Velonify</span>
         </div>
         <p className="login-claim">Klein im Team. Groß im Anspruch.</p>
-        <p className="login-note">Intern · Nur für das Velonify-Team</p>
+        <p className="login-note">{mandantenModus ? 'Velonify Hub · Für eingeladene Teams' : 'Intern · Nur für das Velonify-Team'}</p>
       </section>
       <main className="login-main">
         <div className="login-card">
           <div className="eyebrow-mark">Anmeldung</div>
-          <h1>Velonify intern</h1>
-          <p className="lead-text">CRM, Kunden und interne Werkzeuge an einem Ort.</p>
+          <h1>{mandantenModus ? 'Velonify Hub' : 'Velonify intern'}</h1>
+          <p className="lead-text">{mandantenModus ? 'Leads, Pipeline und Anschreiben an einem Ort.' : 'CRM, Kunden und interne Werkzeuge an einem Ort.'}</p>
           <button type="button" className="button primary large" onClick={handleClick} disabled={!googleReady || busy}>
             {busy ? 'Anmeldung läuft …' : googleReady ? 'Mit Google anmelden' : 'Google-Anmeldung wird geladen …'}
           </button>
-          <p className="hint">Nur für Konten mit @{config.allowedDomain}</p>
+          <p className="hint">{mandantenModus ? 'Mit dem Google-Konto, für das ihr eingeladen wurdet.' : `Nur für Konten mit @${config.allowedDomain}`}</p>
           {error && (
             <p className="alert error" role="alert">
               {error}

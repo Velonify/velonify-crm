@@ -1,12 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { config, isDemo } from '../config';
+import { config, isDemo, mandantenModus } from '../config';
 import { useToast } from '../components/Toasts';
 import { errorMessage } from '../lib/errors';
 import { CrmService } from './crm';
 import { AuthExpiredError } from './errors';
 import { GoogleCalendar } from './google/calendar';
 import { GoogleDrive } from './google/drive';
+import { ohneDrive, ohneKalender } from './google/ohneGoogle';
 import { ApiStore } from './api/apiStore';
 import { SheetsClient } from './sheets/sheetsClient';
 import type { Database } from './types';
@@ -57,10 +58,10 @@ export function CrmProvider({ children }: { children: ReactNode }) {
       // The data lives in Postgres behind crm-api; the Sheets client is only used for the offer calculations.
       const service = new CrmService({
         store: new ApiStore(config.crmApiUrl, getToken),
-        drive: new GoogleDrive(getToken),
-        calendar: new GoogleCalendar(getToken),
+        drive: mandantenModus ? ohneDrive : new GoogleDrive(getToken),
+        calendar: mandantenModus ? ohneKalender : new GoogleCalendar(getToken),
         currentUser: userEmail,
-        tabelle: (spreadsheetId) => new SheetsClient(spreadsheetId, getToken),
+        tabelle: mandantenModus ? undefined : (spreadsheetId) => new SheetsClient(spreadsheetId, getToken),
         ich: gemerktesIch,
       });
       setBackend({ service });

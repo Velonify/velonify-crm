@@ -25,6 +25,10 @@ import { useKundenDaten } from '../kunden/useKundenDaten';
 import { useTodoDaten } from '../todo/useTodoDaten';
 import { istZustaendig } from '../data/zustaendig';
 import { zeigeStart } from '../data/ansicht';
+import { mandantenModus } from '../config';
+
+/** Start sections tenants do not get (see config.mandantenModus). */
+const OHNE_MANDANT: string[] = ['kalender', 'kunden', 'dateiname'];
 import { useAnsicht } from '../lib/useAnsicht';
 
 const MAX_AUFGABEN = 5;
@@ -310,7 +314,8 @@ export function StartPage() {
   const eingang = useEingang();
   const [ich] = useIch(db?.listen.team ?? []);
   const { ansicht } = useAnsicht();
-  const zeige = (b: Parameters<typeof zeigeStart>[1]) => zeigeStart(ansicht, b);
+  // Tenants have no Google calendar, no Shared Drive and no client hub.
+  const zeige = (b: Parameters<typeof zeigeStart>[1]) => !(mandantenModus && OHNE_MANDANT.includes(b)) && zeigeStart(ansicht, b);
   const heute = isoDate(new Date());
 
   const cockpit = useMemo(() => {

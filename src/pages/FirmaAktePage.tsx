@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { AuditKarte } from '../audit/AuditKarte';
 import { DealsKarte, KontakteKarte, VerlaufKarte, WiedervorlagenKarte } from '../components/akte/AkteKarten';
 import { DriveKarte, TermineKarte } from '../components/akte/GoogleKarten';
+import { mandantenModus } from '../config';
 import { usePhaseChange } from '../components/dialogs/PhaseChange';
 import { brancheLabel } from '../data/branchen';
 import { TagListe } from '../components/TagFilter';
@@ -179,8 +180,9 @@ export function FirmaAktePage() {
         <div className="akte-side">
           <KontakteKarte firma={f} db={db} />
           <AuditKarte firma={f} />
-          <TermineKarte firma={f} db={db} />
-          <DriveKarte firma={f} db={db} />
+          {/* Appointments and folders live in Google; tenants sign in without calendar and Drive. */}
+          {!mandantenModus && <TermineKarte firma={f} db={db} />}
+          {!mandantenModus && <DriveKarte firma={f} db={db} />}
           <Card title="Firmendaten">
             <dl className="items">
               <Item label="Zuständig">{f.zustaendig}</Item>
