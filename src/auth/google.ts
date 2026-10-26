@@ -81,7 +81,8 @@ export function requestToken(options: { clientId: string; scopes: string[]; doma
           return;
         }
         const apiScopes = options.scopes.filter((scope) => scope.startsWith('https://'));
-        if (!oauth2.hasGrantedAllScopes(response, ...apiScopes)) {
+        // Tenants ask for no API scopes; Google answers "not granted" when asked about none.
+        if (apiScopes.length > 0 && !oauth2.hasGrantedAllScopes(response, ...apiScopes)) {
           oauth2.revoke(response.access_token);
           reject(new Error('Bitte bei der Anmeldung alle Berechtigungen erlauben – ohne Drive, Sheets und Kalender fehlen Kundenordner, Kalkulationen und Termine.'));
           return;
