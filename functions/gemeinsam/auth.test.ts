@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Limit, pruefeGoogleToken, ZugriffsFehler } from './auth';
+import { Limit, plattformPerson, pruefeGoogleKonto, pruefeGoogleToken, ZugriffsFehler } from './auth';
 
 const CLIENT_ID = 'client-123.apps.googleusercontent.com';
 
@@ -58,5 +58,24 @@ describe('Limit', () => {
     expect(limit.erlaubt('a', 20)).toBe(false);
     expect(limit.erlaubt('b', 20)).toBe(true);
     expect(limit.erlaubt('a', 1011)).toBe(true);
+  });
+});
+
+describe('pruefeGoogleKonto', () => {
+  it('returns any verified address with the client it belongs to, for the tenants of the hub', async () => {
+    const f = fakeFetch({ azp: 'mandanten-9', email: 'Leon@Vennie.tech', email_verified: true, expires_in: 3000 }).f;
+    await expect(pruefeGoogleKonto('k1', { clientId: `${CLIENT_ID},mandanten-9`, fetch: f })).resolves.toEqual({ email: 'leon@vennie.tech', client: 'mandanten-9' });
+    const unbestaetigt = fakeFetch({ aud: CLIENT_ID, email: 'a@gmail.com', email_verified: 'false' }).f;
+    await expect(pruefeGoogleKonto('k2', { clientId: CLIENT_ID, fetch: unbestaetigt })).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe('plattformPerson', () => {
+  const kopf = (werte: Record<string, string>) => (name: string) => werte[name];
+  it('trusts the forwarded person only with the right secret', () => {
+    expect(plattformPerson(kopf({ 'x-velonify-plattform': 'geheim', 'x-velonify-person': 'Leon@vennie.tech' }), 'geheim')).toBe('leon@vennie.tech');
+    expect(plattformPerson(kopf({ 'x-velonify-plattform': 'falsch', 'x-velonify-person': 'leon@vennie.tech' }), 'geheim')).toBeNull();
+    expect(plattformPerson(kopf({ 'x-velonify-plattform': 'geheim', 'x-velonify-person': 'leon@vennie.tech' }), '')).toBeNull();
+    expect(plattformPerson(kopf({}), 'geheim')).toBeNull();
   });
 });

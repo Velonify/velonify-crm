@@ -77,7 +77,7 @@ describe('PlattformStore', () => {
     expect(db.deals[0]).toMatchObject({ firma_id, phase: 'neu', titel: 'Lead-Markt' });
 
     // A second click returns the same firm without counting again.
-    expect(await plattform.freischalten(zugang, m, lead.id, vennie.pool)).toEqual({ firma_id, neu: false });
+    expect(await plattform.freischalten(zugang, m, lead.id, vennie.pool)).toEqual({ firma_id, neu: false, koeder: null });
     expect(await plattform.leadsVerbraucht(m)).toBe(1);
     expect((await plattform.markt('vennie', {})).gesamt).toBe(0);
     expect((await plattform.markt('andere', {})).gesamt).toBe(0);

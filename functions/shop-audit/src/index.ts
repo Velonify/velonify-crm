@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { messeShop } from './audit.js';
 import { AUSGABE_SCHEMA, AusgabeSchema, nutzerNachricht, pruefeAufhaenger, SYSTEM_PROMPT, type Aufhaenger } from './aufhaenger.js';
-import { Limit, pruefeGoogleToken, ZugriffsFehler } from '../../gemeinsam/auth';
+import { Limit, plattformPerson, pruefeGoogleToken, ZugriffsFehler } from '../../gemeinsam/auth';
 import { DomainFehler, ladeSeite, normalisiereDomain } from './laden.js';
 import { pagespeed } from './pagespeed.js';
 import { katalog } from './technik.js';
@@ -98,7 +98,11 @@ functions.http('shopAudit', async (req, res) => {
   if (!CLIENT_ID) return fehler(500, 'GOOGLE_CLIENT_ID ist nicht gesetzt.');
 
   let email: string;
-  try {
+  // Tenants of the hub come through crm-api, which checked their login and quota; they only get these paths.
+  const mandant = plattformPerson((name) => req.get(name));
+  if (mandant && !/^\/?$|^\/ergebnis\/?$/.test(req.path)) return fehler(403, 'Nur für Velonify.');
+  if (mandant) email = mandant;
+  else try {
     const token = (req.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
     if (!token) return fehler(401, 'Nicht angemeldet.');
     email = await pruefeGoogleToken(token, { clientId: CLIENT_ID, domain: DOMAIN });
