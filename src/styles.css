@@ -1530,3 +1530,13 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
 .gesundheit { font-weight: 700; }
 .gesundheit.is-warn { color: var(--warn); }
 .gesundheit.is-gut { color: var(--ok); }
+
+/* Login des Mandanten-Hubs: Claim, drei Punkte, Recht unten */
+.login-hub { display: flex; flex-direction: column; gap: var(--space-4); }
+.login-hub .login-claim { font-size: clamp(32px, 3.6vw, 60px); }
+.login-punkte { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); max-width: 520px; }
+.login-punkte li { display: grid; gap: 4px; padding-left: 16px; border-left: 2px solid var(--eisblau); }
+.login-punkte strong { font-size: 15px; letter-spacing: 0.02em; }
+.login-punkte span { font-size: 15px; line-height: 1.5; color: var(--on-band-muted); }
+.login-recht a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 760px) { .login-punkte { display: none; } }
