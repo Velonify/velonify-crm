@@ -475,7 +475,7 @@ export class PlattformStore {
   async mandantDetail(id: string) {
     const m = await this.mandant(id);
     if (!m) throw new PlattformFehler('Unbekannter Mandant.', 404);
-    const [zugaenge, nutzung, feedback, freigaben, werkzeuge] = await Promise.all([
+    const [zugaenge, nutzung, feedback, freigaben, werkzeuge, db] = await Promise.all([
       this.db.query('SELECT * FROM plattform_zugaenge WHERE mandant_id = $1 ORDER BY angelegt_am', [id]),
       this.db.query('SELECT art, email, detail, am FROM plattform_nutzung WHERE mandant_id = $1 ORDER BY am DESC LIMIT 200', [id]),
       this.db.query('SELECT anlass, email, wert, text, am FROM plattform_feedback WHERE mandant_id = $1 ORDER BY am DESC', [id]),
@@ -484,6 +484,8 @@ export class PlattformStore {
         `SELECT detail, count(*) AS n FROM plattform_nutzung WHERE mandant_id = $1 AND art = 'seite' GROUP BY detail ORDER BY n DESC`,
         [id],
       ),
+      // The tenant's database is created by hand (scripts/mandant-db.ts); the admin page shows whether that happened.
+      this.db.query('SELECT 1 FROM pg_database WHERE datname = $1', [`hub_${id}`]),
     ]);
     const zeit = (z: Record<string, unknown>) => ({ ...z, am: text(z.am) });
     return {
@@ -493,6 +495,7 @@ export class PlattformStore {
       feedback: feedback.rows.map(zeit),
       freigaben: freigaben.rows.map(zeit),
       werkzeuge_genutzt: werkzeuge.rows.map((w) => ({ werkzeug: w.detail, aufrufe: Number(w.n) })),
+      datenbank: db.rows.length > 0,
     };
   }
 
