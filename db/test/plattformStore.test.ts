@@ -25,7 +25,8 @@ async function aufbau(jetzt = JETZT) {
   return { crm, plattform, vennie, zugang };
 }
 
-describe('PlattformStore', () => {
+// Two PGlite databases per test (platform and tenant) take a few seconds each on CI runners.
+describe('PlattformStore', { timeout: 60_000 }, () => {
   it('starts a 30-day trial today and finds the login case-insensitively, inactive logins do not count', async () => {
     const { plattform } = await aufbau();
     const gefunden = await plattform.zugang('leon@vennie.tech');
