@@ -13,6 +13,8 @@ import { SheetsClient } from './sheets/sheetsClient';
 import type { Database } from './types';
 import { read as gemerktesIch } from '../lib/useIch';
 import { leereLadeCache } from '../lib/useLoad';
+import { useMandant } from '../plattform/MandantContext';
+import { internesBoardTitel } from './todos';
 
 interface CrmContextValue {
   service: CrmService | null;
@@ -36,6 +38,8 @@ const REFRESH_ON_FOCUS_AFTER_MS = 30_000;
 
 export function CrmProvider({ children }: { children: ReactNode }) {
   const { getToken, userEmail, expire } = useAuth();
+  // The tenant's hub only renders once its view is loaded, so the name is there before the service is built.
+  const mandantName = useMandant().sicht?.mandant.name ?? null;
   const toast = useToast();
   const [backend, setBackend] = useState<{ service: CrmService } | null>(null);
   const [db, setDb] = useState<Database | null>(null);
@@ -63,13 +67,14 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         currentUser: userEmail,
         tabelle: mandantenModus ? undefined : (spreadsheetId) => new SheetsClient(spreadsheetId, getToken),
         ich: gemerktesIch,
+        internesBoard: internesBoardTitel(mandantName),
       });
       setBackend({ service });
     }
     return () => {
       cancelled = true;
     };
-  }, [getToken, userEmail]);
+  }, [getToken, userEmail, mandantName]);
 
   const refresh = useCallback(async () => {
     if (!backend) return;

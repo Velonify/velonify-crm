@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { isDemo, mandantenModus } from '../config';
 import { Gesperrt, MandantLeiste } from '../plattform/MandantLeiste';
-import { useMandant } from '../plattform/MandantContext';
+import { useMandant, useMarke } from '../plattform/MandantContext';
 import { useCrm } from '../data/CrmContext';
 import { zeigeStart } from '../data/ansicht';
 import { kundenListe } from '../data/kunden';
@@ -31,10 +31,11 @@ export function Layout() {
     if (gefunden) setZuletzt(gefunden);
   }, [gefunden]);
   const werkzeug = gefunden ?? zuletzt;
-  useEffect(() => {
-    document.title = seitentitel(werkzeug, mandantenModus);
-  }, [werkzeug]);
   const { erlaubt, api, sicht } = useMandant();
+  const marke = useMarke();
+  useEffect(() => {
+    document.title = seitentitel(werkzeug, mandantenModus ? marke : undefined);
+  }, [werkzeug, marke]);
   // Tenants: which tool was opened, once per tool and session, for the usage in the admin tool.
   useEffect(() => {
     if (!sicht || !gefunden) return;
@@ -86,7 +87,7 @@ export function Layout() {
               <span className="brand-zeichen">
                 <img src="./zeichen-eisblau.png" alt="" />
               </span>
-              <span className="brand-wort">{mandantenModus ? 'Velonify Hub' : 'Velonify'}</span>
+              <span className="brand-wort">{marke}</span>
             </Link>
           </header>
 

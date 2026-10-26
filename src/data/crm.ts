@@ -158,6 +158,8 @@ export interface CrmDeps {
   ich?: () => string | null | undefined;
   /** Called with new @-mentions after they are saved, e.g. to send them to Slack (crm-mcp). Errors are only logged. */
   erwaehnt?: (erwaehnungen: Erwaehnung[]) => Promise<void>;
+  /** Title of the internal board; a tenant's hub names it after the tenant ("vennie intern"). */
+  internesBoard?: string;
 }
 
 export interface KalkulationsErgebnis {
@@ -242,6 +244,7 @@ export class CrmService {
   private readonly tabelle?: (spreadsheetId: string) => SheetsApi;
   private readonly ich?: () => string | null | undefined;
   private readonly erwaehnt?: (erwaehnungen: Erwaehnung[]) => Promise<void>;
+  private readonly internesBoard: string;
 
   constructor(deps: CrmDeps) {
     this.stand = new Stand(deps.store);
@@ -253,6 +256,7 @@ export class CrmService {
     this.tabelle = deps.tabelle;
     this.ich = deps.ich;
     this.erwaehnt = deps.erwaehnt;
+    this.internesBoard = deps.internesBoard || INTERNES_BOARD_TITEL;
   }
 
   load(): Promise<Database> {
@@ -1167,8 +1171,26 @@ export class CrmService {
     const { boards } = await this.store.loadTodoDaten();
     const vorhanden = boardVon(boards, firmaId);
     if (vorhanden) return vorhanden;
-    const titel = firmaId ? boardTitelFuer(CrmService.find((await this.stand.daten()).firmen, firmaId)) : INTERNES_BOARD_TITEL;
+    const titel = firmaId ? boardTitelFuer(CrmService.find((await this.stand.daten()).firmen, firmaId)) : this.internesBoard;
     const board: Board = { id: newId(ID_PREFIX.boards), firma_id: firmaId, titel, spalten: JSON.stringify(STANDARD_SPALTEN), archiviert: false, ...this.created() };
+    await this.store.insert('boards', [board]);
+    return board;
+  }
+
+  /**
+   * A further board without a client, e.g. "Vertrieb" or "Onboarding". It belongs to no firm like the internal board;
+   * the internal board stays the first of them, so "intern" keeps meaning the same board.
+   */
+  async neuesBoard(titel: string): Promise<Board> {
+    const name = titel.trim();
+    if (!name) throw new ValidationError('titel', 'Das Board braucht einen Namen.');
+    const { boards } = await this.store.loadTodoDaten();
+    if (boards.some((b) => !b.archiviert && b.titel.trim().toLowerCase() === name.toLowerCase())) {
+      throw new ValidationError('titel', `Ein Board „${name}“ gibt es schon.`);
+    }
+    // Without an internal board yet, it is created first, so a free board never takes over its role.
+    if (!boardVon(boards, '')) await this.boardFuer('');
+    const board: Board = { id: newId(ID_PREFIX.boards), firma_id: '', titel: name, spalten: JSON.stringify(STANDARD_SPALTEN), archiviert: false, ...this.created() };
     await this.store.insert('boards', [board]);
     return board;
   }

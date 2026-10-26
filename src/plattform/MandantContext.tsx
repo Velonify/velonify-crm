@@ -85,6 +85,12 @@ export function MandantProvider({ children }: { children: ReactNode }) {
   return <MandantContext.Provider value={value}>{children}</MandantContext.Provider>;
 }
 
+/** Brand at the top left: "Velonify" in our hub, "<tenant> Hub" in a tenant's. */
+export function useMarke(): string {
+  const { sicht } = useMandant();
+  return mandantenModus ? `${sicht?.mandant.name ?? 'Velonify'} Hub` : 'Velonify';
+}
+
 export function useMandant(): MandantContextValue {
   const context = useContext(MandantContext);
   if (!context) throw new Error('useMandant must be used inside MandantProvider');

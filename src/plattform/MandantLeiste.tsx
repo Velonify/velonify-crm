@@ -196,7 +196,7 @@ function BedingungenDialog() {
     }
   };
   return (
-    <Dialog title="Willkommen im Velonify Hub" onClose={() => undefined} onSubmit={bestaetigen} submitLabel="Verstanden, los geht’s" busy={busy}>
+    <Dialog title={`Willkommen im ${sicht.mandant.name} Hub`} onClose={() => undefined} onSubmit={bestaetigen} submitLabel="Verstanden, los geht’s" busy={busy}>
       <p>Schön, dass ihr den Hub testet. Drei Dinge vorab:</p>
       <ul className="bedingungen">
         <li>

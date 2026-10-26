@@ -14,8 +14,7 @@ import { useIch } from '../lib/useIch';
 import { useTheme } from '../lib/useTheme';
 import { useTodoDaten } from '../todo/useTodoDaten';
 import { LEISTE, leistenEintragFuerPfad, type LeistenZahl } from '../werkzeuge';
-import { mandantenModus } from '../config';
-import { useMandant } from '../plattform/MandantContext';
+import { useMandant, useMarke } from '../plattform/MandantContext';
 import { Glocke } from './Glocke';
 import { WerkzeugIcon } from './Icons';
 import { Suche } from './Suche';
@@ -66,16 +65,17 @@ export function Seitenleiste({ offen }: { offen: boolean }) {
   const zahlen = useZahlen();
   const aktiv = leistenEintragFuerPfad(pathname);
   const { erlaubt } = useMandant();
+  const marke = useMarke();
   const gruppen = LEISTE.map((g) => ({ ...g, eintraege: g.eintraege.filter((e) => erlaubt(e.werkzeug) && !ansicht.ausgeblendet.includes(e.werkzeug)) })).filter((g) => g.eintraege.length > 0);
 
   return (
     <aside className={`seitenleiste glass${offen ? ' is-offen' : ''}`} aria-label="Navigation">
       <div className="leiste-kopf">
-        <Link to="/" className="leiste-marke" aria-label="Velonify Hub – Home">
+        <Link to="/" className="leiste-marke" aria-label={`${marke} – Home`}>
           <span className="brand-zeichen">
             <img src="./zeichen-eisblau.png" alt="" />
           </span>
-          <span className="brand-wort">{mandantenModus ? 'Velonify Hub' : 'Velonify'}</span>
+          <span className="brand-wort">{marke}</span>
         </Link>
         <Glocke />
       </div>

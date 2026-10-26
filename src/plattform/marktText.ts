@@ -22,3 +22,12 @@ export const ladezeitLabel = (ms: number | null) => (ms ? `${(ms / 1000).toLocal
 
 /** Helpdesks the filter offers, in the order tenants ask for them. */
 export const HELPDESK_AUSWAHL = ['Zendesk', 'Gorgias', 'Freshdesk', 'Richpanel', 'Tidio', 'Intercom', 'Userlike', 'LiveChat', 'Trengo', 'eDesk'];
+
+/** Payment methods as the shop check stores them ("apple_pay") → how people write them. */
+const ZAHLARTEN: Record<string, string> = {
+  paypal: 'PayPal', klarna: 'Klarna', apple_pay: 'Apple Pay', google_pay: 'Google Pay', amazon_pay: 'Amazon Pay', shop_pay: 'Shop Pay',
+  sofort: 'Sofort', giropay: 'giropay', kreditkarte: 'Kreditkarte', vorkasse: 'Vorkasse', rechnung: 'Rechnung', lastschrift: 'Lastschrift',
+  sepa: 'SEPA', mollie: 'Mollie', stripe: 'Stripe', unzer: 'Unzer', ratepay: 'Ratepay', billie: 'Billie', twint: 'TWINT',
+};
+
+export const zahlartLabel = (id: string) => ZAHLARTEN[id] ?? id.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
