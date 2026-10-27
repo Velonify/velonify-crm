@@ -1,5 +1,5 @@
 import type { EntityTab } from './schema';
-import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Erwaehnung, KundenDaten, PortalDaten, TodoDaten, MagnetDaten, MonsteraEintrag, SocialDaten, SpieleDaten, WordleErgebnis } from './types';
+import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Erwaehnung, KundenDaten, PortalDaten, TodoDaten, WhiteboardDaten, MagnetDaten, MonsteraEintrag, SocialDaten, SpieleDaten, WordleErgebnis } from './types';
 
 export interface RecordUpdate<T> {
   id: string;
@@ -40,6 +40,8 @@ export interface Store {
   loadErwaehnungen(): Promise<Erwaehnung[]>;
   /** Logins, client tools and roadmap of the client portal. Throws SchemaError while the tabs are not set up. */
   loadPortalDaten(): Promise<PortalDaten>;
+  /** Whiteboards and their comments (without the drawings). Throws SchemaError while the tabs are not set up. */
+  loadWhiteboardDaten(): Promise<WhiteboardDaten>;
   /** Forget which tabs exist, after the setup created new ones. */
   vergissStruktur(): void;
   insert<K extends EntityTab>(tab: K, records: EntityMap[K][]): Promise<void>;

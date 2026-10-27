@@ -28,6 +28,8 @@ export const ID_PREFIX = {
   kunden_links: 'KL',
   kunden_news: 'KN',
   boards: 'B',
+  whiteboards: 'WB',
+  whiteboard_kommentare: 'WK',
   aufgaben: 'T',
   aufgaben_kommentare: 'TK',
   erwaehnungen: 'ER',

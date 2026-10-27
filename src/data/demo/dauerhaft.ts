@@ -2,6 +2,7 @@ import type { LeadFinderZustand } from './leadFinderDemo';
 import { demoLeadFinder } from './leadFinderDemo';
 import { createDemoBackend, stelleDemoHer, type DemoBackend, type DemoDaten } from './seed';
 import { ladeGespeichert, speichere } from './speicher';
+import { runSetup } from '../sheets/setup';
 
 /** Raised when the shape of the sample data changes: older saved copies are then dropped. */
 export const STAND_VERSION = 2;
@@ -33,6 +34,8 @@ export async function starteDemo(currentUser: () => string): Promise<DemoBackend
   let backend: DemoBackend;
   if (istGueltig(gespeichert)) {
     backend = stelleDemoHer(currentUser, gespeichert);
+    // Copies saved before a tool got new tabs (e.g. the whiteboard) get them added, without touching the rest.
+    await runSetup(backend.sheets);
     leadFinder.stelleHer(gespeichert.leadFinder);
   } else {
     backend = await createDemoBackend(currentUser, { schaufenster: true });

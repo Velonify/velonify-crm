@@ -1,4 +1,4 @@
-import { type TabSchema, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, EINGANG_TABS, ENTITY_TABS, KUNDEN_TABS, MAGNET_TABS, MONSTERA_TABS, PORTAL_TABS, SCHEMA, SOCIAL_TABS, TODO_TABS, ERWAEHNUNGEN_TABS, WORDLE_TABS, type TabName } from './schema';
+import { type TabSchema, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, EINGANG_TABS, ENTITY_TABS, KUNDEN_TABS, MAGNET_TABS, MONSTERA_TABS, PORTAL_TABS, SCHEMA, SOCIAL_TABS, TODO_TABS, WHITEBOARD_TABS, ERWAEHNUNGEN_TABS, WORDLE_TABS, type TabName } from './schema';
 
 /** Rules of the data view (Einrichtung → Daten): which tables, which fields may be edited, search, CSV, undo. */
 
@@ -14,6 +14,7 @@ export const TABELLEN_GRUPPEN: { titel: string; tabs: readonly TabName[] }[] = [
   { titel: 'Lead-Magnete', tabs: MAGNET_TABS },
   { titel: 'Social Media', tabs: SOCIAL_TABS },
   { titel: 'Kunden und To-dos', tabs: [...KUNDEN_TABS, ...TODO_TABS, ...ERWAEHNUNGEN_TABS, ...PORTAL_TABS] },
+  { titel: 'Whiteboard', tabs: WHITEBOARD_TABS },
   { titel: 'Team-Spiele', tabs: [...WORDLE_TABS, ...MONSTERA_TABS] },
 ];
 

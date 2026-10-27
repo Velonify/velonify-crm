@@ -1,7 +1,7 @@
 import { ConflictError, NotFoundError, SchemaError } from '../errors';
-import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, EINGANG_TABS, ERWAEHNUNGEN_TABS, KUNDEN_TABS, LISTEN_DEFAULTS, MAGNET_TABS, SCHEMA, MONSTERA_TABS, PORTAL_TABS, SOCIAL_TABS, TODO_TABS, WORDLE_TABS, type EntityTab, type TabSchema } from '../schema';
+import { ENTITY_TABS, ANGEBOTS_TABS, AUDIT_TABS, CONTACT_TABS, EINGANG_TABS, ERWAEHNUNGEN_TABS, KUNDEN_TABS, LISTEN_DEFAULTS, MAGNET_TABS, SCHEMA, MONSTERA_TABS, PORTAL_TABS, SOCIAL_TABS, TODO_TABS, WHITEBOARD_TABS, WORDLE_TABS, type EntityTab, type TabSchema } from '../schema';
 import type { RecordUpdate, Store } from '../store';
-import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Erwaehnung, KundenDaten, Listen, PortalDaten, TodoDaten, MagnetDaten, MonsteraEintrag, SocialDaten, SpieleDaten, WordleErgebnis } from '../types';
+import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Erwaehnung, KundenDaten, Listen, PortalDaten, TodoDaten, WhiteboardDaten, MagnetDaten, MonsteraEintrag, SocialDaten, SpieleDaten, WordleErgebnis } from '../types';
 import { columnLetter, recordToRow, rowToRecord } from './rows';
 import { quoteTab, type SheetsApi, type SpreadsheetInfo, type ValueWrite } from './sheetsClient';
 
@@ -257,6 +257,22 @@ export class SheetStore implements Store {
       return table;
     });
     return { boards: entityRows('boards', tables[0]), aufgaben: entityRows('aufgaben', tables[1]), kommentare: entityRows('aufgaben_kommentare', tables[2]) };
+  }
+
+  async loadWhiteboardDaten(): Promise<WhiteboardDaten> {
+    const info = await this.info();
+    const vorhanden = new Set(info.sheets?.map((sheet) => sheet.properties.title));
+    if (WHITEBOARD_TABS.some((tab) => !vorhanden.has(tab))) {
+      throw new SchemaError('Die Whiteboards sind noch nicht eingerichtet. Bitte unter \u201eEinrichtung\u201c auf \u201eEinrichten\u201c klicken.');
+    }
+    const values = await this.api.batchGetValues(WHITEBOARD_TABS.map((tab) => fullRange(tab)));
+    const tables = WHITEBOARD_TABS.map((tab, i) => {
+      const table = splitHeader(values[i]);
+      assertColumns(SCHEMA[tab], table.header);
+      this.headers.set(tab, table.header);
+      return table;
+    });
+    return { boards: entityRows('whiteboards', tables[0]), kommentare: entityRows('whiteboard_kommentare', tables[1]) };
   }
 
   async loadPortalDaten(): Promise<PortalDaten> {

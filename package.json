@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/excalidraw-schriften.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/excalidraw-schriften.mjs",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
@@ -13,6 +15,7 @@
     "db:migrieren": "tsx scripts/db-migrieren.ts"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router-dom": "^7.18.4"

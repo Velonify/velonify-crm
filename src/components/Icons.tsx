@@ -4,6 +4,7 @@ const PFADE: Record<string, string> = {
   crm: 'M3 4h14v4H3zM3 12h9v4H3z',
   kunden: 'M3 3h6v6H3zM11 3h6v6h-6zM3 11h6v6H3zM11 11h6v6h-6z',
   todo: 'M3 3h4v14H3zM8 3h4v9H8zM13 3h4v12h-4z',
+  whiteboard: 'M2 3h16v11H2zM6 17l4-3 4 3M5 10l3-3 2 2 4-4',
   angebote: 'M5 2h7l3 3v13H5zM8 8h5M8 11h5M8 14h3',
   contact: 'M2 5h16v10H2zM2 5l8 6 8-6',
   audit: 'M3 15 7 9l3 3 4-6 3 4M3 3v14h14',
