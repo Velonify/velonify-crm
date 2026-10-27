@@ -1,4 +1,5 @@
-import { ConflictError, NotFoundError } from '../../../src/data/errors';
+import { ConflictError, GesperrtError, NotFoundError } from '../../../src/data/errors';
+import { MITARBEITER_SCHLUESSEL } from '../../../src/data/rollen';
 import { SCHEMA, type EntityTab } from '../../../src/data/schema';
 import type { RecordUpdate, Store } from '../../../src/data/store';
 import type { Erwaehnung } from '../../../src/data/types';
@@ -38,6 +39,8 @@ function tabelle(wert: unknown): EntityTab | null {
 export interface RoutenOptionen {
   /** Gets new @-mentions after they are saved, e.g. to send them to Slack. Errors are only logged. */
   erwaehnt?: (erwaehnungen: Erwaehnung[]) => Promise<void>;
+  /** Whether the caller may change who is an employee (admins only). */
+  darfRollen?: boolean;
 }
 
 const fehler = (status: number, meldung: string, extra: Record<string, unknown> = {}): Antwort => ({ status, daten: { fehler: meldung, ...extra } });
@@ -80,6 +83,7 @@ export async function behandle(methode: string, pfad: string, body: unknown, sto
     if (pfad === '/einstellungen') {
       const werte = body.werte;
       if (!istObjekt(werte) || !Object.values(werte).every((w) => typeof w === 'string')) return fehler(400, 'Einstellungen ungültig.');
+      if (MITARBEITER_SCHLUESSEL in werte && !optionen.darfRollen) return fehler(403, 'Rollen dürfen nur Admins vergeben.');
       await store.saveEinstellungen(werte as Record<string, string>);
       return { status: 200, daten: { ok: true } };
     }
@@ -87,6 +91,7 @@ export async function behandle(methode: string, pfad: string, body: unknown, sto
   } catch (err) {
     if (err instanceof ConflictError) return fehler(409, err.message, { geaendert_von: err.geaendertVon, geaendert_am: err.geaendertAm });
     if (err instanceof NotFoundError) return fehler(404, err.message);
+    if (err instanceof GesperrtError) return fehler(403, err.message);
     throw err;
   }
 }

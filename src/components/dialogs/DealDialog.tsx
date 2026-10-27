@@ -11,6 +11,7 @@ import { Dialog } from '../Dialog';
 import { useToast } from '../Toasts';
 import { Field, FormError } from '../ui';
 import { PersonenAuswahl } from '../PersonenAuswahl';
+import { useRolle } from '../../lib/useRolle';
 
 interface Props {
   /** Without a firm (e.g. from the pipeline) the dialog asks for one. */
@@ -24,6 +25,7 @@ const zahlText = (n: number | null) => (n === null ? '' : String(n));
 
 export function DealDialog({ firmaId: festeFirma, deal, ich, onClose }: Props) {
   const { db, mutate } = useCrm();
+  const { siehtGeld } = useRolle();
   const toast = useToast();
   const [firmaId, setFirmaId] = useState(deal?.firma_id ?? festeFirma ?? '');
   const [values, setValues] = useState<DealInput>(() => {
@@ -116,9 +118,11 @@ export function DealDialog({ firmaId: festeFirma, deal, ich, onClose }: Props) {
         <Field label="Titel" wide invalid={invalid === 'titel'}>
           <input value={values.titel} onChange={set('titel')} />
         </Field>
-        <Field label="Angebotswert (€)" invalid={invalid === 'wert_eur'}>
-          <input inputMode="decimal" value={wertText} onChange={(e) => setWertText(e.target.value)} placeholder="z. B. 25000" />
-        </Field>
+        {siehtGeld && (
+          <Field label="Angebotswert (€)" invalid={invalid === 'wert_eur'}>
+            <input inputMode="decimal" value={wertText} onChange={(e) => setWertText(e.target.value)} placeholder="z. B. 25000" />
+          </Field>
+        )}
         <Field
           label="Wahrscheinlichkeit (%)"
           invalid={invalid === 'wahrscheinlichkeit'}

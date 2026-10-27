@@ -975,7 +975,7 @@ export function registriereWerkzeuge(server: McpServer, kontext: Kontext): void 
 
   registriereEingang(kasten);
   registriereKunden(kasten);
-  registriereAngebote(kasten);
+  if (!kontext.mitarbeiter) registriereAngebote(kasten);
   registriereAudit(kasten);
   registriereSocial(kasten);
 }

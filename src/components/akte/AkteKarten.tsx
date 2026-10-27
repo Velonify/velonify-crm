@@ -15,11 +15,13 @@ import { TerminDialog } from '../dialogs/TerminDialog';
 import { WiedervorlageDialog } from '../dialogs/WiedervorlageDialog';
 import { useToast } from '../Toasts';
 import { Card, FormError } from '../ui';
+import { useRolle } from '../../lib/useRolle';
 
 // ─── Deals ───────────────────────────────────────────────────────────────────
 
 export function DealsKarte({ firma, db, ich, requestPhase }: { firma: Firma; db: Database; ich: string | null; requestPhase(deal: Deal, phase: string): void }) {
   const [dialog, setDialog] = useState<{ deal?: Deal } | null>(null);
+  const { siehtGeld } = useRolle();
   const [zeigeAbgeschlossene, setZeigeAbgeschlossene] = useState(false);
   const heute = isoDate(new Date());
   const deals = db.deals.filter((d) => d.firma_id === firma.id && !d.archiviert);
@@ -49,10 +51,14 @@ export function DealsKarte({ firma, db, ich, requestPhase }: { firma: Firma; db:
                   {deal.titel}
                 </button>
                 <div className="row-sub">
-                  {formatEuro(deal.wert_eur)}
-                  {deal.wert_eur !== null && !isAbgeschlossen(deal.phase) && <span> · {wahrscheinlichkeit(deal)} %</span>}
-                  {deal.zustaendig && <span> · {deal.zustaendig}</span>}
-                  {kontakt && <span> · {kontaktName(kontakt)}</span>}
+                  {[
+                    siehtGeld && formatEuro(deal.wert_eur),
+                    siehtGeld && deal.wert_eur !== null && !isAbgeschlossen(deal.phase) && `${wahrscheinlichkeit(deal)} %`,
+                    deal.zustaendig,
+                    kontakt && kontaktName(kontakt),
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </div>
                 {!isAbgeschlossen(deal.phase) && (
                   <div className={`next-step${ueberfaellig ? ' overdue' : ''}`}>
@@ -67,7 +73,7 @@ export function DealsKarte({ firma, db, ich, requestPhase }: { firma: Firma; db:
                   </div>
                 )}
                 {deal.phase === 'verloren' && deal.verlustgrund && <div className="row-sub">Grund: {deal.verlustgrund}</div>}
-                {!isAbgeschlossen(deal.phase) && !firma.archiviert && (
+                {siehtGeld && !isAbgeschlossen(deal.phase) && !firma.archiviert && (
                   <Link to={`/angebote/neu?firma=${firma.id}&deal=${deal.id}`} className="small">
                     Angebot erstellen →
                   </Link>

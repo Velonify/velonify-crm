@@ -12,6 +12,7 @@ import type { Deal } from '../data/types';
 import { faelligText, formatDayShort, formatEuro } from '../lib/format';
 import { useIch } from '../lib/useIch';
 import { istZustaendig } from '../data/zustaendig';
+import { useRolle } from '../lib/useRolle';
 
 function AufgabenListe({ titel, aufgaben, heute, leer, onDeal, klasse = '' }: {
   titel: string;
@@ -76,6 +77,7 @@ function AufgabenListe({ titel, aufgaben, heute, leer, onDeal, klasse = '' }: {
 
 export function MeinTagPage() {
   const { db, loading, error, refresh } = useCrm();
+  const { siehtGeld } = useRolle();
   const team = db?.listen.team ?? [];
   const [ich, setIch] = useIch(team);
   const [nurMeine, setNurMeine] = useState(true);
@@ -104,8 +106,12 @@ export function MeinTagPage() {
         zahlen={[
           { wert: offen, label: tag.ueberfaellig.length > 0 ? `heute dran · ${tag.ueberfaellig.length} überfällig` : 'heute dran', warn: tag.ueberfaellig.length > 0 },
           { wert: zahlen.offen, label: 'offene Deals' },
-          { wert: formatEuro(zahlen.pipelineWert), label: `Pipeline · ${formatEuro(zahlen.angebotWert)} im Angebot` },
-          { wert: formatEuro(zahlen.gewonnenMonatWert), label: `gewonnen diesen Monat · ${zahlen.gewonnenMonat} ${zahlen.gewonnenMonat === 1 ? 'Deal' : 'Deals'}` },
+          ...(siehtGeld
+            ? [
+                { wert: formatEuro(zahlen.pipelineWert), label: `Pipeline · ${formatEuro(zahlen.angebotWert)} im Angebot` },
+                { wert: formatEuro(zahlen.gewonnenMonatWert), label: `gewonnen diesen Monat · ${zahlen.gewonnenMonat} ${zahlen.gewonnenMonat === 1 ? 'Deal' : 'Deals'}` },
+              ]
+            : [{ wert: zahlen.gewonnenMonat, label: 'gewonnen diesen Monat' }]),
         ]}
         ueberlappen
         actions={

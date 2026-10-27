@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PostgresStore } from '../../../src/data/postgres/postgresStore';
+import { istMitarbeiterIn, MitarbeiterStore, vergissMitarbeiter } from '../../../src/data/postgres/mitarbeiterStore';
 import { testDb } from '../../../db/test/testDb';
 import { behandle, behandleAdmin, behandleDaten } from './routen';
 
@@ -86,5 +87,32 @@ describe('Datenansicht', () => {
     expect((await s.load()).listen.team).toEqual(['Lugge', 'Julian']);
     expect((await behandleDaten('POST', '/listen', { liste: 'team', werte: [] }, s))?.status).toBe(400);
     expect(await behandleDaten('GET', '/daten/kern', undefined, s)).toBeNull();
+  });
+
+  it('gives employees the hub without money', async () => {
+    const { pool } = await testDb();
+    const chef = new PostgresStore(pool, () => 'chef@velonify.de');
+    await behandle('POST', '/einfuegen', { tab: 'deals', records: [{ ...deal, wert_eur: 12000 }] }, chef);
+    expect((await behandle('POST', '/einstellungen', { werte: { rolle_mitarbeiter: 'neu@velonify.de' } }, chef)).status).toBe(403);
+    expect((await behandle('POST', '/einstellungen', { werte: { rolle_mitarbeiter: 'neu@velonify.de' } }, chef, { darfRollen: true })).status).toBe(200);
+    vergissMitarbeiter(pool);
+    expect(await istMitarbeiterIn(pool, 'Neu@velonify.de')).toBe(true);
+    expect(await istMitarbeiterIn(pool, 'chef@velonify.de')).toBe(false);
+
+    const neu = new MitarbeiterStore(pool, () => 'neu@velonify.de');
+    const kern = (await behandle('GET', '/daten/kern', undefined, neu)).daten as { deals: { wert_eur: number | null }[] };
+    expect(kern.deals[0].wert_eur).toBeNull();
+    expect((await behandle('GET', '/daten/angebote', undefined, neu)).status).toBe(403);
+    expect((await behandle('POST', '/einfuegen', { tab: 'angebote', records: [{ id: 'A-1' }] }, neu)).status).toBe(403);
+    expect((await behandle('POST', '/einstellungen', { werte: { rolle_mitarbeiter: '' } }, neu)).status).toBe(403);
+    await expect(behandleDaten('GET', '/tabelle/leistungen', undefined, neu)).rejects.toThrow('gesperrt');
+
+    // Saving the deal from the employee's hub sends the emptied value back; the stored one stays.
+    const geaendert = await behandle('POST', '/aendern', { tab: 'deals', updates: [{ id: 'D-1', changes: { phase: 'qualifiziert', wert_eur: null } }] }, neu);
+    expect(geaendert).toMatchObject({ status: 200, daten: { records: [{ phase: 'qualifiziert', wert_eur: null }] } });
+    const tabelle = (await behandleDaten('GET', '/tabelle/deals', undefined, chef))?.daten as { records: { wert_eur: number }[] };
+    expect(tabelle.records[0].wert_eur).toBe(12000);
+    const verlauf = (await behandleDaten('GET', '/verlauf/deals/D-1', undefined, neu))?.daten as { eintraege: { nachher: { wert_eur: unknown } }[] };
+    expect(verlauf.eintraege.every((e) => e.nachher.wert_eur === null)).toBe(true);
   });
 });

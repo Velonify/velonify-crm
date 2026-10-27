@@ -40,7 +40,8 @@ describe('suche', () => {
 
   it('finds actions and tools for the command palette', () => {
     const werkzeuge = [{ id: 'todo', name: 'To-Dos', beschreibung: 'Boards', pfad: '/todo' }, { id: 'plan', name: 'Geplant', beschreibung: '' }];
-    expect(befehle('angebot', werkzeuge).map((t) => t.pfad)).toEqual(['/angebote/neu']);
+    expect(befehle('angebot', werkzeuge).map((t) => t.pfad)).toEqual([]);
+    expect(befehle('angebot', [...werkzeuge, { id: 'angebote', name: 'Angebots-Rechner', beschreibung: '' }]).map((t) => t.pfad)).toEqual(['/angebote/neu']);
     expect(befehle('to-dos', werkzeuge).map((t) => t.titel)).toEqual(['To-Dos']);
     expect(befehle('', werkzeuge).some((t) => t.titel === 'Geplant')).toBe(false);
   });

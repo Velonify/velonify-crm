@@ -9,6 +9,8 @@ import { AuthExpiredError } from '../data/errors';
 import { driveFolderUrl, type DriveFile } from '../data/google/drive';
 import { extractDriveFolderId } from '../data/rules';
 import { errorMessage } from '../lib/errors';
+import { MITARBEITER_SCHLUESSEL, mitarbeiterListe } from '../data/rollen';
+import { useMandant } from '../plattform/MandantContext';
 
 type OrdnerSchluessel = keyof typeof DRIVE_ORDNER_NAMEN;
 const ORDNER: { key: OrdnerSchluessel; einstellung: string; label: string; hinweis: string }[] = [
@@ -262,6 +264,55 @@ function LinksKarte() {
   );
 }
 
+/** Employees see the hub without money (src/data/rollen.ts); only admins change who that is, crm-api checks again. */
+function MitarbeiterKarte() {
+  const { db, mutate } = useCrm();
+  const { istAdmin } = useMandant();
+  const toast = useToast();
+  const [text, setText] = useState(() => mitarbeiterListe(db?.einstellungen[MITARBEITER_SCHLUESSEL]).join(', '));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>();
+  const liste = mitarbeiterListe(text);
+  const fremd = liste.filter((a) => !a.endsWith(`@${config.allowedDomain}`));
+
+  const speichern = async () => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await mutate((s) => s.saveEinstellungen({ [MITARBEITER_SCHLUESSEL]: liste.join(',') }));
+      setText(liste.join(', '));
+      toast.show('Mitarbeiter gespeichert');
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card title="6. Mitarbeiter-Zugang">
+      <p className="muted">
+        Diese Adressen sehen alles außer Geld: kein Angebots-Rechner, keine Kalkulation, keine Deal-Werte und Preise – im Hub und im Claude-Connector.
+      </p>
+      <label className={`field${fremd.length ? ' invalid' : ''}`}>
+        <span className="field-label">Mitarbeiter</span>
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder={`name@${config.allowedDomain}, …`} disabled={!istAdmin} />
+        <small className="field-hint">
+          {fremd.length ? `Nur Adressen mit @${config.allowedDomain}.` : istAdmin ? 'Mehrere mit Komma trennen. Gilt nach spätestens einer Minute.' : 'Ändern können nur Admins.'}
+        </small>
+      </label>
+      <FormError error={error} />
+      {istAdmin && (
+        <div className="form-actions">
+          <button type="button" className="button primary" onClick={speichern} disabled={busy || fremd.length > 0}>
+            {busy ? 'Speichert …' : 'Speichern'}
+          </button>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export function EinrichtungPage() {
   const { db, error } = useCrm();
   return (
@@ -283,6 +334,7 @@ export function EinrichtungPage() {
       <TeamKarte />
       <TelefonKarte key={db ? 'telefon-bereit' : 'telefon-laedt'} />
       <LinksKarte key={db ? 'links-bereit' : 'links-laedt'} />
+      <MitarbeiterKarte key={db ? 'mitarbeiter-bereit' : 'mitarbeiter-laedt'} />
     </div>
   );
 }

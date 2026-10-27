@@ -9,6 +9,7 @@ import type { Deal } from '../data/types';
 import { faelligText, formatDateTime, formatEuro } from '../lib/format';
 import { usePhaseChange } from './dialogs/PhaseChange';
 import { AuchOffen, useAnwesenheit } from './Praesenz';
+import { useRolle } from '../lib/useRolle';
 
 interface BlattZiel {
   firmaId: string;
@@ -47,6 +48,7 @@ const PIPELINE_PHASEN = PHASEN.filter((p) => !isAbgeschlossen(p));
 
 function FirmaBlatt({ ziel, onClose }: { ziel: BlattZiel | null; onClose(): void }) {
   const { db } = useCrm();
+  const { siehtGeld } = useRolle();
   const phaseChange = usePhaseChange();
   const zuKnopf = useRef<HTMLButtonElement>(null);
   const vorher = useRef<Element | null>(null);
@@ -165,8 +167,12 @@ function FirmaBlatt({ ziel, onClose }: { ziel: BlattZiel | null; onClose(): void
 
               <dl className="blatt-fakten">
                 <div><dt>Deal</dt><dd>{deal ? deal.titel : '–'}</dd></div>
-                <div><dt>Wert</dt><dd className="num">{formatEuro(deal?.wert_eur)}</dd></div>
-                <div><dt>Gewichtet</dt><dd className="num">{deal && deal.wert_eur ? formatEuro(Math.round((deal.wert_eur * wahrscheinlichkeit(deal)) / 100)) : '–'}</dd></div>
+                {siehtGeld && (
+                  <>
+                    <div><dt>Wert</dt><dd className="num">{formatEuro(deal?.wert_eur)}</dd></div>
+                    <div><dt>Gewichtet</dt><dd className="num">{deal && deal.wert_eur ? formatEuro(Math.round((deal.wert_eur * wahrscheinlichkeit(deal)) / 100)) : '–'}</dd></div>
+                  </>
+                )}
                 <div><dt>Plattform</dt><dd>{[firma.plattform, firma.version].filter(Boolean).join(' ') || '–'}</dd></div>
               </dl>
 
@@ -240,9 +246,11 @@ function FirmaBlatt({ ziel, onClose }: { ziel: BlattZiel | null; onClose(): void
                   Shop-Audit
                 </Link>
               )}
-              <Link to={`/angebote/neu?firma=${firma.id}${deal ? `&deal=${deal.id}` : ''}`} className="button small">
-                Angebot
-              </Link>
+              {siehtGeld && (
+                <Link to={`/angebote/neu?firma=${firma.id}${deal ? `&deal=${deal.id}` : ''}`} className="button small">
+                  Angebot
+                </Link>
+              )}
               <Link to={`/crm/firmen/${firma.id}`} className="button small subtle">
                 Ganze Akte →
               </Link>

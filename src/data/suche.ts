@@ -28,10 +28,10 @@ export interface Treffer {
 }
 
 /** Things to do from the command palette, found by name or by one of the extra words. */
-export const AKTIONEN: { titel: string; pfad: string; woerter: string }[] = [
+export const AKTIONEN: { titel: string; pfad: string; woerter: string; /** Only offered while this tool is. */ werkzeug?: string }[] = [
   { titel: 'Neue Firma anlegen', pfad: '/crm/firmen/neu', woerter: 'lead firma neu anlegen' },
   { titel: 'Lead aus LinkedIn', pfad: '/crm/linkedin', woerter: 'linkedin profil lead' },
-  { titel: 'Neues Angebot', pfad: '/angebote/neu', woerter: 'angebot kalkulation pdf' },
+  { titel: 'Neues Angebot', pfad: '/angebote/neu', woerter: 'angebot kalkulation pdf', werkzeug: 'angebote' },
   { titel: 'Anschreiben erstellen', pfad: '/contact', woerter: 'nachricht mail linkedin instagram contact' },
   { titel: 'Shop prüfen', pfad: '/audit/neu', woerter: 'audit domain shop check' },
   { titel: 'Meine Aufgaben', pfad: '/todo/meine', woerter: 'todo karten aufgaben' },
@@ -46,7 +46,7 @@ export const AKTIONEN: { titel: string; pfad: string; woerter: string }[] = [
 export function befehle(eingabe: string, werkzeuge: readonly { id: string; name: string; beschreibung: string; pfad?: string }[]): Treffer[] {
   const woerter = normalisiere(eingabe).split(/\s+/).filter(Boolean);
   const passt = (text: string) => woerter.every((w) => normalisiere(text).includes(w));
-  const aktionen = AKTIONEN.filter((a) => passt(`${a.titel} ${a.woerter}`)).map((a, i) => ({
+  const aktionen = AKTIONEN.filter((a) => (!a.werkzeug || werkzeuge.some((w) => w.id === a.werkzeug)) && passt(`${a.titel} ${a.woerter}`)).map((a, i) => ({
     art: 'aktion' as const, id: `aktion-${i}`, firmaId: '', titel: a.titel, details: '', archiviert: false, score: 1, pfad: a.pfad,
   }));
   const tools = werkzeuge
