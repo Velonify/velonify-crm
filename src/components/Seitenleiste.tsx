@@ -14,7 +14,8 @@ import { useIch } from '../lib/useIch';
 import { useTheme } from '../lib/useTheme';
 import { useTodoDaten } from '../todo/useTodoDaten';
 import { LEISTE, leistenEintragFuerPfad, type LeistenZahl } from '../werkzeuge';
-import { useMandant, useMarke } from '../plattform/MandantContext';
+import { useMarke } from '../plattform/MandantContext';
+import { useRolle } from '../lib/useRolle';
 import { Glocke } from './Glocke';
 import { WerkzeugIcon } from './Icons';
 import { Suche } from './Suche';
@@ -64,7 +65,7 @@ export function Seitenleiste({ offen }: { offen: boolean }) {
   const { pathname } = useLocation();
   const zahlen = useZahlen();
   const aktiv = leistenEintragFuerPfad(pathname);
-  const { erlaubt } = useMandant();
+  const { erlaubt } = useRolle();
   const marke = useMarke();
   const gruppen = LEISTE.map((g) => ({ ...g, eintraege: g.eintraege.filter((e) => erlaubt(e.werkzeug) && !ansicht.ausgeblendet.includes(e.werkzeug)) })).filter((g) => g.eintraege.length > 0);
 

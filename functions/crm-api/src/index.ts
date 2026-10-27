@@ -1,6 +1,8 @@
 import * as functions from '@google-cloud/functions-framework';
 import { Limit, pruefeGoogleKonto, ZugriffsFehler } from '../../gemeinsam/auth';
 import { PostgresStore } from '../../../src/data/postgres/postgresStore';
+import { istMitarbeiterIn, MitarbeiterStore, vergissMitarbeiter } from '../../../src/data/postgres/mitarbeiterStore';
+import { GesperrtError } from '../../../src/data/errors';
 import { verbinde, type Verbindung } from '../../../db/verbindung';
 import { timingSafeEqual } from 'node:crypto';
 import { behandle, behandleAdmin, behandleDaten } from './routen';
@@ -238,11 +240,17 @@ functions.http('crmApi', async (req, res) => {
   }
   try {
     const { pool } = await datenbank();
-    const store = new PostgresStore(pool, () => email);
-    const antwort = (await behandleDaten(req.method, pfad, req.body, store)) ?? (await behandle(req.method, pfad, req.body, store, { erwaehnt: slack }));
-    if (req.method !== 'GET') console.log(JSON.stringify({ email, pfad, tab: (req.body as { tab?: string })?.tab, status: antwort.status, dauer_ms: Date.now() - start }));
+    // Employees get the same hub without money: see src/data/rollen.ts.
+    const mitarbeiter = !ADMINS.includes(email) && (await istMitarbeiterIn(pool, email));
+    const store = mitarbeiter ? new MitarbeiterStore(pool, () => email) : new PostgresStore(pool, () => email);
+    const antwort =
+      (await behandleDaten(req.method, pfad, req.body, store)) ??
+      (await behandle(req.method, pfad, req.body, store, { erwaehnt: slack, darfRollen: ADMINS.includes(email) }));
+    if (pfad === '/einstellungen' && antwort.status === 200) vergissMitarbeiter(pool);
+    if (req.method !== 'GET') console.log(JSON.stringify({ email, pfad, tab: (req.body as { tab?: string })?.tab, mitarbeiter: mitarbeiter || undefined, status: antwort.status, dauer_ms: Date.now() - start }));
     res.status(antwort.status).json(antwort.daten);
   } catch (err) {
+    if (err instanceof GesperrtError) return void fehler(403, err.message);
     console.error(`${req.method} ${pfad} fehlgeschlagen`, err);
     fehler(500, 'Die Datenbank hat mit einem Fehler geantwortet.');
   }

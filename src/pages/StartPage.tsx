@@ -30,6 +30,7 @@ import { mandantenModus } from '../config';
 /** Start sections tenants do not get (see config.mandantenModus). */
 const OHNE_MANDANT: string[] = ['kalender', 'kunden', 'dateiname'];
 import { useAnsicht } from '../lib/useAnsicht';
+import { useRolle } from '../lib/useRolle';
 
 const MAX_AUFGABEN = 5;
 
@@ -148,6 +149,7 @@ function Kunden({ db, todos, news, heute }: { db: Database; todos?: TodoDaten; n
 }
 
 function Pipeline({ db, ich }: { db: Database; ich: string | null }) {
+  const { siehtGeld } = useRolle();
   const stufen = useMemo(() => {
     const firmen = new Map(db.firmen.map((f) => [f.id, f]));
     return pipelineStufen(db.deals.filter((d) => !firmen.get(d.firma_id)?.archiviert && (!ich || istZustaendig(d.zustaendig, ich))));
@@ -171,7 +173,7 @@ function Pipeline({ db, ich }: { db: Database; ich: string | null }) {
             <span className="stufe-balken" aria-hidden="true">
               <span style={{ width: `${(s.anzahl / max) * 100}%` }} />
             </span>
-            <span className="stufe-wert">{s.wert > 0 ? formatEuro(s.wert) : '–'}</span>
+            {siehtGeld && <span className="stufe-wert">{s.wert > 0 ? formatEuro(s.wert) : '–'}</span>}
           </div>
         ))}
       </div>
@@ -307,6 +309,7 @@ function Dateiname({ db, heute }: { db: Database; heute: string }) {
 
 export function StartPage() {
   const { db, service, loading, error, refresh } = useCrm();
+  const { siehtGeld } = useRolle();
   // Word game and plant share one request, so opening the start page stays a small load for Google.
   const spiele = useLoad(() => (service ? service.loadSpiele() : new Promise<never>(() => {})), [service], 'spiele');
   const todos = useTodoDaten();
@@ -355,7 +358,7 @@ export function StartPage() {
   const teile = [
     cockpit.eintraege.length === 0 ? 'Heute ist nichts fällig' : `${cockpit.eintraege.length} ${cockpit.eintraege.length === 1 ? 'Sache ist' : 'Dinge sind'} heute dran${cockpit.ueberfaellig > 0 ? `, ${cockpit.ueberfaellig} davon überfällig` : ''}`,
     ...(cockpit.anfragen ? [`${cockpit.anfragen} ${cockpit.anfragen === 1 ? 'neue Anfrage' : 'neue Anfragen'}`] : []),
-    `${ich ? 'deine' : 'die'} Pipeline steht bei ${formatEuro(cockpit.pipelineWert)}`,
+    ...(siehtGeld ? [`${ich ? 'deine' : 'die'} Pipeline steht bei ${formatEuro(cockpit.pipelineWert)}`] : []),
   ];
   const satz = `${teile.join(' · ')}.`;
 

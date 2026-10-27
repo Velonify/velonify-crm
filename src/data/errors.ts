@@ -73,3 +73,11 @@ export class NotConfiguredError extends Error {
     this.name = 'NotConfiguredError';
   }
 }
+
+/** Employees asked for something with money in it (offers, calculation, catalogue). */
+export class GesperrtError extends Error {
+  constructor(message = 'Angebote, Kalkulation und Preise sind für deine Rolle gesperrt.') {
+    super(message);
+    this.name = 'GesperrtError';
+  }
+}

@@ -11,7 +11,7 @@ import { useAnsicht } from '../lib/useAnsicht';
 import { useIch } from '../lib/useIch';
 import { useTheme } from '../lib/useTheme';
 import { LEISTE, WERKZEUGE } from '../werkzeuge';
-import { useMandant } from '../plattform/MandantContext';
+import { useRolle } from '../lib/useRolle';
 
 const ABSCHNITTE = [
   { id: 'leiste', titel: 'Seitenleiste' },
@@ -52,7 +52,7 @@ export function EinstellungenPage() {
   const { ansicht, setze, fehler } = useAnsicht();
   const [theme, setTheme] = useTheme();
   const [, setHilfe] = useHilfe();
-  const { erlaubt } = useMandant();
+  const { erlaubt } = useRolle();
   const werkzeuge = LEISTE.flatMap((g) => g.eintraege).filter((e, i, alle) => e.werkzeug !== 'home' && erlaubt(e.werkzeug) && alle.findIndex((x) => x.werkzeug === e.werkzeug) === i);
 
   const werkzeugAn = (id: string, an: boolean) =>

@@ -13,6 +13,8 @@ import type { Aenderung } from '../data/postgres/postgresStore';
 import { SCHEMA, type EntityTab, type TabName, type TabSchema } from '../data/schema';
 import { errorMessage } from '../lib/errors';
 import { useLoad } from '../lib/useLoad';
+import { GESPERRTE_TABS } from '../data/rollen';
+import { useRolle } from '../lib/useRolle';
 
 const ANZEIGE_MAX = 300;
 const kurz = (wert: unknown) => {
@@ -30,6 +32,7 @@ function useApis() {
  * directly in the sheet. Edits use the same conflict check as the rest of the hub and land in the change log.
  */
 export function DatenPage() {
+  const { siehtGeld } = useRolle();
   const { tab } = useParams();
   const navigate = useNavigate();
   if (!config.crmApiUrl) {
@@ -49,7 +52,7 @@ export function DatenPage() {
             {!istTabelle(tab) && <option value="">Bitte wählen</option>}
             {TABELLEN_GRUPPEN.map((g) => (
               <optgroup key={g.titel} label={g.titel}>
-                {g.tabs.map((t) => (
+                {g.tabs.filter((t) => siehtGeld || !GESPERRTE_TABS.includes(t)).map((t) => (
                   <option key={t} value={t}>
                     {t}
                   </option>

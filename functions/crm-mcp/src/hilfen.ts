@@ -327,6 +327,8 @@ export interface Kontext {
   dienste?: Dienste;
   /** Replaces a select list (team, verlustgrund, …), like Einrichtung → Daten; only with the Postgres store. */
   setzeListe?: (liste: string, werte: string[]) => Promise<void>;
+  /** Employees (src/data/rollen.ts) get no offer tools; their store already hides amounts. */
+  mitarbeiter?: boolean;
 }
 
 /** The team name of the signed-in person: the fixed one if it is in the team, else found like the hub's useIch does. */

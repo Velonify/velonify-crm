@@ -20,11 +20,13 @@ import type { Deal } from '../data/types';
 import { domainLabel, formatDayShort, formatEuro, websiteUrl } from '../lib/format';
 import { useIch } from '../lib/useIch';
 import { istZustaendig, kuerzelVon } from '../data/zustaendig';
+import { useRolle } from '../lib/useRolle';
 
 const ABGESCHLOSSEN_TAGE = 30;
 
 export function PipelinePage() {
   const { db, loading, error, refresh } = useCrm();
+  const { siehtGeld } = useRolle();
   const [ich] = useIch(db?.listen.team ?? []);
   const [zustaendig, setZustaendig] = useState('');
   const [dialog, setDialog] = useState<{ deal?: Deal } | null>(null);
@@ -95,8 +97,12 @@ export function PipelinePage() {
         eyebrow="Vertrieb"
         title="Pipeline"
         zahlen={[
-          { wert: formatEuro(offenSumme), label: 'offen' },
-          { wert: formatEuro(offenGewichtet), label: 'gewichtet' },
+          ...(siehtGeld
+            ? [
+                { wert: formatEuro(offenSumme), label: 'offen' },
+                { wert: formatEuro(offenGewichtet), label: 'gewichtet' },
+              ]
+            : []),
           { wert: offen.reduce((n, sp) => n + sp.deals.length, 0), label: 'offene Deals' },
           { wert: ueberfaelligeSchritte, label: 'Schritte überfällig', warn: ueberfaelligeSchritte > 0 },
         ]}
@@ -148,8 +154,8 @@ export function PipelinePage() {
               <h2>
                 {phaseLabel(spalte.phase)} <span className="count">{spalte.deals.length}</span>
               </h2>
-              <span className="board-column-sum">{formatEuro(spalte.summe)}</span>
-              {!isAbgeschlossen(spalte.phase) && (
+              {siehtGeld && <span className="board-column-sum">{formatEuro(spalte.summe)}</span>}
+              {siehtGeld && !isAbgeschlossen(spalte.phase) && (
                 <div className="spalte-gewichtet" title={`Abschlusswahrscheinlichkeit ${STANDARD_WAHRSCHEINLICHKEIT[spalte.phase]} %`}>
                   <span className="wbalken" aria-hidden="true">
                     <i style={{ width: `${STANDARD_WAHRSCHEINLICHKEIT[spalte.phase]}%` }} />
@@ -216,7 +222,7 @@ export function PipelinePage() {
                       </div>
                     )}
                     <div className="board-card-meta">
-                      <span>{formatEuro(deal.wert_eur)}</span>
+                      {siehtGeld && <span>{formatEuro(deal.wert_eur)}</span>}
                       {deal.zustaendig && (
                         <span className="board-card-personen" title={deal.zustaendig}>
                           {kuerzelVon(deal.zustaendig).map((k, i) => (

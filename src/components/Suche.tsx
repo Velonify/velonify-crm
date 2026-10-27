@@ -14,7 +14,7 @@ import type { CrmService } from '../data/crm';
 import { AuthExpiredError } from '../data/errors';
 import { befehle, suche, sucheBereiche, type Bereichsdaten, type Treffer, type TrefferArt } from '../data/suche';
 import { WERKZEUGE } from '../werkzeuge';
-import { useMandant } from '../plattform/MandantContext';
+import { useRolle } from '../lib/useRolle';
 
 const ART_LABEL: Record<TrefferArt, string> = {
   firma: 'Firmen', kunde: 'Kunden', kontakt: 'Kontakte', deal: 'Deals', karte: 'To-dos', angebot: 'Angebote',
@@ -40,7 +40,7 @@ const cache = new Map<Bereich, { service: CrmService; zeit: number; laden: Promi
  * Loads the other areas when the palette opens – not with the hub, so opening the hub stays as fast as before.
  * Each area arrives on its own; one that fails is listed in `fehler` and the rest stays searchable.
  */
-function useBereichsdaten(service: CrmService | null) {
+function useBereichsdaten(service: CrmService | null, siehtGeld: boolean) {
   const { expire } = useAuth();
   const [daten, setDaten] = useState<Bereichsdaten>({});
   const [fehler, setFehler] = useState<Bereich[]>([]);
@@ -49,6 +49,7 @@ function useBereichsdaten(service: CrmService | null) {
     if (!service) return;
     let aktiv = true;
     for (const bereich of BEREICHE) {
+      if (bereich === 'angebote' && !siehtGeld) continue;
       let eintrag = cache.get(bereich);
       if (!eintrag || eintrag.service !== service || Date.now() - eintrag.zeit > CACHE_MS) {
         eintrag = { service, zeit: Date.now(), laden: LADER[bereich](service) };
@@ -68,7 +69,7 @@ function useBereichsdaten(service: CrmService | null) {
     return () => {
       aktiv = false;
     };
-  }, [service, expire]);
+  }, [service, expire, siehtGeld]);
 
   return { daten, fehler };
 }
@@ -115,11 +116,11 @@ function SuchDialog({ onClose }: { onClose(): void }) {
   const blatt = useBlatt();
   const [frageStand, setFrageStand] = useState<FrageStand | null>(null);
   const frageApi = useMemo(() => (isDemo || !config.contactGeneratorUrl ? new DemoFrage() : new CloudFrage(config.contactGeneratorUrl, getToken)), [getToken]);
-  const { daten, fehler } = useBereichsdaten(service);
+  const { erlaubt, siehtGeld } = useRolle();
+  const { daten, fehler } = useBereichsdaten(service, siehtGeld);
   const navigate = useNavigate();
   const [eingabe, setEingabe] = useState('');
   const [aktiv, setAktiv] = useState(0);
-  const { erlaubt } = useMandant();
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);

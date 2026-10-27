@@ -7,6 +7,7 @@ import { GoogleDrive } from '../../../src/data/google/drive';
 import { isoDate } from '../../../src/data/ids';
 import { SheetsClient } from '../../../src/data/sheets/sheetsClient';
 import { PostgresStore } from '../../../src/data/postgres/postgresStore';
+import { istMitarbeiterIn, MitarbeiterStore } from '../../../src/data/postgres/mitarbeiterStore';
 import { slackBenachrichtiger } from '../../../src/data/slack';
 import { CloudGenerator } from '../../../src/data/contactGenerator';
 import { CloudLeadFinder } from '../../../src/data/leadFinder';
@@ -128,7 +129,9 @@ async function mcp(req: Request, res: Response, lz: Laufzeit): Promise<void> {
     throw err;
   }
   const getToken = () => lz.tokens.zugangstoken(zugang.g);
-  const postgres = new PostgresStore((await lz.db).pool, () => zugang.email);
+  const { pool } = await lz.db;
+  const mitarbeiter = await istMitarbeiterIn(pool, zugang.email);
+  const postgres = mitarbeiter ? new MitarbeiterStore(pool, () => zugang.email) : new PostgresStore(pool, () => zugang.email);
   const service = new CrmService({
     store: postgres,
     drive: new GoogleDrive(getToken),
@@ -147,6 +150,7 @@ async function mcp(req: Request, res: Response, lz: Laufzeit): Promise<void> {
     heute: () => isoDate(new Date()),
     dienste: dienste(getToken),
     setzeListe: (liste, werte) => postgres.setzeListe(liste, werte),
+    mitarbeiter,
   });
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on('close', () => {

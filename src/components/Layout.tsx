@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { isDemo, mandantenModus } from '../config';
 import { Gesperrt, MandantLeiste } from '../plattform/MandantLeiste';
 import { useMandant, useMarke } from '../plattform/MandantContext';
+import { useRolle } from '../lib/useRolle';
 import { useCrm } from '../data/CrmContext';
 import { zeigeStart } from '../data/ansicht';
 import { kundenListe } from '../data/kunden';
@@ -31,7 +32,8 @@ export function Layout() {
     if (gefunden) setZuletzt(gefunden);
   }, [gefunden]);
   const werkzeug = gefunden ?? zuletzt;
-  const { erlaubt, api, sicht } = useMandant();
+  const { api, sicht } = useMandant();
+  const { erlaubt } = useRolle();
   const marke = useMarke();
   useEffect(() => {
     document.title = seitentitel(werkzeug, mandantenModus ? marke : undefined);
