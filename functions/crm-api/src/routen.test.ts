@@ -14,7 +14,7 @@ const deal = { id: 'D-1', firma_id: 'F-1', titel: 'Migration', phase: 'neu', gea
 describe('crm-api Routen', () => {
   it('loads every data group of the hub', async () => {
     const s = await store();
-    for (const gruppe of ['kern', 'angebote', 'contact', 'audits', 'wordle', 'monstera', 'eingang', 'spiele', 'social', 'magnete', 'kunden', 'todos', 'erwaehnungen', 'portal']) {
+    for (const gruppe of ['kern', 'angebote', 'contact', 'audits', 'wordle', 'monstera', 'eingang', 'spiele', 'social', 'magnete', 'kunden', 'todos', 'erwaehnungen', 'portal', 'whiteboards']) {
       expect((await behandle('GET', `/daten/${gruppe}`, undefined, s)).status, gruppe).toBe(200);
     }
     expect((await behandle('GET', '/daten/geheim', undefined, s)).status).toBe(404);

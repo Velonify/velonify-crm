@@ -18,6 +18,7 @@ import { SheetsClient } from '../../../src/data/sheets/sheetsClient';
 import { slackBenachrichtiger, slackDirekt } from '../../../src/data/slack';
 import { leseTeamZuordnung } from '../../../src/data/selectors';
 import { PraesenzRaum, pruefeMeldung } from '../../../src/data/praesenz';
+import { behandleWhiteboard, cloudStorage, speicherAblage, type Ablage } from './whiteboard';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 /** OAuth client of the tenants' hub (app.velonify.de, own Google project with an external audience, only openid/email/profile). */
@@ -93,6 +94,11 @@ function magnete(): MagnetKonfig {
   };
   return magnetKonfig;
 }
+
+/** Images of the whiteboards: the bucket WHITEBOARD_BUCKET, without it (local runs) only in memory. */
+const whiteboardAblage: Ablage = process.env.WHITEBOARD_BUCKET
+  ? cloudStorage(process.env.WHITEBOARD_BUCKET, dienstkontoToken(fetch, ['https://www.googleapis.com/auth/devstorage.read_write']))
+  : speicherAblage();
 
 /** Who is in the hub right now: only in memory, which works because crm-api runs as a single instance. */
 const praesenz = new PraesenzRaum();
@@ -240,6 +246,16 @@ functions.http('crmApi', async (req, res) => {
   }
   try {
     const { pool } = await datenbank();
+    const wb = await behandleWhiteboard(req.method, pfad, req.body, { pool, ablage: whiteboardAblage, email, roh: req.rawBody, typ: req.get('content-type') });
+    if (wb && 'inhalt' in wb) {
+      // Images never change under their id, so the browser may keep them.
+      res.set('Cache-Control', 'private, max-age=31536000, immutable');
+      return void res.status(200).type(wb.typ).send(wb.inhalt);
+    }
+    if (wb) {
+      if (req.method !== 'GET') console.log(JSON.stringify({ email, pfad, status: wb.status, dauer_ms: Date.now() - start }));
+      return void res.status(wb.status).json(wb.daten);
+    }
     // Employees get the same hub without money: see src/data/rollen.ts.
     const mitarbeiter = !ADMINS.includes(email) && (await istMitarbeiterIn(pool, email));
     const store = mitarbeiter ? new MitarbeiterStore(pool, () => email) : new PostgresStore(pool, () => email);

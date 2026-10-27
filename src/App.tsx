@@ -53,6 +53,8 @@ const UebersichtPage = seite(() => import('./todo/UebersichtPage'), 'UebersichtP
 const MagnetLeadsPage = seite(() => import('./magnete/LeadsPage'), 'MagnetLeadsPage');
 const MagnetePage = seite(() => import('./magnete/MagnetePage'), 'MagnetePage');
 const RoastPage = seite(() => import('./magnete/RoastPage'), 'RoastPage');
+const WhiteboardPage = seite(() => import('./whiteboard/WhiteboardPage'), 'WhiteboardPage');
+const WhiteboardUebersichtPage = seite(() => import('./whiteboard/WhiteboardUebersichtPage'), 'WhiteboardUebersichtPage');
 const WordlePage = seite(() => import('./wordle/WordlePage'), 'WordlePage');
 const LeadMarktPage = seite(() => import('./plattform/LeadMarktPage'), 'LeadMarktPage');
 const PlattformPage = seite(() => import('./plattform/PlattformPage'), 'PlattformPage');
@@ -101,6 +103,10 @@ export function App() {
                   <Route index element={<UebersichtPage />} />
                   <Route path="meine" element={<UebersichtPage nurIch />} />
                   <Route path=":id" element={<BoardPage />} />
+                </Route>
+                <Route path="whiteboard">
+                  <Route index element={<WhiteboardUebersichtPage />} />
+                  <Route path=":id" element={<WhiteboardPage />} />
                 </Route>
                 <Route path="angebote">
                   <Route index element={<AngebotePage />} />

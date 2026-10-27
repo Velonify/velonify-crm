@@ -10,6 +10,7 @@ Die API zwischen Hub und Postgres. Seit dem Umzug vom Google Sheet liegen die Da
 - **Wer ist online** (`POST /praesenz`): Herzschlag jedes offenen Hub-Tabs alle 20 s mit Seite und geöffneter Karte/Firma/Kunde; die Antwort sind alle anderen. Nur im Speicher, nicht in der Datenbank – das geht, weil crm-api mit `--max-instances=1` läuft. Nach einem Neustart ist die Liste bis zum nächsten Herzschlag leer.
 - **Lese-Spiegel** (`POST /extern/spiegel`, Token im Header `X-Velonify-Token`): Cloud Scheduler startet ihn jede Nacht. Er schreibt alle Tabellen in ein Sheet, das das Team nur lesen kann (`SPIEGEL_SHEET_ID`), mit dem Dienstkonto der Function.
 - **Website** (`/extern/eingang`, `/extern/magnete`, Token im Header `X-Velonify-Token`, nicht mehr im Query-String): ersetzt die Apps Scripts `eingang` und `magnete` mit demselben Antwortformat (HTTP 200, Ergebnis in `status`). Die Netlify-Functions der Website brauchen dafür nur neue Adressen in `CRM_EINGANG_URL` und `CRM_MAGNETE_URL`. Magnet-Mails gehen über die Gmail-API (Refresh-Token von lukas@, nur `gmail.send`).
+- **Whiteboard** (`src/whiteboard.ts`): `GET|POST /whiteboard/<id>/inhalt` (Zeichnung, beim Speichern Element für Element mit dem gespeicherten Stand zusammengeführt, nie überschrieben), `GET|POST /whiteboard/<id>/datei/<fileId>` (Bilder, bis 8 MB, liegen im Bucket `WHITEBOARD_BUCKET` unter `boards/<id>/`, nicht in der Datenbank), `GET /whiteboard/vorschauen` (kleine Bilder für die Übersicht). Kopf und Kommentare der Boards laufen über `/einfuegen` und `/aendern` wie jede Tabelle. Live geht über den eigenen Dienst `functions/whiteboard-live`.
 - **Datenbank** (`../../db/verbindung.ts`): Cloud SQL Connector mit IAM-Anmeldung als `crm-api@velonify-crm.iam`, keine Passwörter. Pool mit 3 Verbindungen, die Rolle darf höchstens 5.
 - **Änderungsprotokoll**: Jede Schreibanfrage setzt `app.person`, ein Trigger schreibt alte und neue Werte nach `aenderungen`.
 
@@ -54,6 +55,18 @@ gcloud scheduler jobs create http crm-spiegel --location=europe-west3 --project=
 
 Beim Deploy zusätzlich `SPIEGEL_SHEET_ID=<ID aus der Sheet-URL>` in `--set-env-vars`.
 
+### Bilder der Whiteboards (einmalig)
+
+Ein privater Bucket; crm-api schreibt und liest, das Kundenportal liest nur. Ohne `WHITEBOARD_BUCKET` hält crm-api Bilder nur im Speicher (für lokale Läufe).
+
+```bash
+gcloud storage buckets create gs://velonify-whiteboard --project=velonify-crm --location=europe-west3 --uniform-bucket-level-access --public-access-prevention
+gcloud storage buckets add-iam-policy-binding gs://velonify-whiteboard --member=serviceAccount:crm-api@velonify-crm.iam.gserviceaccount.com --role=roles/storage.objectAdmin
+gcloud storage buckets add-iam-policy-binding gs://velonify-whiteboard --member=serviceAccount:kundenportal@velonify-crm.iam.gserviceaccount.com --role=roles/storage.objectViewer
+```
+
+Beim Deploy `WHITEBOARD_BUCKET=velonify-whiteboard` in `--set-env-vars`.
+
 ### Slack-Benachrichtigung für @-Erwähnungen (optional)
 
 Wer im Hub oder über den CRM-MCP mit „@Name“ markiert wird, bekommt immer einen Eintrag unter der Glocke. Mit dem Token einer eigenen Slack-App schicken crm-api und crm-mcp zusätzlich eine Direktnachricht.
@@ -91,7 +104,7 @@ gcloud run services update crm-api --region=europe-west3 --no-invoker-iam-check 
 
 `gcp-build` ist absichtlich leer: Cloud Build bekommt das fertige `dist/index.js` und installiert nur Functions Framework, `pg` und den Connector. Die Org-Policy verbietet `allUsers`, deshalb `--no-invoker-iam-check`; die Function prüft jede Anfrage selbst.
 
-Optionale Variablen: `ALLOWED_ORIGINS` (Standard crm.velonify.de, velonify.github.io, localhost), `ADMINS` (Übernahme), `MAIL_ABSENDER` (Standard „Lukas von Velonify <lukas@velonify.de>“), `MAIL_ANTWORT_AN`, `SIGNATUR_NAME`, `BASIS_URL`.
+Optionale Variablen: `WHITEBOARD_BUCKET` (Bilder der Whiteboards, siehe oben), `ALLOWED_ORIGINS` (Standard crm.velonify.de, velonify.github.io, localhost), `ADMINS` (Übernahme), `MAIL_ABSENDER` (Standard „Lukas von Velonify <lukas@velonify.de>“), `MAIL_ANTWORT_AN`, `SIGNATUR_NAME`, `BASIS_URL`.
 
 ## Lokal
 

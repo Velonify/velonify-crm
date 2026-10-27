@@ -22,6 +22,7 @@ const LADEN: Record<string, (store: Store) => Promise<unknown>> = {
   todos: (s) => s.loadTodoDaten(),
   erwaehnungen: (s) => s.loadErwaehnungen(),
   portal: (s) => s.loadPortalDaten(),
+  whiteboards: (s) => s.loadWhiteboardDaten(),
 };
 
 export interface Antwort {

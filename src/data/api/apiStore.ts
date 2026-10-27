@@ -1,7 +1,7 @@
 import { AuthExpiredError, ConflictError, NotFoundError } from '../errors';
 import type { EntityTab } from '../schema';
 import type { RecordUpdate, Store } from '../store';
-import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Erwaehnung, KundenDaten, MagnetDaten, MonsteraEintrag, PortalDaten, SocialDaten, SpieleDaten, TodoDaten, WordleErgebnis } from '../types';
+import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Erwaehnung, KundenDaten, MagnetDaten, MonsteraEintrag, PortalDaten, SocialDaten, SpieleDaten, TodoDaten, WhiteboardDaten, WordleErgebnis } from '../types';
 
 /**
  * The hub's store when the data lives in Postgres: every call goes to the crm-api function with the Google token the
@@ -77,6 +77,10 @@ export class ApiStore implements Store {
   }
   loadPortalDaten(): Promise<PortalDaten> {
     return this.anfrage('/daten/portal');
+  }
+
+  loadWhiteboardDaten(): Promise<WhiteboardDaten> {
+    return this.anfrage('/daten/whiteboards');
   }
 
   vergissStruktur(): void {}

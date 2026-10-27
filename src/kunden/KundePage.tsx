@@ -21,6 +21,7 @@ import { errorMessage } from '../lib/errors';
 import { BoardAnsicht } from '../todo/BoardAnsicht';
 import { useTodoDaten } from '../todo/useTodoDaten';
 import { Portal } from './Portal';
+import { WhiteboardsDerFirma } from '../whiteboard/WhiteboardUebersichtPage';
 
 /** Finished cards of the client board stay in the ticker for a week. */
 const ERLEDIGT_TAGE = 7;
@@ -29,6 +30,7 @@ const BEREICHE = [
   { pfad: '', label: 'Übersicht' },
   { pfad: 'todos', label: 'To-dos' },
   { pfad: 'dateien', label: 'Dateien' },
+  { pfad: 'whiteboards', label: 'Whiteboards' },
   { pfad: 'tools', label: 'Tools & Ressourcen' },
   { pfad: 'news', label: 'News' },
   { pfad: 'portal', label: 'Portal' },
@@ -128,6 +130,7 @@ export function KundePage() {
       {bereich === '' && <Uebersicht firma={firma} db={db} daten={daten.data} eintraege={eintraege} aendern={daten.aendern} />}
       {bereich === 'todos' && <KundenTodos firma={firma} team={db.listen.team ?? []} todos={todos} />}
       {bereich === 'dateien' && <Dateien firma={firma} />}
+      {bereich === 'whiteboards' && <WhiteboardsDerFirma firmaId={firma.id} />}
       {bereich === 'tools' && (daten.data ? <ToolsUndRessourcen firma={firma} daten={daten.data} aendern={daten.aendern} /> : !daten.error && <Loading />)}
       {bereich === 'portal' && <Portal firma={firma} db={db} kunden={daten.data} todos={todos.data} />}
       {bereich === 'news' && (daten.data ? <News firma={firma} db={db} daten={daten.data} heute={heute} aendern={daten.aendern} /> : !daten.error && <Loading />)}

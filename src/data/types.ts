@@ -626,6 +626,8 @@ export interface EntityMap {
   kunden_berichte: KundenBericht;
   kunden_feedback: KundenFeedback;
   kunden_meilensteine: Meilenstein;
+  whiteboards: Whiteboard;
+  whiteboard_kommentare: WhiteboardKommentar;
 }
 
 export type KundenLinkArt = 'tool' | 'ressource';
@@ -737,7 +739,7 @@ export interface AufgabenKommentar {
 }
 
 /** Where a mention was written. */
-export type ErwaehnungsArt = 'kommentar' | 'karte' | 'verlauf' | 'firma' | 'kontakt' | 'news';
+export type ErwaehnungsArt = 'kommentar' | 'karte' | 'verlauf' | 'firma' | 'kontakt' | 'news' | 'whiteboard';
 
 /** One team member tagged with "@Name" somewhere in the hub; the bell shows the unread ones of the signed-in person. */
 export interface Erwaehnung {
@@ -759,6 +761,39 @@ export interface Erwaehnung {
   /** Hub path that opens the place, e.g. "/todo/B-1?karte=T-1". */
   link: string;
   gelesen_am: string;
+}
+
+/** A whiteboard: Velonify-internal (no firm) or one client's, optionally shown read-only in the client portal. */
+export interface Whiteboard extends Meta {
+  id: string;
+  titel: string;
+  firma_id: string;
+  /** Template it was started from ('' = empty). */
+  vorlage: string;
+  sichtbar_kunde: boolean;
+  archiviert: boolean;
+}
+
+/**
+ * A comment pin on a whiteboard, at an element (it follows it) or at a free spot in scene coordinates. Replies point to
+ * the pin with `antwort_auf`; only pins carry a position and `erledigt`.
+ */
+export interface WhiteboardKommentar extends Meta {
+  id: string;
+  board_id: string;
+  antwort_auf: string;
+  element_id: string;
+  x: number | null;
+  y: number | null;
+  text: string;
+  /** Address of the writer. */
+  von: string;
+  erledigt: boolean;
+}
+
+export interface WhiteboardDaten {
+  boards: Whiteboard[];
+  kommentare: WhiteboardKommentar[];
 }
 
 export interface TodoDaten {

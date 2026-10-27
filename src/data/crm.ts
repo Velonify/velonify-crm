@@ -60,7 +60,7 @@ import {
   prepareWiedervorlage,
 } from './rules';
 import { driveKonfiguration, findeTeamMitglied, tageSeitVernetzung } from './selectors';
-import { auszug, firmenLink, kartenLink, kundenLink, neuErwaehnt } from './erwaehnungen';
+import { auszug, firmenLink, kartenLink, kundenLink, neuErwaehnt, whiteboardLink } from './erwaehnungen';
 import {
   findeWert,
   prepareAufgabe,
@@ -144,6 +144,9 @@ import type {
   WordleErgebnis,
   KundenTracking,
   KundenBericht,
+  Whiteboard,
+  WhiteboardDaten,
+  WhiteboardKommentar,
 } from './types';
 
 export interface CrmDeps {
@@ -1158,6 +1161,71 @@ export class CrmService {
   async ordnerDateien(ordnerId: string): Promise<DriveFile[]> {
     const dateien = await this.drive.listChildren(ordnerId);
     return dateien.sort((a, b) => Number(isFolder(b)) - Number(isFolder(a)) || a.name.localeCompare(b.name, 'de', { numeric: true }));
+  }
+
+  // ─── Whiteboards ───────────────────────────────────────────────────────────
+
+  loadWhiteboardDaten(): Promise<WhiteboardDaten> {
+    return this.store.loadWhiteboardDaten();
+  }
+
+  /** A new board, Velonify-internal without a firm. The drawing (empty or from a template) is saved by the board page. */
+  async whiteboardAnlegen(input: { titel: string; firma_id?: string; vorlage?: string }): Promise<Whiteboard> {
+    const titel = input.titel.trim();
+    if (!titel) throw new ValidationError('titel', 'Das Whiteboard braucht einen Namen.');
+    if (input.firma_id) CrmService.find((await this.stand.daten()).firmen, input.firma_id);
+    const board: Whiteboard = { id: newId(ID_PREFIX.whiteboards), titel, firma_id: input.firma_id ?? '', vorlage: input.vorlage ?? '', sichtbar_kunde: false, archiviert: false, ...this.created() };
+    await this.store.insert('whiteboards', [board]);
+    return board;
+  }
+
+  /** Rename, move to another firm (or none), portal switch, archive. A board without a firm is never shown to clients. */
+  async whiteboardAendern(board: Whiteboard, changes: Partial<Pick<Whiteboard, 'titel' | 'firma_id' | 'sichtbar_kunde' | 'archiviert'>>): Promise<Whiteboard> {
+    const neu = { ...changes };
+    if (neu.titel !== undefined) {
+      neu.titel = neu.titel.trim();
+      if (!neu.titel) throw new ValidationError('titel', 'Das Whiteboard braucht einen Namen.');
+    }
+    if (neu.firma_id) CrmService.find((await this.stand.daten()).firmen, neu.firma_id);
+    if ((neu.firma_id ?? board.firma_id) === '') neu.sichtbar_kunde = false;
+    const [gespeichert] = await this.store.update('whiteboards', [{ id: board.id, changes: { ...neu, ...this.changed() }, expectedGeaendertAm: board.geaendert_am }]);
+    return gespeichert;
+  }
+
+  /**
+   * A comment pin (at an element or a free spot) or a reply to one. "@Name" tags team members: bell and Slack, with a
+   * link that opens the board at the pin.
+   */
+  async whiteboardKommentieren(
+    board: Whiteboard,
+    input: { text: string; antwort_auf?: string; element_id?: string; x?: number | null; y?: number | null },
+    team?: readonly string[],
+  ): Promise<WhiteboardKommentar> {
+    const text = input.text.trim();
+    if (!text) throw new ValidationError('text', 'Der Kommentar ist leer.');
+    const antwort = Boolean(input.antwort_auf);
+    const kommentar: WhiteboardKommentar = {
+      id: newId(ID_PREFIX.whiteboard_kommentare),
+      board_id: board.id,
+      antwort_auf: input.antwort_auf ?? '',
+      element_id: antwort ? '' : (input.element_id ?? ''),
+      x: antwort ? null : (input.x ?? null),
+      y: antwort ? null : (input.y ?? null),
+      text,
+      von: this.currentUser(),
+      erledigt: false,
+      ...this.created(),
+    };
+    await this.store.insert('whiteboard_kommentare', [kommentar]);
+    const pin = input.antwort_auf || kommentar.id;
+    await this.erwaehne('', text, { art: 'whiteboard', quelle_id: kommentar.id, firma_id: board.firma_id, titel: board.titel, link: whiteboardLink(board.id, pin) }, team);
+    return kommentar;
+  }
+
+  /** Marks a pin as done (it disappears from the board, the thread stays) or opens it again. */
+  async whiteboardKommentarErledigt(kommentar: WhiteboardKommentar, erledigt: boolean): Promise<WhiteboardKommentar> {
+    const [gespeichert] = await this.store.update('whiteboard_kommentare', [{ id: kommentar.id, changes: { erledigt, ...this.changed() } }]);
+    return gespeichert;
   }
 
   // ─── To-Dos ────────────────────────────────────────────────────────────────

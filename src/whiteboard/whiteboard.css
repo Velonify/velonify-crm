@@ -1,0 +1,89 @@
+/* Whiteboard: overview tiles, the board bar, the canvas with comment pins and the presentation bar. */
+
+.wb-filter { display: flex; flex-wrap: wrap; gap: var(--space-2, 12px); align-items: center; margin-bottom: var(--space-3, 16px); }
+.wb-filter input[type='search'] { min-width: 240px; flex: 0 1 320px; }
+.wb-leer { padding: var(--space-4, 24px) 0; }
+
+.wb-kacheln { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-3, 16px); }
+.wb-kachel { display: flex; flex-direction: column; background: var(--raised); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; color: var(--ink); text-decoration: none; box-shadow: var(--karten-schatten, none); transition: transform 0.18s ease, box-shadow 0.18s ease; }
+.wb-kachel:hover { text-decoration: none; transform: translateY(-2px); box-shadow: var(--karten-schatten-hoch, none); }
+.wb-kachel-bild { aspect-ratio: 16 / 10; background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.wb-kachel-bild img { width: 100%; height: 100%; object-fit: contain; }
+.wb-kachel-leer { width: 100%; height: 100%; background-image: radial-gradient(circle, var(--line-strong) 1px, transparent 1px); background-size: 16px 16px; opacity: 0.6; }
+.wb-kachel-text { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px 14px; }
+.wb-kachel-text strong { font-size: 15px; }
+.wb-kachel-text span { font-size: 12.5px; color: var(--ink-muted); }
+
+.wb-firma-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.wb-firma-liste li { display: flex; justify-content: space-between; gap: 12px; }
+
+.wb-vorlagen-wahl { border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.wb-vorlagen-wahl legend { font-weight: 700; margin-bottom: 6px; font-size: 13px; }
+.wb-vorlagen-wahl label { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+.wb-vorlagen-wahl label.is-aktiv { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.wb-vorlagen-wahl input { position: absolute; opacity: 0; pointer-events: none; }
+.wb-vorlagen-wahl span { font-size: 12px; color: var(--ink-muted); }
+
+/* The board page: bar, toolbar and canvas fill the window below the hub's own head. */
+.wb-seite { display: flex; flex-direction: column; gap: 8px; height: calc(100dvh - 96px); min-height: 520px; padding-bottom: 12px; }
+.wb-kopf { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.wb-kopf h1 { font-size: 20px; margin: 0; line-height: 1.2; }
+.wb-pfad { font-size: 13px; color: var(--ink-muted); width: 100%; }
+.wb { position: relative; flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.wb-werkzeuge { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.wb-gruppe { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.wb-status { font-size: 12.5px; color: var(--ink-muted); gap: 12px; }
+.wb-live { display: inline-flex; align-items: center; gap: 6px; }
+.wb-live i { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-muted); }
+.wb-live.is-live i { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+.wb-live.is-verbinde i, .wb-live.is-getrennt i { background: var(--warn); }
+.wb-personen { display: inline-flex; }
+.wb-personen span { width: 26px; height: 26px; border-radius: 50%; color: #fff; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--surface); margin-left: -6px; }
+.wb-personen .wb-mehr { background: var(--ink-muted); }
+.wb-speichern.is-fehler { color: var(--danger); font-weight: 600; }
+.wb-menue { position: relative; }
+.wb-aufklapp { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; background: var(--raised); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--karten-schatten-hoch, 0 10px 30px rgb(0 0 0 / 15%)); padding: 6px; display: grid; min-width: 300px; }
+.wb-aufklapp button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; border: 0; background: transparent; color: var(--ink); padding: 9px 10px; border-radius: 10px; cursor: pointer; font: inherit; }
+.wb-aufklapp button:hover { background: var(--hover); }
+.wb-aufklapp button span { font-size: 12px; color: var(--ink-muted); }
+.wb-farben { display: flex; min-width: 0; gap: 6px; }
+.wb-farben button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgb(0 0 0 / 15%); padding: 0; }
+.wb-farben button:hover { transform: scale(1.08); background: inherit; }
+.wb-unsichtbar { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.wb-flaeche { flex: 1; display: flex; gap: 8px; min-height: 0; }
+.wb-excalidraw { position: relative; flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.wb-excalidraw .excalidraw { --zIndex-layerUI: 3; }
+
+.wb-kommentare { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
+.wb-setzen { position: absolute; inset: 0; pointer-events: auto; cursor: crosshair; background: rgb(44 14 24 / 4%); }
+.wb-pin { position: absolute; transform: translate(-50%, -100%); pointer-events: auto; min-width: 28px; height: 28px; padding: 0 6px; border-radius: 14px 14px 14px 3px; border: 2px solid #fff; background: var(--espresso, #45142d); color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgb(0 0 0 / 25%); }
+.wb-pin.is-offen { background: var(--danger); }
+.wb-blase { position: absolute; pointer-events: auto; width: 320px; max-width: calc(100% - 24px); background: var(--raised); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 14px 40px -12px rgb(0 0 0 / 35%); padding: 12px; }
+.wb-faden { display: grid; gap: 10px; max-height: 360px; overflow: auto; }
+.wb-beitrag p { margin: 4px 0 0; white-space: pre-wrap; font-size: 14px; }
+.wb-beitrag-kopf { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; }
+.wb-beitrag-kopf span { color: var(--ink-muted); }
+.wb-eingabe { display: grid; gap: 6px; }
+.wb-eingabe textarea { width: 100%; resize: vertical; }
+.wb-eingabe-knoepfe { display: flex; justify-content: flex-end; gap: 6px; }
+.wb-erledigt { justify-self: start; }
+
+.wb-liste { width: 300px; flex: none; overflow: auto; background: var(--raised); border: 1px solid var(--line); border-radius: 16px; padding: 12px; }
+.wb-liste-titel { display: flex; justify-content: space-between; align-items: center; }
+.wb-liste-titel h2 { font-size: 16px; margin: 0; }
+.wb-liste ul { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 4px; }
+.wb-liste li button { width: 100%; text-align: left; display: grid; gap: 2px; border: 0; background: transparent; color: var(--ink); padding: 8px; border-radius: 10px; cursor: pointer; font: inherit; }
+.wb-liste li button:hover { background: var(--hover); }
+.wb-liste-kopf, .wb-liste-antworten { font-size: 12px; color: var(--ink-muted); }
+.wb-liste-text { font-size: 13.5px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.wb-liste-erledigt { opacity: 0.65; }
+
+.wb-praesentiert .wb-excalidraw { border-radius: 0; }
+.wb-praesentation { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 10px; background: var(--raised); border: 1px solid var(--line); border-radius: 999px; padding: 8px 10px 8px 16px; box-shadow: 0 14px 40px -12px rgb(0 0 0 / 35%); font-size: 14px; }
+
+@media (max-width: 720px) {
+  .wb-seite { height: calc(100dvh - 72px); }
+  .wb-liste { position: absolute; right: 8px; top: 8px; bottom: 8px; z-index: 6; width: min(300px, calc(100% - 16px)); }
+  .wb-flaeche { position: relative; }
+}

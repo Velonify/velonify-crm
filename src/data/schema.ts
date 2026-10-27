@@ -257,6 +257,17 @@ export const SCHEMA = {
     numeric: ['sortierung'],
     boolean: ['archiviert'],
   },
+  whiteboards: {
+    name: 'whiteboards',
+    columns: ['id', 'titel', 'firma_id', 'vorlage', 'sichtbar_kunde', 'archiviert', ...META],
+    boolean: ['sichtbar_kunde', 'archiviert'],
+  },
+  whiteboard_kommentare: {
+    name: 'whiteboard_kommentare',
+    columns: ['id', 'board_id', 'antwort_auf', 'element_id', 'x', 'y', 'text', 'von', 'erledigt', ...META],
+    numeric: ['x', 'y'],
+    boolean: ['erledigt'],
+  },
   listen: {
     name: 'listen',
     columns: ['liste', 'wert'],
@@ -307,6 +318,11 @@ export const ERWAEHNUNGEN_TABS = ['erwaehnungen'] as const;
  * shown as the client's roadmap. Loaded only on the "Portal" tab of a client page.
  */
 export const PORTAL_TABS = ['portal_zugaenge', 'portal_werkzeuge', 'kunden_meilensteine', 'kunden_tracking', 'kunden_berichte', 'kunden_feedback'] as const;
+/**
+ * Whiteboards: the boards (title, client, portal switch) and the comment pins on them. The drawing itself lives in
+ * `whiteboard_inhalte` behind its own routes, it is far too big to travel with these tabs.
+ */
+export const WHITEBOARD_TABS = ['whiteboards', 'whiteboard_kommentare'] as const;
 export type EntityTab =
   | (typeof ENTITY_TABS)[number]
   | (typeof ANGEBOTS_TABS)[number]
@@ -320,7 +336,8 @@ export type EntityTab =
   | (typeof KUNDEN_TABS)[number]
   | (typeof TODO_TABS)[number]
   | (typeof ERWAEHNUNGEN_TABS)[number]
-  | (typeof PORTAL_TABS)[number];
+  | (typeof PORTAL_TABS)[number]
+  | (typeof WHITEBOARD_TABS)[number];
 
 /** Editable select values, written to the "listen" tab on setup and maintained there afterwards. */
 export const LISTEN_DEFAULTS: Record<string, string[]> = {

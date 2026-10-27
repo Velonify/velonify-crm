@@ -90,8 +90,10 @@ export const ART_LABEL: Record<Erwaehnung['art'], string> = {
   firma: 'Firmen-Notiz',
   kontakt: 'Kontakt-Notiz',
   news: 'Kunden-News',
+  whiteboard: 'Whiteboard',
 };
 
 export const kartenLink = (boardId: string, aufgabeId: string, kommentarId?: string) => `/todo/${boardId}?karte=${aufgabeId}${kommentarId ? `&kommentar=${kommentarId}` : ''}`;
+export const whiteboardLink = (boardId: string, kommentarId?: string) => `/whiteboard/${boardId}${kommentarId ? `?kommentar=${kommentarId}` : ''}`;
 export const firmenLink = (firmaId: string) => `/crm/firmen/${firmaId}`;
 export const kundenLink = (firmaId: string) => (firmaId ? `/kunden/${firmaId}` : '/kunden');

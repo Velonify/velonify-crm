@@ -64,6 +64,14 @@ export const WERKZEUGE: Werkzeug[] = [
     ],
   },
   {
+    id: 'whiteboard',
+    name: 'Whiteboard',
+    kurz: 'Board',
+    beschreibung: 'Gemeinsam skizzieren wie in Miro: Sticky Notes, Vorlagen, Frames, Kommentare, live mit dem Team',
+    pfad: '/whiteboard',
+    navigation: [{ label: 'Alle Whiteboards', pfad: '/whiteboard', end: true }],
+  },
+  {
     id: 'angebote',
     name: 'Angebots-Rechner',
     kurz: 'Angebote',
@@ -179,6 +187,7 @@ export const LEISTE: { titel?: string; eintraege: LeistenEintrag[] }[] = [
       { werkzeug: 'home', label: 'Home', pfad: '/', icon: 'home' },
       { werkzeug: 'home', label: 'Eingang', pfad: '/eingang', icon: 'eingang', zahl: 'eingang' },
       { werkzeug: 'todo', label: 'To-Dos', pfad: '/todo', icon: 'todo', zahl: 'todo' },
+      { werkzeug: 'whiteboard', label: 'Whiteboard', pfad: '/whiteboard', icon: 'whiteboard' },
     ],
   },
   {

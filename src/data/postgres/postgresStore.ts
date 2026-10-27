@@ -1,7 +1,7 @@
 import { ConflictError, NotFoundError } from '../errors';
-import { ANGEBOTS_TABS, CONTACT_TABS, ENTITY_TABS, KUNDEN_TABS, LISTEN_DEFAULTS, MAGNET_TABS, PORTAL_TABS, SCHEMA, SOCIAL_TABS, TODO_TABS, type EntityTab, type TabName, type TabSchema } from '../schema';
+import { ANGEBOTS_TABS, CONTACT_TABS, ENTITY_TABS, KUNDEN_TABS, LISTEN_DEFAULTS, MAGNET_TABS, PORTAL_TABS, SCHEMA, SOCIAL_TABS, TODO_TABS, WHITEBOARD_TABS, type EntityTab, type TabName, type TabSchema } from '../schema';
 import type { RecordUpdate, Store } from '../store';
-import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Erwaehnung, KundenDaten, Listen, MagnetDaten, MonsteraEintrag, PortalDaten, SocialDaten, SpieleDaten, TodoDaten, WordleErgebnis } from '../types';
+import type { Anfrage, AngebotsDaten, Audit, ContactDaten, Database, Einstellungen, EntityMap, Erwaehnung, KundenDaten, Listen, MagnetDaten, MonsteraEintrag, PortalDaten, SocialDaten, SpieleDaten, TodoDaten, WhiteboardDaten, WordleErgebnis } from '../types';
 
 /** The little of a Postgres client the store needs: node-postgres in the functions, PGlite in the tests. */
 export interface Db {
@@ -162,6 +162,11 @@ export class PostgresStore implements Store {
   async loadPortalDaten(): Promise<PortalDaten> {
     const [zugaenge, werkzeuge, meilensteine, tracking, berichte, feedback] = await Promise.all(PORTAL_TABS.map((tab) => this.tabelle(tab)));
     return { zugaenge, werkzeuge, meilensteine, tracking, berichte, feedback } as PortalDaten;
+  }
+
+  async loadWhiteboardDaten(): Promise<WhiteboardDaten> {
+    const [boards, kommentare] = await Promise.all(WHITEBOARD_TABS.map((tab) => this.tabelle(tab)));
+    return { boards, kommentare } as WhiteboardDaten;
   }
 
   /** Any table as the app sees it, for the data view (Einrichtung → Daten). */

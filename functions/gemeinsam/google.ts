@@ -24,9 +24,9 @@ function gecacht(holen: () => Promise<{ access_token: string; expires_in: number
   };
 }
 
-export function dienstkontoToken(fetchFn: typeof fetch = fetch): () => Promise<string> {
+export function dienstkontoToken(fetchFn: typeof fetch = fetch, scopes: readonly string[] = DIENSTKONTO_SCOPES): () => Promise<string> {
   return gecacht(async () => {
-    const antwort = await fetchFn(`${METADATA_TOKEN}?scopes=${encodeURIComponent(DIENSTKONTO_SCOPES.join(','))}`, { headers: { 'Metadata-Flavor': 'Google' } });
+    const antwort = await fetchFn(`${METADATA_TOKEN}?scopes=${encodeURIComponent(scopes.join(','))}`, { headers: { 'Metadata-Flavor': 'Google' } });
     if (!antwort.ok) throw new Error(`Kein Token vom Metadatenserver (${antwort.status}).`);
     return (await antwort.json()) as { access_token: string; expires_in: number };
   });

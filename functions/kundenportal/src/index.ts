@@ -35,6 +35,8 @@ import { istKritik, kritikNachricht, pruefeFeedback } from '../../../src/data/fe
 import { leseTeamZuordnung } from '../../../src/data/selectors';
 import { slackDirekt } from '../../../src/data/slack';
 import { personen } from '../../../src/data/zustaendig';
+import { cloudStorage, speicherAblage, type Ablage } from '../../gemeinsam/ablage';
+import { boardFuerKunde, dateiFuerKunde, sichtbareBoards } from './whiteboards';
 
 interface Laufzeit {
   siegel: Siegel;
@@ -92,6 +94,11 @@ function holeLaufzeit(): Laufzeit {
   };
   return laufzeit;
 }
+
+/** Images of the whiteboards (bucket WHITEBOARD_BUCKET, read-only for the portal); without it the portal shows boards without images. */
+const whiteboardAblage: Ablage = process.env.WHITEBOARD_BUCKET
+  ? cloudStorage(process.env.WHITEBOARD_BUCKET, dienstkontoToken(fetch, ['https://www.googleapis.com/auth/devstorage.read_only']))
+  : speicherAblage();
 
 const loginProMail = new Begrenzer(3, 15 * 60_000);
 const loginProIp = new Begrenzer(20, 15 * 60_000);
@@ -321,6 +328,31 @@ async function datei(req: Request, res: Response, lz: Laufzeit, id: string): Pro
   res.send(Buffer.from(await antwort.arrayBuffer()));
 }
 
+/**
+ * Whiteboards the team shows in the portal, read-only (stage 1): `GET /whiteboards`, `GET /whiteboard/<id>` and
+ * `GET /whiteboard/<id>/datei/<fileId>`. Only boards of the own firm with „Im Kundenportal zeigen“.
+ */
+async function whiteboard(req: Request, res: Response, lz: Laufzeit, pfad: string): Promise<void> {
+  const s = await store(lz);
+  const anmeldung = await angemeldet(req, lz, s);
+  if (!anmeldung) return json(res, 401, { fehler: NICHT_ANGEMELDET });
+  if (!abrufeProSitzung.erlaubt(anmeldung.sitzung.v ?? anmeldung.berechtigung.kontakt.id)) return json(res, 429, { fehler: 'Zu viele Abrufe. Bitte kurz warten.' });
+  const firmaId = anmeldung.berechtigung.firma.id;
+  const { pool } = await lz.db;
+  if (pfad === '/whiteboards') return json(res, 200, { boards: await sichtbareBoards(pool, firmaId) });
+  const datei = /^\/whiteboard\/([A-Z0-9-]{1,40})\/datei\/([^/]+)$/.exec(pfad);
+  if (datei) {
+    const bild = await dateiFuerKunde(pool, whiteboardAblage, firmaId, datei[1], datei[2]);
+    if (!bild) return json(res, 404, { fehler: 'Dieses Bild gibt es nicht (mehr).' });
+    res.status(200).set('Cache-Control', 'private, max-age=86400').set('Content-Type', bild.typ).send(bild.inhalt);
+    return;
+  }
+  const board = /^\/whiteboard\/([A-Z0-9-]{1,40})$/.exec(pfad);
+  const inhalt = board ? await boardFuerKunde(pool, firmaId, board[1]) : null;
+  if (!inhalt) return json(res, 404, { fehler: 'Dieses Whiteboard gibt es nicht (mehr).' });
+  json(res, 200, inhalt);
+}
+
 /** The JSON body as an object; anything else counts as empty. */
 function eingabe(req: Request): Record<string, unknown> {
   const body: unknown = req.body;
@@ -499,6 +531,7 @@ http('kundenportal', async (req: Request, res: Response) => {
     if (req.method === 'POST' && pfad === '/kennzahlen') return await kennzahlen(req, res, lz);
     if (req.method === 'POST' && pfad === '/bericht') return await monatsbericht(req, res, lz);
     if (req.method === 'POST' && pfad === '/feedback') return await feedback(req, res, lz);
+    if (req.method === 'GET' && (pfad === '/whiteboards' || pfad.startsWith('/whiteboard/'))) return await whiteboard(req, res, lz, pfad);
     const dateiPfad = /^\/datei\/([\w-]+)$/.exec(pfad);
     if (req.method === 'GET' && dateiPfad) return await datei(req, res, lz, dateiPfad[1]);
     if (req.method === 'GET' && pfad === '/') return json(res, 200, { dienst: 'velonify-kundenportal' });
