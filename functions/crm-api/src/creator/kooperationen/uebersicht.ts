@@ -1,3 +1,4 @@
+import { darfEinrichten } from '../../../../../src/data/instanz';
 import type { Db } from '../../../../../src/data/postgres/postgresStore';
 import type { Antwort } from '../../routen';
 import { freigabeVon } from '../freigaben';
@@ -218,6 +219,13 @@ export async function speichereKooperation(ctx: CreatorKontext, body: Record<str
   if (id && !vorher) throw Object.assign(new Eingabefehler('Kooperation nicht gefunden.'), { status: 404 });
   if (!vorher && !f.partner) throw new Eingabefehler('Der Partner fehlt.');
   if (vorher && 'partner' in f && !f.partner) throw new Eingabefehler('Der Partner fehlt.');
+  if (f.stand !== undefined && f.stand !== (vorher?.stand ?? 'anfrage')) {
+    if (!ctx.sicht.bausteine.includes('pipeline')) throw Object.assign(new Eingabefehler('Die Pipeline ist nicht eingeschaltet.'), { status: 403 });
+    if (ctx.sicht.bausteine.includes('freigaben') && ['reporting', 'rechnung', 'abgeschlossen'].includes(String(f.stand))) {
+      const freigabe = vorher ? await freigabeVon(ctx.pool, 'kooperation', vorher.id) : null;
+      if (!freigabe || freigabe.status !== 'freigegeben') throw Object.assign(new Eingabefehler('Die Kooperation braucht zuerst eine Freigabe.'), { status: 409 });
+    }
+  }
   zahlungsdaten(f, vorher, heute);
   const von = (f.zeitraum_von ?? vorher?.zeitraum_von) as string | null;
   const bis = (f.zeitraum_bis ?? vorher?.zeitraum_bis) as string | null;
@@ -363,6 +371,7 @@ export async function uebersichtRouten(methode: string, pfad: string, body: unkn
   }
 
   if (pfad === '/c/kooperationen/einstellungen') {
+    if (!darfEinrichten(ctx.rolle)) return fehler(403, 'Die Einrichtung ist nur für Admins.');
     const zu = baustein(ctx, 'kooperationen');
     if (zu) return zu;
     if (!istObjekt(body)) return fehler(400, 'Anfrage ohne Inhalt.');

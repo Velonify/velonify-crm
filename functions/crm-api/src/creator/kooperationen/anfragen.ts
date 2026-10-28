@@ -148,7 +148,7 @@ export async function anfragenRouten(methode: string, pfad: string, body: unknow
 
   if (pfad === '/c/kooperationen/anfragen' && methode === 'GET') {
     const { rows } = await db.query<Record<string, unknown>>(`SELECT ${SPALTEN} FROM kooperation_anfragen ORDER BY status = 'neu' DESC, eingegangen_am DESC LIMIT 300`);
-    return ok({ anfragen: rows.map(zuAnfrage), empfaenger: await empfaenger(db) });
+    return ok({ anfragen: rows.map(zuAnfrage).map(a => ctx.sicht.betraege ? a : { ...a, budget: '' }), empfaenger: await empfaenger(db) });
   }
   if (methode !== 'POST' || !istObjekt(body) || typeof body.id !== 'string') return methode === 'POST' ? fehler(400, 'Anfrage fehlt.') : null;
   const { rows } = await db.query<Record<string, unknown>>(`SELECT ${SPALTEN} FROM kooperation_anfragen WHERE id = $1`, [body.id]);
