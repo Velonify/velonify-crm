@@ -64,6 +64,7 @@ export interface AblageOrdner {
   art: 'angelegt' | 'verknuepft';
   erstellt_am: string;
   erstellt_von: string;
+  bereit: boolean;
 }
 
 // Password manager: recommended, set up with this checklist, never built into the hub (Konzept, Abgrenzung).

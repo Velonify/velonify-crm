@@ -128,3 +128,9 @@ CREATE TABLE studio_importe (
   am timestamptz NOT NULL DEFAULT now(),
   von text
 );
+
+ALTER TABLE analytics_oauth ADD COLUMN rolle text NOT NULL DEFAULT 'admin';
+ALTER TABLE kanal_konten ADD COLUMN abruf_sperre_bis timestamptz;
+ALTER TABLE studio_importe ADD COLUMN fingerprint text UNIQUE;
+ALTER TABLE benchmark_werte ADD COLUMN import_quelle text;
+CREATE TABLE analytics_einstellungen (schluessel text PRIMARY KEY, wert text NOT NULL);

@@ -51,6 +51,7 @@ CREATE TABLE ablage_ordner (
   schluessel text PRIMARY KEY,
   name text NOT NULL,
   drive_id text NOT NULL,
+  bereit boolean NOT NULL DEFAULT true,
   -- angelegt (vom Hub erzeugt) oder verknuepft (bestehender Ordner, über den Google Picker gewählt)
   art text NOT NULL DEFAULT 'angelegt' CHECK (art IN ('angelegt', 'verknuepft')),
   erstellt_am timestamptz NOT NULL DEFAULT now(),

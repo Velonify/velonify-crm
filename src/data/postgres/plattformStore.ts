@@ -508,7 +508,7 @@ export class PlattformStore {
     return {
       mandant: m,
       zugaenge: zugaenge.rows.map(zuZugang),
-      nutzung: nutzung.rows.map(zeit),
+      nutzung: nutzung.rows.map(z => ({ art: text(z.art), email: text(z.email), detail: text(z.detail), am: text(z.am) })),
       feedback: feedback.rows.map(zeit),
       freigaben: freigaben.rows.map(zeit),
       werkzeuge_genutzt: werkzeuge.rows.map((w) => ({ werkzeug: w.detail, aufrufe: Number(w.n) })),
@@ -655,7 +655,11 @@ export class PlattformStore {
     };
     if (!neu.name || neu.name.length > 60) throw new PlattformFehler('Die Instanz braucht einen Namen (bis 60 Zeichen).');
     if (neu.domain && !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(neu.domain)) throw new PlattformFehler('Die Domain sieht nicht richtig aus, z. B. beispiel.velonify.de.');
-    if (!/^https:\/\/[^\s/]+(\/\S*)?$/.test(neu.api_url)) throw new PlattformFehler('Die Adresse von crm-api beginnt mit https://.');
+    let api: URL;
+    try { api = new URL(neu.api_url); } catch { throw new PlattformFehler('Die Adresse von crm-api ist keine gültige URL.'); }
+    if (api.protocol !== 'https:' || api.username || api.password || api.search || api.hash || (api.port && api.port !== '443')) throw new PlattformFehler('crm-api braucht eine HTTPS-Adresse ohne Zugangsdaten, Query oder Fragment.');
+    if (!/(?:\.cloudfunctions\.net|\.run\.app|\.velonify\.de)$/.test(api.hostname)) throw new PlattformFehler('Als crm-api sind Cloud Functions, Cloud Run oder eine Velonify-Subdomain erlaubt.');
+    if (neu.notiz.length > 4000) throw new PlattformFehler('Die Notiz darf höchstens 4000 Zeichen enthalten.');
     if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(neu.repo)) throw new PlattformFehler('Das Repo im Format Besitzer/Name, z. B. Velonify/velonify-hub-beispiel.');
     const { rows } = await this.db.query(
       `INSERT INTO plattform_instanzen (kennung, name, domain, api_url, repo, notiz, aktiv, geaendert_von)

@@ -65,7 +65,7 @@ describe('crm-api für Mandanten', { timeout: 60_000 }, () => {
     expect((await behandleMandant('POST', '/feedback', { anlass: 'tag14', wert: 4, text: 'Gute Leads' }, await kontext())).status).toBe(200);
     expect((await behandleMandant('POST', '/feedback', { anlass: 'quatsch', text: 'x' }, await kontext())).status).toBe(400);
     const detail = await plattform.mandantDetail('vennie');
-    expect(detail.nutzung.map((n) => (n as { art: string }).art)).toContain('bewegung');
+    expect(detail.nutzung.map((n) => n.art)).toContain('bewegung');
     expect(detail.feedback).toHaveLength(1);
     // The test database has no hub_vennie, so the admin page asks for it.
     expect(detail.datenbank).toBe(false);

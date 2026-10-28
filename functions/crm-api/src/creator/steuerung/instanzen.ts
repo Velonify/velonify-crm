@@ -74,6 +74,7 @@ async function rufeInstanz<T>(d: SteuerDienste, instanz: PlattformInstanz, metho
   try {
     antwort = await d.holen(`${instanz.api_url}${pfad}`, {
       method: methode,
+      redirect: 'error',
       headers: { 'x-velonify-token': token, ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(WARTEZEIT_MS),
@@ -95,6 +96,7 @@ async function rufeGithub<T>(d: SteuerDienste, methode: 'GET' | 'POST', pfad: st
   try {
     antwort = await d.holen(`${GITHUB}${pfad}`, {
       method: methode,
+      redirect: 'error',
       headers: {
         authorization: `Bearer ${d.github}`,
         accept: 'application/vnd.github+json',

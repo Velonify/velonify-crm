@@ -45,7 +45,7 @@ export async function behandleSteuerung(methode: string, pfad: string, body: unk
       const werkzeug = typeof body.werkzeug === 'string' ? body.werkzeug.trim() : '';
       if (!titel || titel.length > 120) return fehler(400, 'Der Titel braucht 1 bis 120 Zeichen.');
       if (!inhalt || inhalt.length > 2000) return fehler(400, 'Der Text braucht 1 bis 2000 Zeichen.');
-      if (link && !/^(\/\S*|https:\/\/\S+)$/.test(link)) return fehler(400, 'Der Link ist ein Hub-Pfad wie /analytics oder eine https-Adresse.');
+      if (link && !/^(\/(?!\/)[^\s\\]*|https:\/\/[^\s\\]+)$/.test(link)) return fehler(400, 'Der Link ist ein Hub-Pfad wie /analytics oder eine https-Adresse.');
       if (werkzeug && !PROFIL_WERKZEUGE[dienste.profil].includes(werkzeug)) return fehler(400, 'Unbekanntes Werkzeug.');
       const von = typeof body.von === 'string' ? body.von.trim().slice(0, 120) : '';
       const { rows } = await dienste.pool.query<Record<string, unknown>>(
@@ -135,7 +135,7 @@ async function status(dienste: InstanzDienste, jetzt: Date): Promise<InstanzStat
       beispiel: k.beispiel === true,
       verbunden_am: zeit(k.verbunden_am),
       letzte_abholung: zeit(k.letzte_abholung),
-      fehler: text(k.fehler),
+      fehler: k.fehler ? 'Abruf fehlgeschlagen. Details im Kanalbereich der Instanz.' : '',
     })),
     ki: {
       monat: new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit' }).format(jetzt),

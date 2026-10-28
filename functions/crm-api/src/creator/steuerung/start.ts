@@ -1,4 +1,4 @@
-import { darfEinrichten } from '../../../../../src/data/instanz';
+import { darfEinrichten, listeAus } from '../../../../../src/data/instanz';
 import { heuteBerlin, plusTage } from '../../../../../src/data/plattform';
 import type { Db } from '../../../../../src/data/postgres/postgresStore';
 import {
@@ -122,11 +122,11 @@ async function startDaten(ctx: CreatorKontext): Promise<StartDaten> {
   const an = (k: StartKachel) => kacheln.includes(k);
 
   const [uploads, fristen, kooperationen, freigaben, zahlen, bericht, neuigkeiten, stand] = await Promise.all([
-    an('uploads') ? ladeUploads(db, woche) : [],
-    an('fristen') ? ladeFristen(db, woche, heute, { ohneInhalte: an('uploads'), ohneKooperationen: an('kooperationen') }) : [],
+    an('uploads') ? ladeUploads(db, woche, baustein('twitch')) : [],
+    an('fristen') ? ladeFristen(ctx, woche, heute, { ohneInhalte: an('uploads'), ohneKooperationen: an('kooperationen') }) : [],
     an('kooperationen') && koopSpalten ? ladeKooperationen(db, koopSpalten, woche, heute, sicht.betraege) : [],
-    an('freigaben') ? ladeFreigaben(db, ctx.person) : [],
-    an('zahlen') ? ladeZahlen(db) : [],
+    an('freigaben') ? ladeFreigaben(db, ctx.person, sicht.werkzeuge) : [],
+    an('zahlen') ? ladeZahlen(db, baustein('twitch')) : [],
     an('bericht') ? ladeBericht(db) : null,
     ladeNeuigkeiten(db, sicht.werkzeuge, ctx.email.trim().toLowerCase()),
     db.query<{ rundgang_am: unknown }>('SELECT rundgang_am FROM instanz_rundgang WHERE email = $1', [ctx.email.trim().toLowerCase()]),
@@ -141,24 +141,35 @@ async function spalten(db: Db, tabelle: string): Promise<Set<string> | null> {
   return new Set(namen.map((n) => n.column_name));
 }
 
-async function ladeUploads(db: Db, woche: { von: string; bis: string }): Promise<StartInhalt[]> {
+async function ladeUploads(db: Db, woche: { von: string; bis: string }, twitch: boolean): Promise<StartInhalt[]> {
   const { rows } = await db.query<Record<string, unknown>>(
     `SELECT id, titel, kanal, format, status, to_char(geplant_am, 'YYYY-MM-DD') AS geplant_am, zustaendig
-     FROM inhalte WHERE NOT archiviert AND geplant_am BETWEEN $1::date AND $2::date ORDER BY geplant_am, titel LIMIT 50`,
-    [woche.von, woche.bis],
+     FROM inhalte WHERE NOT archiviert AND (kanal <> 'twitch' OR $3) AND geplant_am BETWEEN $1::date AND $2::date ORDER BY geplant_am, titel LIMIT 50`,
+    [woche.von, woche.bis, twitch],
   );
   return rows.map((r) => ({ id: text(r.id), titel: text(r.titel), kanal: text(r.kanal), format: text(r.format), status: text(r.status), geplant_am: text(r.geplant_am), zustaendig: text(r.zustaendig) }));
 }
 
 /** This week's open deadlines and older ones still open. Uploads and cooperations have their own tiles, so their deadlines stay out there. */
-async function ladeFristen(db: Db, woche: { von: string; bis: string }, heute: string, ohne: { ohneInhalte: boolean; ohneKooperationen: boolean }): Promise<StartFrist[]> {
+async function ladeFristen(ctx: CreatorKontext, woche: { von: string; bis: string }, heute: string, ohne: { ohneInhalte: boolean; ohneKooperationen: boolean }): Promise<StartFrist[]> {
+  const db = ctx.pool;
+  const { rows: grant } = await db.query<{boards:string}>('SELECT boards FROM instanz_zugaenge WHERE email=$1', [ctx.email]);
+  const boards = listeAus(grant[0]?.boards);
+  const tools = ctx.sicht.werkzeuge;
+  const partner = ctx.rolle === 'partner';
   const quellen = [...(ohne.ohneInhalte ? ['inhalt'] : []), ...(ohne.ohneKooperationen ? ['kooperation'] : [])];
   const { rows } = await db.query<Record<string, unknown>>(
     `SELECT id, titel, to_char(datum, 'YYYY-MM-DD') AS datum, uhrzeit, art, link, zustaendig
      FROM fristen
      WHERE NOT archiviert AND NOT erledigt AND datum <= $2::date AND (datum >= $1::date OR datum < $3::date) AND NOT (quelle = ANY($4::text[]))
+       AND ((quelle IN ('manuell','serie') AND NOT $5)
+         OR (quelle='inhalt' AND NOT $5 AND $6 AND EXISTS (SELECT 1 FROM inhalte i WHERE i.id=fristen.bezug_id AND (i.kanal<>'twitch' OR $11)))
+         OR (quelle IN ('kooperation','pipeline') AND NOT $5 AND $7)
+         OR (quelle='bericht' AND NOT $5 AND $8)
+         OR (quelle='einnahme' AND NOT $5 AND $9)
+         OR (quelle IN ('aufgabe','karte') AND $10 AND EXISTS (SELECT 1 FROM aufgaben a WHERE a.id=fristen.bezug_id AND NOT a.archiviert AND (NOT $5 OR a.board_id=ANY($12::text[])))))
      ORDER BY datum, uhrzeit NULLS FIRST, titel LIMIT 50`,
-    [woche.von, woche.bis, heute, quellen],
+    [woche.von, woche.bis, heute, quellen, partner, tools.includes('content') && ctx.sicht.bausteine.includes('contentplan'), tools.includes('kooperationen'), tools.includes('analytics') && ctx.sicht.bausteine.includes('berichte'), tools.includes('einnahmen'), tools.includes('todo') && ctx.sicht.bausteine.includes('boards'), ctx.sicht.bausteine.includes('twitch'), boards],
   );
   return rows.map((r) => ({ id: text(r.id), titel: text(r.titel), datum: text(r.datum), uhrzeit: text(r.uhrzeit), art: text(r.art), link: text(r.link), zustaendig: text(r.zustaendig) }));
 }
@@ -194,25 +205,26 @@ async function ladeKooperationen(db: Db, sp: Set<string>, woche: { bis: string }
   }));
 }
 
-async function ladeFreigaben(db: Db, person: string): Promise<StartFreigabe[]> {
+async function ladeFreigaben(db: Db, person: string, werkzeuge: string[]): Promise<StartFreigabe[]> {
   const { rows } = await db.query<Record<string, unknown>>(
     `SELECT id, titel, link, objekt_typ, angefragt_von, angefragt_am FROM freigaben WHERE status = 'offen' AND freigeber = $1 ORDER BY angefragt_am LIMIT 30`,
     [person],
   );
-  return rows.map((r) => ({ id: text(r.id), titel: text(r.titel), link: text(r.link), objekt_typ: text(r.objekt_typ), angefragt_von: text(r.angefragt_von), angefragt_am: zeit(r.angefragt_am) }));
+  const bereiche: Record<string,string> = {skript:'content',inhalt:'content',thumbnail:'content',upload:'content',kooperation:'kooperationen',reporting:'kooperationen',bericht:'analytics'};
+  return rows.filter(r => Boolean(bereiche[text(r.objekt_typ)] && werkzeuge.includes(bereiche[text(r.objekt_typ)]))).map((r) => ({ id: text(r.id), titel: text(r.titel), link: text(r.link), objekt_typ: text(r.objekt_typ), angefragt_von: text(r.angefragt_von), angefragt_am: zeit(r.angefragt_am) }));
 }
 
 /** Latest values per channel, the follower change against a week earlier and the views of the last seven days of values. */
-async function ladeZahlen(db: Db): Promise<StartKanal[]> {
+async function ladeZahlen(db: Db, twitch: boolean): Promise<StartKanal[]> {
   const { rows } = await db.query<Record<string, unknown>>(
     `SELECT k.id, k.plattform, k.handle, k.status, k.beispiel AS konto_beispiel,
        to_char(w.datum, 'YYYY-MM-DD') AS datum, w.follower, w.beispiel AS werte_beispiel, v.follower AS follower_vorher,
-       (SELECT sum(x.aufrufe) FROM kanal_werte x WHERE x.konto_id = k.id AND x.datum > w.datum - 7 AND x.datum <= w.datum) AS aufrufe_7
+       w.aufrufe AS aufrufe
      FROM kanal_konten k
      LEFT JOIN LATERAL (SELECT * FROM kanal_werte WHERE konto_id = k.id ORDER BY datum DESC LIMIT 1) w ON true
      LEFT JOIN LATERAL (SELECT follower FROM kanal_werte WHERE konto_id = k.id AND datum <= w.datum - 7 ORDER BY datum DESC LIMIT 1) v ON true
-     WHERE k.status <> 'getrennt'
-     ORDER BY k.plattform, k.id`,
+     WHERE k.status <> 'getrennt' AND (k.plattform <> 'twitch' OR $1)
+     ORDER BY k.plattform, k.id`, [twitch],
   );
   return rows.map((r) => {
     const follower = zahlOderNull(r.follower);
@@ -225,7 +237,7 @@ async function ladeZahlen(db: Db): Promise<StartKanal[]> {
       datum: text(r.datum),
       follower,
       follower_plus: follower !== null && vorher !== null ? follower - vorher : null,
-      aufrufe_7: zahlOderNull(r.aufrufe_7),
+      aufrufe: zahlOderNull(r.aufrufe),
       beispiel: r.konto_beispiel === true || r.werte_beispiel === true || r.status === 'beispiel',
     };
   });

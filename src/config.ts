@@ -46,7 +46,7 @@ export const isDemo = !config.googleClientId || !config.crmApiUrl;
 //   created by the app, so drive.file would not see them. Full drive would also cover the Sheets API; the spreadsheets
 //   scope stays anyway until that has been tried live.
 // - Calendar: Meet appointments.
-export const GOOGLE_SCOPES = offenerLogin ? ['openid', 'email', 'profile'] : [
+export const GOOGLE_SCOPES = offenerLogin ? ['openid', 'email', 'profile', ...(instanzModus ? ['https://www.googleapis.com/auth/drive.file'] : [])] : [
   'openid',
   'email',
   'profile',
