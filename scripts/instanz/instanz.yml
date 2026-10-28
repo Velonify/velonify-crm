@@ -10,6 +10,7 @@
 #   GOOGLE_CLIENT_ID  OAuth client of the instance
 #   CRM_API_URL       https://europe-west3-velonify-<kennung>.cloudfunctions.net/crm-api
 #   HUB_DOMAIN        <kennung>.velonify.de
+#   INSTANZ_NAME      Name auf der Login-Seite, z. B. „Beispiel“ → „Beispiel HUB · by Velonify“
 #   ADMINS            Velonify support addresses, comma separated (always have access)
 #
 # The repo is public (GitHub Pages on the free plan), so the logs are public too: nothing here prints secrets or env vars.
@@ -151,6 +152,7 @@ jobs:
           VITE_PROFIL: creator
           VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
           VITE_CRM_API_URL: ${{ vars.CRM_API_URL }}
+          VITE_INSTANZ_NAME: ${{ vars.INSTANZ_NAME }}
       - run: touch dist/.nojekyll
       - uses: actions/upload-pages-artifact@v4
         with:
