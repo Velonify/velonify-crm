@@ -175,3 +175,84 @@ export function gesundheit(w: { aktive_tage_7: number; leads_anteil: number; bew
 }
 
 export const ist_mandanten_id = (id: string) => /^[a-z0-9_]{2,30}$/.test(id);
+
+// Own instances (own Google Cloud project, database and crm-api), steered from the admin tool "Plattform" → Instanzen.
+// Their status comes from the instance's GET /steuerung/status: metadata only, never content.
+
+export const ist_instanz_kennung = (kennung: string) => /^[a-z0-9-]{2,30}$/.test(kennung);
+
+/** An instance as Velonify's hub knows it (table plattform_instanzen). */
+export interface PlattformInstanz {
+  kennung: string;
+  name: string;
+  domain: string;
+  /** The instance's crm-api, https only. */
+  api_url: string;
+  /** GitHub repo with the workflow instanz.yml, e.g. Velonify/velonify-hub-beispiel. */
+  repo: string;
+  notiz: string;
+  aktiv: boolean;
+  angelegt_am: string;
+  geaendert_am: string;
+}
+
+/** What an instance says about itself (GET /steuerung/status). */
+export interface InstanzStatus {
+  /** Commit the instance's crm-api was deployed from (HUB_VERSION); '' when not set. */
+  version: string;
+  profil: string;
+  name: string;
+  bausteine: string[];
+  werkzeuge: string[];
+  /** Whether Velonify's support may sign in (the instance's admins switch it). */
+  velonify_zugang: boolean;
+  zugaenge: { aktiv: number; inaktiv: number; rollen: Record<string, number>; aktiv_7_tage: number; letzter_login: string };
+  kanaele: { plattform: string; status: string; beispiel: boolean; verbunden_am: string; letzte_abholung: string; fehler: string }[];
+  /** Claude calls of the current month (Berlin). */
+  ki: { monat: string; aufrufe: number; tokens_ein: number; tokens_aus: number; modelle: { modell: string; aufrufe: number; tokens_ein: number; tokens_aus: number }[] };
+  speicher: { datenbank_bytes: number };
+  /** Active entries of "Neu im Hub". */
+  neuigkeiten: number;
+  /** When the instance answered (ISO). */
+  stand: string;
+}
+
+/** An entry of "Neu im Hub" in an instance. */
+export interface InstanzNeuigkeit {
+  id: string;
+  titel: string;
+  text: string;
+  link: string;
+  werkzeug: string;
+  am: string;
+  von: string;
+  archiviert: boolean;
+}
+
+/** A commit of the hub code between the instance's version and main. */
+export interface InstanzCommit {
+  sha: string;
+  titel: string;
+  autor: string;
+  am: string;
+  url: string;
+}
+
+/** A run of the workflow instanz.yml in the instance's repo. */
+export interface InstanzLauf {
+  id: number;
+  /** queued, in_progress, completed … */
+  status: string;
+  /** success, failure, cancelled …; '' while running */
+  ergebnis: string;
+  am: string;
+  url: string;
+}
+
+/** What Velonify did at an instance (table plattform_instanz_protokoll). */
+export interface InstanzProtokoll {
+  art: 'update' | 'bausteine' | 'neuigkeit';
+  detail: Record<string, unknown>;
+  von: string;
+  am: string;
+}
