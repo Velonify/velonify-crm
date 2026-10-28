@@ -1,0 +1,11 @@
+/* Analytics pages of the creator profile: only what the shared hub styles do not cover. */
+.analytics-kacheln { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.analytics-kachel { padding: 14px 16px; border: 1px solid var(--line, rgba(127, 127, 127, 0.25)); }
+.analytics-kachel .zahl { font-family: var(--font-display); font-size: 22px; line-height: 1.2; }
+.analytics-balken { display: inline-block; height: 8px; min-width: 2px; background: var(--eisblau, #c5d8e6); vertical-align: middle; margin-right: 6px; }
+.analytics-vergleich { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.analytics-vorschau { max-height: 320px; overflow: auto; }
+.analytics-zeile-fehler td { color: var(--rot, #b23a3a); }
+@media print {
+  .seitenleiste, .reiter, .mobilkopf, .hub-insel, .analytics-nicht-drucken { display: none !important; }
+}
