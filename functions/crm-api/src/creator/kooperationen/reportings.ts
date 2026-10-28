@@ -237,7 +237,7 @@ export async function reportingRouten(methode: string, pfad: string, body: unkno
     const berichtText = optText(body.text, 'Text', 20000);
     if (titel === null) return fehler(400, 'Der Titel fehlt.');
     const { rows } = await db.query<Record<string, unknown>>(
-      `UPDATE kooperation_reportings SET titel = COALESCE($2, titel), text = COALESCE($3, text), geaendert_am = now(), geaendert_von = $4 WHERE id = $1 RETURNING ${SPALTEN}`,
+      `UPDATE kooperation_reportings SET titel = COALESCE($2, titel), text = COALESCE($3, text), link_aktiv = false, geaendert_am = now(), geaendert_von = $4 WHERE id = $1 RETURNING ${SPALTEN}`,
       [r.id, titel ?? null, berichtText === undefined ? null : (berichtText ?? ''), ctx.person],
     );
     return ok({ reporting: zuReporting(rows[0]) });
@@ -253,7 +253,7 @@ export async function reportingRouten(methode: string, pfad: string, body: unkno
       berichtText = await schreibeText(ctx, k, { zeitraum_von: r.zeitraum_von, zeitraum_bis: r.zeitraum_bis, kennzahlen: z.kennzahlen }, creator ?? '');
     }
     const { rows } = await db.query<Record<string, unknown>>(
-      `UPDATE kooperation_reportings SET kennzahlen = $2, beispiel = $3, text = $4, geaendert_am = now(), geaendert_von = $5 WHERE id = $1 RETURNING ${SPALTEN}`,
+      `UPDATE kooperation_reportings SET kennzahlen = $2, beispiel = $3, text = $4, link_aktiv = false, geaendert_am = now(), geaendert_von = $5 WHERE id = $1 RETURNING ${SPALTEN}`,
       [r.id, JSON.stringify(z.kennzahlen), z.beispiel, berichtText, ctx.person],
     );
     return ok({ reporting: zuReporting(rows[0]) });
@@ -267,7 +267,7 @@ export async function reportingRouten(methode: string, pfad: string, body: unkno
     );
     // The pipeline moves on to "Reporting an den Partner" (never backwards).
     const k = await ladeKooperation(db, r.kooperation_id);
-    if (k && (PHASEN as readonly string[]).indexOf(k.stand) < PHASEN.indexOf('reporting') && (PHASEN as readonly string[]).includes(k.stand)) {
+    if (k && ctx.sicht.bausteine.includes('pipeline') && (!ctx.sicht.bausteine.includes('freigaben') || (await freigabeVon(db, 'kooperation', k.id))?.status === 'freigegeben') && (PHASEN as readonly string[]).indexOf(k.stand) < PHASEN.indexOf('reporting') && (PHASEN as readonly string[]).includes(k.stand)) {
       await speichereKooperation(ctx, { id: k.id, stand: 'reporting' }, heute);
     }
     return ok({ reporting: zuReporting(rows[0]), link: berichtLink(ctx, r.schluessel) });

@@ -1,15 +1,12 @@
 import { Route, Routes } from 'react-router-dom';
-import { ImBau } from '../ImBau';
-
-/** Pages of the module below its tool path (App.tsx mounts it with "/*"). */
+import { Uebersicht } from './Uebersicht';
+import { Anfragen, BausteinSeite, MediakitEditor, Reportings } from './Verwaltung';
 export function KooperationenRouten() {
-  return (
-    <Routes>
-      <Route index element={<ImBau titel="Kooperationen" punkt="Interne Kooperations-Übersicht (Punkt 21)" />} />
-      <Route path="pipeline" element={<ImBau titel="Pipeline" punkt="Kooperations-Pipeline (Punkt 22)" />} />
-      <Route path="anfragen" element={<ImBau titel="Anfragen" punkt="Anfrageformular (Punkt 23)" />} />
-      <Route path="mediakit" element={<ImBau titel="Mediakit" punkt="Live-Mediakit (Punkt 24)" />} />
-      <Route path="reportings" element={<ImBau titel="Reportings" punkt="Partner-Reporting (Punkt 25)" />} />
-    </Routes>
-  );
+  return <Routes>
+    <Route index element={<BausteinSeite id="kooperationen"><Uebersicht/></BausteinSeite>}/>
+    <Route path="pipeline" element={<BausteinSeite id="pipeline"><Uebersicht board/></BausteinSeite>}/>
+    <Route path="anfragen" element={<BausteinSeite id="anfrageformular"><Anfragen/></BausteinSeite>}/>
+    <Route path="mediakit" element={<BausteinSeite id="mediakit"><MediakitEditor/></BausteinSeite>}/>
+    <Route path="reportings" element={<BausteinSeite id="partnerreporting"><Reportings/></BausteinSeite>}/>
+  </Routes>;
 }

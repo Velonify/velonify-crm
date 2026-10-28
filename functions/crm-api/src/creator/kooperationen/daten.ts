@@ -33,7 +33,7 @@ export function tag(w: unknown): string {
   return String(w).slice(0, 10);
 }
 export const zahl = (w: unknown): number | null => (w === null || w === undefined || w === '' ? null : Number(w));
-export const istTag = (w: unknown): w is string => typeof w === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w) && !Number.isNaN(new Date(`${w}T00:00:00Z`).getTime());
+export const istTag = (w: unknown): w is string => typeof w === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w) && !Number.isNaN(new Date(`${w}T00:00:00Z`).getTime()) && new Date(`${w}T00:00:00Z`).toISOString().slice(0, 10) === w;
 /** "YYYY-MM-DD" of a Date in Europe/Berlin. */
 export const heuteIn = (d: Date): string => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(d);
 

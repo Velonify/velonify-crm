@@ -1,14 +1,32 @@
-import { ImBau } from '../ImBau';
-
-/** Public pages of the module Kooperationen (no login): request form, live media kit, report for a partner. */
+import { useEffect, useState } from 'react';
+import { Card, ErrorBox, Field, FormError, Loading, PageHeader } from '../../components/ui';
+import { oeffentlich } from '../api';
+import type { MediakitTexte, MediakitZahlen } from '../../../functions/crm-api/src/creator/kooperationen/mediakit';
+import type { ReportingKennzahlen } from '../../../functions/crm-api/src/creator/kooperationen/reportings';
+function usePublic<T>(path: string) {
+  const [daten, setDaten] = useState<T>(); const [fehler, setFehler] = useState<unknown>();
+  useEffect(() => { let aktiv = true; setDaten(undefined); setFehler(undefined); void oeffentlich<T>(path).then(d => { if(aktiv)setDaten(d); }).catch(e => { if(aktiv)setFehler(e); }); return () => { aktiv = false; }; },[path]);
+  return { daten, fehler };
+}
+export function RechtLinks() { return <footer className="filters"><a href="#/oeffentlich/impressum">Impressum</a><a href="#/oeffentlich/datenschutz">Datenschutz</a><a href="#/oeffentlich/nutzungsbedingungen">Nutzungsbedingungen</a></footer>; }
 export function AnfrageSeite() {
-  return <ImBau titel="Kooperationsanfrage" punkt="Anfrageformular (Punkt 23)" />;
+  const { daten, fehler } = usePublic<{ name:string; kanaele:string[]; budgets:string[] }>('/oeffentlich/kooperationen/anfrage');
+  const [start] = useState(Date.now); const [busy,setBusy]=useState(false); const [gesendet,setGesendet]=useState(false); const [error,setError]=useState<unknown>();
+  const [form,setForm]=useState<Record<string,string>>({}); const [kanaele,setKanaele]=useState<string[]>([]); const [einwilligung,setEinwilligung]=useState(false);
+  if(!daten)return fehler?<ErrorBox error={fehler}/>:<Loading/>;
+  return <main className="page narrow"><PageHeader title={`Kooperationsanfrage${daten.name ? ` · ${daten.name}` : ''}`} subtitle="Beschreibt euer Vorhaben. Das Team meldet sich bei euch."/>{gesendet?<Card title="Anfrage eingegangen"><p>Vielen Dank. Eure Anfrage wurde an das Team übermittelt.</p></Card>:<form onSubmit={async e=>{e.preventDefault();setBusy(true);setError(undefined);try{await oeffentlich('/oeffentlich/kooperationen/anfrage',{...form,kanaele,einwilligung,geladen_ms:Date.now()-start});setGesendet(true);}catch(err){setError(err);}finally{setBusy(false);}}}>
+    <div className="form-grid">{[['firma','Firma'],['ansprechpartner','Ansprechperson'],['email','E-Mail'],['marke','Marke / Produkt'],['zeitraum_von','Zeitraum von'],['zeitraum_bis','Zeitraum bis']].map(([k,l])=><Field key={k} label={l}><input required={['firma','ansprechpartner','email'].includes(k)} maxLength={200} type={k==='email'?'email':k.startsWith('zeitraum')?'date':'text'} value={form[k]??''} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}/></Field>)}<Field label="Budget-Rahmen"><select value={form.budget??''} onChange={e=>setForm(f=>({...f,budget:e.target.value}))}><option value="">Bitte wählen</option>{daten.budgets.map(b=><option key={b}>{b}</option>)}</select></Field></div>
+    <fieldset><legend>Kanäle</legend>{daten.kanaele.map(k=><label key={k}><input type="checkbox" checked={kanaele.includes(k)} onChange={e=>setKanaele(a=>e.target.checked?[...a,k]:a.filter(x=>x!==k))}/> {k} </label>)}</fieldset><Field label="Eure Idee"><textarea required minLength={20} maxLength={5000} rows={6} value={form.nachricht??''} onChange={e=>setForm(f=>({...f,nachricht:e.target.value}))}/></Field>
+    <div hidden aria-hidden="true"><label>Website<input tabIndex={-1} autoComplete="off" value={form.website??''} onChange={e=>setForm(f=>({...f,website:e.target.value}))}/></label></div><label><input required type="checkbox" checked={einwilligung} onChange={e=>setEinwilligung(e.target.checked)}/> Ich bin mit der Verarbeitung meiner Angaben zur Bearbeitung dieser Anfrage einverstanden. <a href="#/oeffentlich/datenschutz">Datenschutz lesen</a></label><FormError error={error}/><button className="button primary" disabled={busy}>{busy?'Wird gesendet …':'Anfrage senden'}</button></form>}<RechtLinks/></main>;
 }
-
 export function MediakitSeite() {
-  return <ImBau titel="Mediakit" punkt="Live-Mediakit (Punkt 24)" />;
+  const {daten,fehler}=usePublic<{texte:MediakitTexte;zahlen:MediakitZahlen;anfrage:boolean}>('/oeffentlich/kooperationen/mediakit');
+  if(!daten)return fehler?<ErrorBox error={fehler}/>:<Loading/>;
+  const {texte:t,zahlen:z}=daten;
+  return <main className="page narrow"><PageHeader title={t.name||'Mediakit'} subtitle={t.untertitel}/><p style={{whiteSpace:'pre-wrap'}}>{t.ueber}</p><h2>Themen und Zielgruppe</h2><p>{t.themen}</p><p>{t.zielgruppe}</p><h2>Aktuelle Reichweite</h2><div style={{overflowX:'auto'}}><table className="table compact"><thead><tr><th>Kanal</th><th>Follower</th><th>Aufrufe je Video</th><th>Interaktion</th></tr></thead><tbody>{z.kanaele.map(k=><tr key={k.plattform}><td>{k.plattform} {k.handles.join(', ')}</td><td>{k.follower?.toLocaleString('de-DE')??'–'}</td><td>{k.aufrufe_schnitt?.toLocaleString('de-DE')??'–'}</td><td>{k.interaktionsrate===null?'–':`${k.interaktionsrate.toFixed(2)} %`}</td></tr>)}</tbody></table></div><p className="small muted">Stand: {z.stand?.slice(0,10)||'Noch keine Werte'} · Betrachtungszeitraum: {t.zeitraum_tage} Tage</p>{z.top?.length>0&&<><h2>Ausgewählte Inhalte</h2><ul>{z.top.map(v=><li key={v.id}><a href={v.url} rel="noreferrer" target="_blank">{v.titel||v.plattform}</a> · {v.aufrufe.toLocaleString('de-DE')} Aufrufe</li>)}</ul></>}{t.referenzen.length>0&&<><h2>Referenzen</h2>{t.referenzen.map((r,i)=><p key={i}><strong>{r.name}</strong> — {r.text}</p>)}</>}{daten.anfrage&&<a className="button primary" href="#/oeffentlich/anfrage">Kooperation anfragen</a>}<RechtLinks/></main>;
 }
-
-export function BerichtSeite({ schluessel }: { schluessel: string }) {
-  return <ImBau titel="Kampagnenbericht" punkt={`Partner-Reporting (Punkt 25), Link ${schluessel}`} />;
+export function BerichtSeite({schluessel}:{schluessel:string}) {
+  const {daten,fehler}=usePublic<{titel:string;creator:string;partner:string;zeitraum_von:string;zeitraum_bis:string;kennzahlen:ReportingKennzahlen;text:string}>(`/oeffentlich/kooperationen/bericht/${encodeURIComponent(schluessel)}`);
+  if(!daten)return fehler?<ErrorBox error={fehler}/>:<Loading/>;
+  return <main className="page narrow"><PageHeader title={daten.titel} subtitle={`${daten.creator} · ${daten.partner} · ${daten.zeitraum_von} – ${daten.zeitraum_bis}`} actions={<button className="button" onClick={()=>window.print()}>Drucken / PDF speichern</button>}/><p style={{whiteSpace:'pre-wrap'}}>{daten.text}</p><h2>Kampagnenergebnisse</h2><p>{daten.kennzahlen.summen.aufrufe.toLocaleString('de-DE')} Aufrufe aus {daten.kennzahlen.summen.videos} Videos</p><div style={{overflowX:'auto'}}><table className="table compact"><thead><tr><th>Video</th><th>Aufrufe</th><th>Likes</th><th>Kommentare</th><th>Shares</th></tr></thead><tbody>{daten.kennzahlen.videos.map(v=><tr key={v.id}><td><a href={v.url} target="_blank" rel="noreferrer">{v.titel||v.plattform}</a></td><td>{v.aufrufe}</td><td>{v.likes}</td><td>{v.kommentare}</td><td>{v.shares}</td></tr>)}</tbody></table></div><p className="small muted">Zahlenstand: {daten.kennzahlen.stand}</p><RechtLinks/></main>;
 }
