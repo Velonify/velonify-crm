@@ -216,9 +216,9 @@ WIF_PROVIDER=projects/${NR}/locations/global/workloadIdentityPools/github/provid
 
 Im Projekt `velonify-<kennung>` unter **Google Auth Platform**:
 
-1. **Branding:** App-Name „Velonify Hub“, Support-Mail (eine Velonify-Adresse), Startseite `https://<kennung>.velonify.de`, Datenschutzerklärung `https://velonify.de/datenschutz/` (bis die Instanz eine eigene Seite hat), autorisierte Domain `velonify.de`. Logo weglassen, sonst prüft Google das Branding.
+1. **Branding:** App-Name „<Name> HUB“, Support-Mail (eine Velonify-Adresse), Startseite `https://<kennung>.velonify.de`, Datenschutzerklärung `https://<kennung>.velonify.de/#/oeffentlich/datenschutz`, Nutzungsbedingungen `https://<kennung>.velonify.de/#/oeffentlich/nutzungsbedingungen`, autorisierte Domain `velonify.de`. Die Angaben dafür vorher im Hub unter Einrichtung → Impressum und Datenschutz eintragen (und juristisch prüfen lassen). Logo weglassen, sonst prüft Google das Branding.
 2. **Zielgruppe:** *Extern*, dann **App veröffentlichen** → Status *In Produktion*. Testnutzer braucht es dann nicht.
-3. **Datenzugriff:** nur `openid`, `…/auth/userinfo.email`, `…/auth/userinfo.profile`. Dafür ist keine Prüfung nötig. `drive.file` kommt mit der Ablage später dazu (nicht sensibel, auch ohne Prüfung).
+3. **Datenzugriff:** `openid`, `…/auth/userinfo.email`, `…/auth/userinfo.profile` und `…/auth/drive.file` (Ablage; nicht sensibel, keine Prüfung). Für die YouTube-Anbindung zusätzlich `youtube.readonly` und `yt-analytics.readonly` (sensibel: ohne Prüfung erscheint beim Verbinden ein Warnhinweis, für einen eigenen Kanal reicht das).
 4. **Clients → Client erstellen:** Webanwendung „Velonify Hub (<kennung>)“, autorisierte JavaScript-Quelle `https://<kennung>.velonify.de`. Weiterleitungs-URIs braucht der Hub nicht.
 5. Client-ID kopieren:
 
@@ -295,6 +295,82 @@ curl -s -o /dev/null -w '%{http_code}\n' ${CRM_API_URL}/daten/crm   # ohne Anmel
 ```
 
 In Cloud SQL Studio (Datenbank `hub`): `SELECT name, am FROM schema_migrationen ORDER BY name;` zeigt alle Dateien aus `db/migrationen`.
+
+### 11. Creator-Module: Secrets, Plattform-Apps, Takte
+
+Erst nach dem ersten erfolgreichen Lauf (Schritt 9). Ohne die Plattform-Secrets läuft der Hub trotzdem; die Kanäle zeigen dann „Noch nicht eingerichtet: …“.
+
+**Secrets (Claude, Takte, Steuerung):**
+
+```bash
+SA=${PROJEKT}.iam.gserviceaccount.com
+# Eigener Claude-Schlüssel der Instanz (Anthropic Console → eigener Workspace „<kennung>“, damit die Kosten getrennt sind)
+printf '%s' '<ANTHROPIC-SCHLÜSSEL>' | gcloud secrets create anthropic-api-key --data-file=- --project=${PROJEKT}
+openssl rand -hex 32 | tr -d '\n' | gcloud secrets create takt-token --data-file=- --project=${PROJEKT}
+openssl rand -hex 32 | tr -d '\n' | gcloud secrets create steuer-token --data-file=- --project=${PROJEKT}
+for s in anthropic-api-key takt-token steuer-token; do
+  gcloud secrets add-iam-policy-binding $s --project=${PROJEKT} --member=serviceAccount:crm-api@${SA} --role=roles/secretmanager.secretAccessor --format=none
+done
+# Kanal-Tokens legt crm-api selbst an (Secrets mit Präfix kanal-): nur dafür volle Rechte
+PNUM=$(gcloud projects describe ${PROJEKT} --format='value(projectNumber)')
+gcloud projects add-iam-policy-binding ${PROJEKT} --member=serviceAccount:crm-api@${SA} --role=roles/secretmanager.admin \
+  --condition="expression=resource.name.startsWith('projects/${PNUM}/secrets/kanal-'),title=nur-kanal-secrets" --format=none
+gh variable set CRM_API_SECRETS --repo ${REPO} --body "ANTHROPIC_API_KEY=anthropic-api-key:latest,TAKT_TOKEN=takt-token:latest,STEUER_TOKEN=steuer-token:latest"
+```
+
+**Plattform-Apps** (je Plattform eine App anlegen, Secrets anlegen, `CRM_API_SECRETS` erweitern, Update ausrollen). Redirect-URI immer `${CRM_API_URL}/oeffentlich/analytics/rueckruf/<plattform>`:
+
+| Plattform | Wo | Variablen (Secrets) | Redirect-URI endet auf | Freigabe |
+|---|---|---|---|---|
+| YouTube | Google Cloud des Projekts: YouTube Data API v3 + YouTube Analytics API aktivieren, OAuth-Client „Webanwendung“ | `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_API_KEY` (Benchmarking/Trends, API-Schlüssel nur für YouTube Data API) | `/rueckruf/youtube` | ohne Prüfung mit Warnhinweis |
+| Instagram | developers.facebook.com: App „Business“, Produkt „Instagram“ (API mit Instagram Login), Konto der Creatorin als Instagram-Tester, Einladung auf instagram.com annehmen | `INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET` | `/rueckruf/instagram` | keine App-Prüfung für eigene Konten |
+| Instagram-Vergleiche | dieselbe Meta-App: Facebook Login for Business | `META_APP_ID`, `META_APP_SECRET` (optional `META_GRAPH_VERSION`) | `/rueckruf/facebook` | ohne Prüfung nur für Rollen der App; sonst manuell/CSV |
+| TikTok | developers.tiktok.com: App, Login Kit + Display API, Scopes `user.info.basic`, `user.info.stats`, `video.list`, Website-URL verifizieren | `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET` | `/rueckruf/tiktok` | **App-Prüfung nötig** (Demo-Video aus der Sandbox, Links Datenschutz + Nutzungsbedingungen) |
+| Twitch (ab 2027) | dev.twitch.tv: Anwendung | `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` | `/rueckruf/twitch` | keine |
+
+```bash
+# Beispiel YouTube; für die anderen Plattformen gleich
+printf '%s' '<CLIENT-ID>' | gcloud secrets create youtube-client-id --data-file=- --project=${PROJEKT}
+printf '%s' '<CLIENT-SECRET>' | gcloud secrets create youtube-client-secret --data-file=- --project=${PROJEKT}
+for s in youtube-client-id youtube-client-secret; do gcloud secrets add-iam-policy-binding $s --project=${PROJEKT} --member=serviceAccount:crm-api@${SA} --role=roles/secretmanager.secretAccessor --format=none; done
+gh variable set CRM_API_SECRETS --repo ${REPO} --body "ANTHROPIC_API_KEY=anthropic-api-key:latest,TAKT_TOKEN=takt-token:latest,STEUER_TOKEN=steuer-token:latest,YOUTUBE_CLIENT_ID=youtube-client-id:latest,YOUTUBE_CLIENT_SECRET=youtube-client-secret:latest"
+```
+
+**Google Picker (Ablage):** Picker API im Projekt aktivieren, API-Schlüssel nur für die Picker API und die Domain `https://${DOMAIN}`, App-ID = Projektnummer:
+
+```bash
+gcloud services enable drive.googleapis.com picker.googleapis.com --project=${PROJEKT}
+gh variable set GOOGLE_PICKER_KEY --repo ${REPO} --body "<API-SCHLÜSSEL>"
+gh variable set GOOGLE_APP_ID --repo ${REPO} --body "$(gcloud projects describe ${PROJEKT} --format='value(projectNumber)')"
+```
+
+**Takte (Cloud Scheduler, Zeitzone Europe/Berlin):**
+
+```bash
+gcloud services enable cloudscheduler.googleapis.com --project=${PROJEKT}
+TAKT=$(gcloud secrets versions access latest --secret=takt-token --project=${PROJEKT})
+takt() { gcloud scheduler jobs create http "takt-$1" --project=${PROJEKT} --location=${REGION} --schedule="$2" --time-zone=Europe/Berlin \
+  --uri="${CRM_API_URL}/takt/$1" --http-method=POST --headers="x-velonify-token=${TAKT}" --attempt-deadline=300s; }
+takt abruf "0 5 * * *"                 # Zahlen aller Kanäle, Merkmale, Benchmarking
+takt berichte "0 6 * * *"              # montags Wochen-, am 1. Monatsbericht (je einmal)
+takt recherche "0 7 * * 1"             # Themenvorschläge der Woche
+takt kurse "30 16 * * 1-5"             # EZB-Kurse EUR/JPY
+takt kalender-serien "15 4 * * *"      # wiederkehrende Fristen
+takt twitch-validierung "10 * * * *"   # Twitch verlangt regelmäßige Token-Prüfung
+```
+
+**Velonify-Hub (unser Projekt `velonify-crm`), einmalig je neuer Instanz:** Steuer-Token eintragen und das Werkzeug Plattform → Instanzen freischalten.
+
+```bash
+# Migration p002 (Tabellen plattform_instanzen, plattform_instanz_protokoll) in crm_test und crm
+npm run db:migrieren -- crm_test && npm run db:migrieren -- crm
+# Steuer-Tokens aller Instanzen als JSON; bei weiteren Instanzen eine neue Version mit allen Einträgen anlegen
+printf '{"%s":"%s"}' "${KENNUNG}" "$(gcloud secrets versions access latest --secret=steuer-token --project=${PROJEKT})" | gcloud secrets create instanz-steuer-tokens --data-file=- --project=velonify-crm
+# Fein begrenztes GitHub-Token: Contents (Lesen+Schreiben) in Velonify/velonify-crm für Tags, Actions (Lesen+Schreiben) in ${REPO}
+printf '%s' '<GITHUB-TOKEN>' | gcloud secrets create github-token-instanzen --data-file=- --project=velonify-crm
+```
+
+crm-api von Velonify danach wie im README deployen, zusätzlich `--set-secrets` mit `INSTANZ_STEUER_TOKENS=instanz-steuer-tokens:latest,GITHUB_TOKEN_INSTANZEN=github-token-instanzen:latest` (Dienstkonto von crm-api braucht `secretAccessor` auf beide). Dann im Hub Plattform → Instanzen → Instanz eintragen (Kennung, Name, Domain, API-URL, Repo).
 
 ## Update ausrollen
 
