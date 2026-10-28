@@ -1,0 +1,8 @@
+/* Shared layout of the creator modules (loaded with src/creator/api.ts, which every creator page uses). */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 12px 16px; margin-block: 12px 16px; }
+.form-grid > .wide, .form-grid > .field-wide { grid-column: 1 / -1; }
+.form-grid input:not([type='checkbox']):not([type='radio']), .form-grid select, .form-grid textarea { width: 100%; }
+.form-grid input[type='checkbox'], .form-grid input[type='radio'] { width: auto; margin-right: 6px; }
+.form-grid label:has(> input[type='checkbox']) { display: inline-flex; align-items: center; margin-right: 14px; }
+.form-grid .field { margin: 0; }
+.card form > * + * { margin-top: 12px; }

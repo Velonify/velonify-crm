@@ -1,3 +1,4 @@
+import './creator.css';
 import { useMemo } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { config } from '../config';
