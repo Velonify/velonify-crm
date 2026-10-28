@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { darfEinrichten, INSTANZ_EINSTELLUNG, listeAus } from '../../../../src/data/instanz';
+import { darfEinrichten, INSTANZ_EINSTELLUNG, instanzWerkzeuge, listeAus, teamName } from '../../../../src/data/instanz';
 import type { Db } from '../../../../src/data/postgres/postgresStore';
 import { personen, zustaendigWert } from '../../../../src/data/zustaendig';
 import {
@@ -102,7 +102,7 @@ function fristEingabe(body: Record<string, unknown>): { fehler: string } | Frist
   const art = body.art === undefined || body.art === '' ? 'sonstiges' : body.art;
   if (!istFristArt(art)) return { fehler: 'Unbekannte Art.' };
   const link = feld(body.link, 500);
-  if (link && !/^(https?:\/\/|\/)/.test(link)) return { fehler: 'Link bitte als Adresse (https://…) oder Hub-Pfad (/…).' };
+  if (link && (!/^(https?:\/\/|\/(?!\/))/.test(link) || /[\r\n]/.test(link))) return { fehler: 'Link bitte als Adresse (https://…) oder Hub-Pfad (/…).' };
   return {
     titel,
     datum: body.datum,
@@ -203,7 +203,7 @@ async function abo(db: Db, email: string): Promise<KalenderAbo | null> {
 }
 
 /** Escapes a text value (RFC 5545, 3.3.11). */
-const icsText = (w: string) => w.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+const icsText = (w: string) => w.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r\n|\r|\n/g, '\\n');
 
 /** Folds lines longer than 75 octets (RFC 5545, 3.1), never inside a character. */
 export function falte(zeile: string): string {
@@ -275,14 +275,56 @@ export function kalenderDatei(fristen: Frist[], optionen: { name: string; hubUrl
   return `${zeilen.map(falte).join('\r\n')}\r\n`;
 }
 
-/** Whether the owner of a subscription may still see the calendar: active login (partners only with the tool) or open support. */
-async function aboErlaubt(db: Db, email: string): Promise<boolean> {
-  const { rows } = await db.query<{ aktiv: boolean; rolle: string; werkzeuge: string | null }>('SELECT aktiv, rolle, werkzeuge FROM instanz_zugaenge WHERE email = $1', [email]);
+/** Scope is reloaded on every subscription request, so revoked roles apply immediately. */
+async function aboSicht(ctx: OeffentlichKontext, email: string) {
+  const { rows } = await ctx.pool.query<{ aktiv: boolean; rolle: string; werkzeuge: string | null; boards: string | null; name: string }>('SELECT aktiv, rolle, werkzeuge, boards, name FROM instanz_zugaenge WHERE email = $1', [email]);
+  const { rows: einstellungen } = await ctx.pool.query<{ schluessel: string; wert: string }>("SELECT schluessel, wert FROM einstellungen WHERE schluessel LIKE 'instanz_%'");
+  const e = Object.fromEntries(einstellungen.map(r => [r.schluessel, r.wert]));
   const z = rows[0];
-  if (z) return z.aktiv && (z.rolle !== 'partner' || listeAus(z.werkzeuge).includes('kalender'));
-  // Velonify's support logins are not in instanz_zugaenge: only while the instance lets support in.
-  const { rows: e } = await db.query<{ wert: string | null }>('SELECT wert FROM einstellungen WHERE schluessel = $1', [INSTANZ_EINSTELLUNG.velonifyZugang]);
-  return e[0]?.wert !== 'aus';
+  const tools = instanzWerkzeuge('creator', e);
+  if (z) {
+    if (!z.aktiv || (z.rolle === 'partner' && !listeAus(z.werkzeuge).includes('kalender'))) return null;
+    return { rolle: z.rolle, person: teamName({ name: z.name, email }), werkzeuge: z.rolle === 'partner' ? tools.filter(t => listeAus(z.werkzeuge).includes(t)) : tools, boards: listeAus(z.boards) };
+  }
+  const admins = (ctx.umgebung.wert('ADMINS') ?? '').split(',').map(a => a.trim().toLowerCase());
+  if (!admins.includes(email) || e[INSTANZ_EINSTELLUNG.velonifyZugang] === 'aus') return null;
+  return { rolle: 'velonify', person: '', werkzeuge: tools, boards: [] as string[] };
+}
+
+type KalenderSicht = { rolle: string; werkzeuge: string[]; boards: string[] };
+
+async function zugriff(ctx: CreatorKontext): Promise<KalenderSicht> {
+  const { rows } = await ctx.pool.query<{ boards: string }>('SELECT boards FROM instanz_zugaenge WHERE email = $1', [ctx.email]);
+  return { rolle: ctx.rolle, werkzeuge: ctx.sicht.werkzeuge, boards: listeAus(rows[0]?.boards) };
+}
+
+/** A calendar never broadens the source module's access, especially a partner's board grant. */
+async function sichtbareFristen(db: Db, fristen: Frist[], sicht: KalenderSicht): Promise<Frist[]> {
+  const { rows: aufgaben } = await db.query<{ id: string; board_id: string }>('SELECT id, board_id FROM aufgaben WHERE NOT archiviert');
+  const erlaubt = new Set(aufgaben.filter(a => sicht.rolle !== 'partner' || sicht.boards.includes(a.board_id)).map(a => a.id));
+  const werkzeug: Record<string, string> = { inhalt: 'content', kooperation: 'kooperationen', pipeline: 'kooperationen', bericht: 'analytics', einnahme: 'einnahmen' };
+  return fristen.filter(f => {
+    if (['aufgabe', 'karte'].includes(f.quelle)) return sicht.werkzeuge.includes('todo') && erlaubt.has(f.bezug_id);
+    if (sicht.rolle === 'partner') return false;
+    return istEigeneQuelle(f.quelle) || Boolean(werkzeug[f.quelle] && sicht.werkzeuge.includes(werkzeug[f.quelle]));
+  });
+}
+
+/** Task due dates appear in the calendar but remain editable at their source. */
+async function synchronisiereAufgaben(db: Db) {
+  const { rows } = await db.query<Record<string, unknown>>('SELECT * FROM aufgaben');
+  for (const a of rows) {
+    const tag = text(a.faellig_am).slice(0, 10);
+    if (!istDatum(tag) || a.archiviert) {
+      await db.query("UPDATE fristen SET archiviert = true WHERE quelle = 'aufgabe' AND bezug_id = $1", [a.id]);
+      continue;
+    }
+    await db.query(`INSERT INTO fristen (id, titel, datum, art, quelle, bezug_id, link, zustaendig, erledigt)
+      VALUES ($1,$2,$3,'abgabe','aufgabe',$4,$5,$6,$7)
+      ON CONFLICT (quelle, bezug_id) WHERE bezug_id IS NOT NULL DO UPDATE SET titel = EXCLUDED.titel, datum = EXCLUDED.datum,
+      link = EXCLUDED.link, zustaendig = EXCLUDED.zustaendig, erledigt = EXCLUDED.erledigt, archiviert = false`,
+      [neueId('FR'), a.titel || 'Aufgabe', tag, a.id, `/todo/${encodeURIComponent(text(a.board_id))}?karte=${encodeURIComponent(text(a.id))}`, a.zustaendig || null, Boolean(a.erledigt_am)]);
+  }
 }
 
 async function oeffentlich(methode: string, pfad: string, _body: unknown, ctx: OeffentlichKontext) {
@@ -293,7 +335,9 @@ async function oeffentlich(methode: string, pfad: string, _body: unknown, ctx: O
   const db = ctx.pool;
   const { rows } = await db.query<{ email: string; umfang: string; person: string }>('SELECT email, umfang, person FROM kalender_abos WHERE token = $1', [treffer[1]]);
   const a = rows[0];
-  if (!a || !(await aboErlaubt(db, a.email))) return nichtDa;
+  const sicht = a ? await aboSicht(ctx, a.email) : null;
+  if (!a || !sicht) return nichtDa;
+  await synchronisiereAufgaben(db);
   const heute = heuteIn(ctx.jetzt());
   await verlaengereSerien(db, heute, 'Kalender-Abo');
   const meine = a.umfang === 'meine';
@@ -301,7 +345,7 @@ async function oeffentlich(methode: string, pfad: string, _body: unknown, ctx: O
     plusTage(heute, -90),
   ]);
   const ohne = new Set<string>();
-  const fristen = zeilen.map((z) => zuFrist(z, ohne)).filter((f) => !meine || personen(f.zustaendig).includes(a.person));
+  const fristen = (await sichtbareFristen(db, zeilen.map((z) => zuFrist(z, ohne)), sicht)).filter((f) => !meine || personen(f.zustaendig).includes(sicht.person || a.person));
   const { rows: e } = await db.query<{ wert: string | null }>('SELECT wert FROM einstellungen WHERE schluessel = $1', [INSTANZ_EINSTELLUNG.name]);
   const instanz = e[0]?.wert?.trim();
   const hubUrl = ctx.umgebung.hubUrl.replace(/\/$/, '');
@@ -331,6 +375,7 @@ async function passwortmanagerStand(db: Db): Promise<PasswortmanagerStand> {
  */
 async function passwortmanager(methode: string, body: unknown, ctx: CreatorKontext) {
   const db = ctx.pool;
+  if (ctx.rolle === 'partner') return fehler(403, 'Die Einrichtungshilfe ist für das interne Team.');
   if (methode === 'GET') return ok({ stand: await passwortmanagerStand(db) });
   if (methode !== 'POST') return null;
   if (!darfEinrichten(ctx.rolle)) return fehler(403, 'Die Einrichtung des Passwortmanagers pflegen Admins.');
@@ -364,18 +409,21 @@ async function merkeAbweichung(db: Db, frist: Frist, von: string) {
 }
 
 async function kalenderRouten(methode: string, pfad: string, body: unknown, ctx: CreatorKontext) {
-  if (pfad === '/c/kalender/passwortmanager') return passwortmanager(methode, body, ctx);
+  if (pfad === '/c/kalender/passwortmanager') return baustein(ctx, 'kalender') ?? passwortmanager(methode, body, ctx);
   const zu = baustein(ctx, 'kalender');
   if (zu) return zu;
   const db = ctx.pool;
   const heute = heuteIn(ctx.jetzt());
   const b = istObjekt(body) ? body : {};
+  const sicht = await zugriff(ctx);
+  if (ctx.rolle === 'partner' && !['/c/kalender/liste', '/c/kalender/frist', '/c/kalender/abo', '/c/kalender/abo/beenden'].includes(pfad)) return fehler(403, 'Partner sehen die Fristen ihrer freigegebenen Boards. Bearbeitet sie bitte dort.');
 
   if (pfad === '/c/kalender/liste' && methode === 'POST') {
     const von = istDatum(b.von) ? b.von : plusTage(heute, -40);
     const bis = istDatum(b.bis) ? b.bis : plusTage(heute, 60);
     if (bis < von) return fehler(400, 'Der Zeitraum endet vor seinem Anfang.');
     await verlaengereSerien(db, heute, ctx.person);
+    await synchronisiereAufgaben(db);
     const archiv = b.archiv === true;
     // Overdue open deadlines always come along, so every view can point at them.
     const { rows } = await db.query<Record<string, unknown>>(
@@ -384,13 +432,13 @@ async function kalenderRouten(methode: string, pfad: string, body: unknown, ctx:
       [von, bis, archiv, heute],
     );
     const abw = await abweichungen(db);
-    return ok({ fristen: rows.map((z) => zuFrist(z, abw)), heute });
+    return ok({ fristen: await sichtbareFristen(db, rows.map((z) => zuFrist(z, abw)), sicht), heute });
   }
 
   if (pfad === '/c/kalender/frist' && methode === 'POST') {
     if (typeof b.id !== 'string') return fehler(400, 'Frist fehlt.');
     const f = await eineFrist(db, b.id);
-    return f ? ok({ frist: f }) : fehler(404, 'Frist nicht gefunden.');
+    return f && (await sichtbareFristen(db, [f], sicht)).length ? ok({ frist: f }) : fehler(404, 'Frist nicht gefunden.');
   }
 
   if (pfad === '/c/kalender/speichern' && methode === 'POST') {
@@ -529,6 +577,7 @@ function zuOrdner(z: Record<string, unknown>): AblageOrdner {
     schluessel: text(z.schluessel),
     name: text(z.name),
     drive_id: id,
+    bereit: z.bereit !== false,
     url: driveOrdnerUrl(id),
     art: z.art === 'verknuepft' ? 'verknuepft' : 'angelegt',
     erstellt_am: zeit(z.erstellt_am),
@@ -542,37 +591,56 @@ async function ablageListe(db: Db): Promise<AblageOrdner[]> {
 }
 
 async function ablageRouten(methode: string, pfad: string, body: unknown, ctx: CreatorKontext) {
-  if (pfad === '/c/ablage/passwortmanager') return passwortmanager(methode, body, ctx);
+  if (pfad === '/c/ablage/passwortmanager') return baustein(ctx, 'ablage') ?? passwortmanager(methode, body, ctx);
   const zu = baustein(ctx, 'ablage');
   if (zu) return zu;
   const db = ctx.pool;
   const b = istObjekt(body) ? body : {};
 
-  if (pfad === '/c/ablage' && methode === 'GET') return ok({ ordner: await ablageListe(db) });
+  if (pfad === '/c/ablage' && methode === 'GET') {
+    const ordner = await ablageListe(db);
+    return ok({ ordner: ordner.filter(o => ctx.rolle === 'partner' ? istVorlage(o.schluessel) && /^(content|branding)(\/|$)/.test(o.schluessel) : ctx.sicht.betraege || !/^(buchhaltung|vertraege|gesellschaft)(\/|$)/.test(o.schluessel)) });
+  }
+  if (ctx.rolle === 'partner' && methode !== 'GET') return fehler(403, 'Die Ablage verwaltet das interne Team.');
 
-  if (pfad === '/c/ablage/ordner' && methode === 'POST') {
+  if (['/c/ablage/ordner', '/c/ablage/reservieren'].includes(pfad) && methode === 'POST') {
     if (!istSchluessel(b.schluessel)) return fehler(400, 'Unbekannter Platz in der Ablage.');
     if (!istDriveId(b.drive_id)) return fehler(400, 'Drive-Ordner fehlt.');
     const name = feld(b.name, 200);
     if (!name) return fehler(400, 'Name des Ordners fehlt.');
     const art = b.art === 'verknuepft' ? 'verknuepft' : 'angelegt';
     const schluessel = b.schluessel;
+    if (!ctx.sicht.betraege && /^(buchhaltung|vertraege|gesellschaft)(\/|$)/.test(schluessel)) return fehler(403, 'Dieser Ablagebereich ist für dich nicht freigegeben.');
     const vorlage = istVorlage(schluessel);
     // The structure itself is set up by admins; subfolders (cooperation, video, year) by everyone with the tool.
     if (vorlage && !darfEinrichten(ctx.rolle)) return fehler(403, 'Die Ablagestruktur richten Admins in der Einrichtung ein.');
+    if (vorlage && !pfad.endsWith('/reservieren')) {
+      const { rows: bisher } = await db.query<{ drive_id: string }>('SELECT drive_id FROM ablage_ordner WHERE schluessel = $1', [schluessel]);
+      if (bisher[0] && bisher[0].drive_id !== b.drive_id) {
+        const { rows: kinder } = await db.query("SELECT 1 FROM ablage_ordner WHERE schluessel <> $1 AND ($1 = 'haupt' OR schluessel LIKE $1 || '/%') LIMIT 1", [schluessel]);
+        if (kinder.length) return fehler(409, 'Zu diesem Ordner bestehen Unterordner-Verknüpfungen. Bitte diese zuerst lösen, bevor du den Hauptordner wechselst.');
+      }
+    }
     if (schluessel !== HAUPTORDNER) {
       const { rows } = await db.query('SELECT 1 FROM ablage_ordner WHERE schluessel = $1', [elternVon(schluessel)]);
       if (!rows.length) return fehler(409, 'Der übergeordnete Ordner ist in der Ablage noch nicht eingerichtet.');
     }
+    if (pfad.endsWith('/reservieren')) {
+      const { rows } = await db.query<Record<string, unknown>>(`INSERT INTO ablage_ordner (schluessel, name, drive_id, art, erstellt_von, bereit) VALUES ($1,$2,$3,'angelegt',$4,false) ON CONFLICT (schluessel) DO UPDATE SET schluessel = EXCLUDED.schluessel RETURNING *`, [schluessel, name, b.drive_id, ctx.person]);
+      return ok({ ordner: zuOrdner(rows[0]) });
+    }
     if (!vorlage) {
       // Subfolders are made once: whoever comes second gets the existing one.
       const { rows } = await db.query<Record<string, unknown>>('SELECT * FROM ablage_ordner WHERE schluessel = $1', [schluessel]);
-      if (rows[0]) return ok({ ordner: zuOrdner(rows[0]), neu: false });
+      if (rows[0]) {
+        if (rows[0].drive_id === b.drive_id && rows[0].bereit === false) { await db.query('UPDATE ablage_ordner SET bereit = true WHERE schluessel = $1', [schluessel]); rows[0].bereit = true; }
+        return ok({ ordner: zuOrdner(rows[0]), neu: false });
+      }
     }
     const { rows } = await db.query<Record<string, unknown>>(
       `INSERT INTO ablage_ordner (schluessel, name, drive_id, art, erstellt_von) VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (schluessel) DO UPDATE SET name = $2, drive_id = $3, art = $4, erstellt_am = now(), erstellt_von = $5 RETURNING *`,
-      [schluessel, name, b.drive_id, art, ctx.person],
+       ON CONFLICT (schluessel) DO UPDATE SET name = CASE WHEN $6 THEN $2 ELSE ablage_ordner.name END, drive_id = CASE WHEN $6 THEN $3 ELSE ablage_ordner.drive_id END, art = CASE WHEN $6 THEN $4 ELSE ablage_ordner.art END, bereit = true RETURNING *`,
+      [schluessel, name, b.drive_id, art, ctx.person, vorlage],
     );
     return ok({ ordner: zuOrdner(rows[0]), neu: true });
   }

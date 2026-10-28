@@ -1,0 +1,21 @@
+.organisation-page { display: flex; flex-direction: column; gap: 1.25rem; }
+.organisation-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.organisation-form .wide { grid-column: 1 / -1; }
+.organisation-form input, .organisation-form select, .organisation-form textarea { width: 100%; }
+.kalender-nav, .kalender-filter { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
+.kalender-nav { margin-block: .75rem; }
+.kalender-nav .field { margin: 0; }
+.kalender-raster { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid var(--border, #ddd); border-left: 1px solid var(--border, #ddd); }
+.kalender-tag { min-width: 0; min-height: 8rem; padding: .6rem; border-right: 1px solid var(--border, #ddd); border-bottom: 1px solid var(--border, #ddd); }
+.kalender-tag h2 { font-size: .8rem; font-weight: 600; margin: 0 0 .7rem; }
+.kalender-tag.heute h2 { text-decoration: underline; text-underline-offset: .3rem; }
+.kalender-tag.anderer-monat h2 { font-weight: 400; }
+.kalender-eintrag { display: flex; flex-direction: column; text-align: left; gap: .15rem; width: 100%; padding: .45rem; margin-bottom: .35rem; border: 1px solid var(--border, #ddd); border-radius: .3rem; background: var(--surface, #fff); color: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.kalender-eintrag:hover { border-color: currentColor; }
+.kalender-eintrag small { font-size: .7rem; }
+.kalender-eintrag.erledigt span { text-decoration: line-through; }
+.organisation-table { overflow-x: auto; }
+.organisation-notiz { white-space: pre-wrap; }
+.organisation-page input[type=checkbox] { width: auto; margin-right: .4rem; }
+.organisation-page .liste-schlicht > li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; padding-block: .6rem; }
+@media (max-width: 760px) { .kalender-raster { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kalender-raster.woche { grid-template-columns: 1fr; } .organisation-form { grid-template-columns: 1fr; } .kalender-tag { min-height: 5rem; } }

@@ -37,7 +37,7 @@ function pruefeName(name: string): void {
 /**
  * Secret Manager of the given project over REST, signed in as the function's service account (metadata server).
  * The service account needs roles/secretmanager.admin limited by an IAM condition to secrets named "kanal-*" (INSTANZ.md).
- * After a new version the older enabled versions are destroyed, so a daily token refresh does not pile up versions.
+ * Version retention is configured separately; writes never destroy a concurrently refreshed credential.
  */
 export function secretManagerGeheimnisse(projekt: string, holen: typeof fetch = fetch, token: () => Promise<string> = dienstkontoToken(holen, SCOPE)): Geheimnisse {
   const projektPfad = `${BASIS}/projects/${encodeURIComponent(projekt)}`;
@@ -71,14 +71,9 @@ export function secretManagerGeheimnisse(projekt: string, holen: typeof fetch = 
         body: JSON.stringify({ payload: { data: Buffer.from(wert, 'utf8').toString('base64') } }),
       });
       if (!version.ok) throw await fehlerText(version, 'speichern');
-      const neu = ((await version.json()) as { name?: string }).name;
-      // Older versions are not needed any more; failures here only cost a few cents and must not fail the write.
-      const liste = await aufruf(`${secretPfad(name)}/versions?filter=${encodeURIComponent('state:ENABLED')}&pageSize=100`);
-      if (!liste.ok) return;
-      const { versions = [] } = (await liste.json()) as { versions?: { name: string }[] };
-      for (const v of versions) {
-        if (v.name !== neu) await aufruf(`${BASIS}/${v.name}:destroy`, { method: 'POST', body: '{}' });
-      }
+      // Keep existing versions; a deployment's retention policy owns cleanup. A concurrent refresh
+      // must never have its newly written version destroyed by another request.
+
     },
 
     async loeschen(name) {

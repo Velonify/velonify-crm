@@ -239,3 +239,56 @@ describe('Modul Organisation: Ablage und Passwortmanager', { timeout: 60_000 }, 
     expect((await mara('GET', '/c/kalender/passwortmanager')).status).toBe(200);
   });
 });
+
+describe('Organisation: permissions, revoked subscriptions and idempotent folders', { timeout: 60_000 }, () => {
+  it('restricts partners to task deadlines from their boards in list, detail and ICS, including immediate grant revocation', async () => {
+    const { pool, als, lukas, mara, dienste } = await aufbau();
+    await lukas('POST', '/instanz/einstellungen', { bausteine: { partner: true } });
+    await lukas('POST', '/instanz/zugang', { email: 'partner@example.com', name: 'Extern Beispiel', rolle: 'partner', werkzeuge: ['kalender', 'todo', 'ablage'], boards: ['B-PUBLIC'] });
+    await pool.query(`INSERT INTO boards (id,titel) VALUES ('B-PUBLIC','Freigegeben'),('B-PRIVATE','Intern')`);
+    await pool.query(`INSERT INTO aufgaben (id,board_id,titel,faellig_am,zustaendig) VALUES ('A-PUBLIC','B-PUBLIC','Erlaubte Abgabe','2026-11-15','Extern'),('A-PRIVATE','B-PRIVATE','Vertrauliche Abgabe','2026-11-16','Extern')`);
+    const privat = (await mara('POST', '/c/kalender/speichern', { titel: 'Privater Finanztermin', datum: '2026-11-17', art: 'buchhaltung', zustaendig: 'Extern' })).daten as { frist: Frist };
+    const partner = await als('partner@example.com');
+    const liste = fristen(await partner('POST', '/c/kalender/liste', { von: '2026-11-01', bis: '2026-11-30' }));
+    expect(liste.map(f => f.titel)).toEqual(['Erlaubte Abgabe']);
+    expect((await partner('POST', '/c/kalender/frist', { id: privat.frist.id })).status).toBe(404);
+    expect((await partner('POST', '/c/kalender/speichern', { titel: 'Unerlaubt', datum: '2026-11-17' })).status).toBe(403);
+    expect((await partner('GET', '/c/kalender/serien')).status).toBe(403);
+    expect((await partner('GET', '/c/ablage/passwortmanager')).status).toBe(403);
+    const { abo } = (await partner('POST', '/c/kalender/abo', { umfang: 'alle' })).daten as { abo: KalenderAbo };
+    const abrufen = () => behandleOeffentlich('GET', `/oeffentlich/kalender/${abo.token}.ics`, undefined, {}, dienste, '');
+    const datei = (await abrufen()).daten as { inhalt: string };
+    expect(datei.inhalt).toContain('Erlaubte Abgabe');
+    expect(datei.inhalt).not.toContain('Vertrauliche');
+    expect(datei.inhalt).not.toContain('Finanztermin');
+    await lukas('POST', '/instanz/zugang', { email: 'partner@example.com', boards: [] });
+    expect(((await abrufen()).daten as { inhalt: string }).inhalt).not.toContain('Erlaubte Abgabe');
+    await lukas('POST', '/instanz/zugang', { email: 'partner@example.com', werkzeuge: ['todo'] });
+    expect((await abrufen()).status).toBe(404);
+  });
+
+  it('does not treat a deleted member as support and rejects unsafe links', async () => {
+    const { pool, kim, mara, dienste } = await aufbau();
+    const { abo } = (await kim('POST', '/c/kalender/abo', {})).daten as { abo: KalenderAbo };
+    await pool.query('DELETE FROM instanz_zugaenge WHERE email = $1', ['kim@example.com']);
+    expect((await behandleOeffentlich('GET', `/oeffentlich/kalender/${abo.token}.ics`, undefined, {}, dienste, '')).status).toBe(404);
+    for (const link of ['javascript:alert(1)', '//evil.example', 'https://example.com\nSUMMARY:injected']) {
+      expect((await mara('POST', '/c/kalender/speichern', { titel: 'Test', datum: '2026-11-17', link })).status).toBe(400);
+    }
+  });
+
+  it('keeps a single reserved Drive ID across retries, then confirms it', async () => {
+    const { mara, kim, pool } = await aufbau();
+    await mara('POST', '/c/ablage/ordner', { schluessel: 'haupt', name: 'Hauptordner', drive_id: 'ROOT_1234567890' });
+    await mara('POST', '/c/ablage/ordner', { schluessel: 'kooperationen', name: 'Kooperationen', drive_id: 'COOP_1234567890' });
+    const daten = { schluessel: 'kooperationen/kampagne-1', name: 'Kampagne 1', drive_id: 'FIRST_1234567890' };
+    const eins = await kim('POST', '/c/ablage/reservieren', daten);
+    const zwei = await kim('POST', '/c/ablage/reservieren', { ...daten, drive_id: 'SECOND_1234567890' });
+    expect(eins.daten).toMatchObject({ ordner: { drive_id: daten.drive_id, bereit: false } });
+    expect(zwei.daten).toMatchObject({ ordner: { drive_id: daten.drive_id, bereit: false } });
+    expect((await kim('POST', '/c/ablage/ordner', daten)).daten).toMatchObject({ ordner: { drive_id: daten.drive_id, bereit: true } });
+    const n = await pool.query<{ n: number }>('SELECT count(*)::integer AS n FROM ablage_ordner WHERE schluessel = $1', [daten.schluessel]);
+    expect(n.rows[0].n).toBe(1);
+    expect((await mara('POST', '/c/ablage/ordner', { schluessel: 'haupt', name: 'Neu', drive_id: 'NEWROOT_1234567890' })).status).toBe(409);
+  });
+});

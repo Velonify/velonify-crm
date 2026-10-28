@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Card, ErrorBox, Field, FormError, Loading, PageHeader } from '../../components/ui';
 import type { Kooperation } from '../../../functions/crm-api/src/creator/kooperationen/uebersicht';
 import { useBaustein, useInstanz } from '../api';
+import { useAblageDrive } from '../ablage/drive';
 import { FreigabeKnopf } from '../freigaben/FreigabeKnopf';
 import { geld, KANAELE, LABEL, PHASEN, useDaten } from './gemeinsam';
 
@@ -33,6 +34,8 @@ function KoopForm({ id, start, close, done }: { id: string; start?: Kooperation;
   const [form, setForm] = useState<Record<string, string | number | boolean | string[] | null>>({ partner: '', titel: '', marke: '', kanaele: [], waehrung: 'EUR', stand: 'anfrage', zahlung: 'offen', werbung: true, ueber_agentur: false, ...(start ?? {}) });
   const [busy, setBusy] = useState(false);
   const sicht = useInstanz();
+  const drive = useAblageDrive();
+  const ablage = useBaustein('ablage');
   const pipeline = useBaustein('pipeline');
   const set = (k: string, v: string | boolean | string[]) => setForm(f => ({ ...f, [k]: v }));
   const submit = async () => {
@@ -48,7 +51,7 @@ function KoopForm({ id, start, close, done }: { id: string; start?: Kooperation;
     <Field label="Zahlung"><select value={String(form.zahlung)} onChange={e => set('zahlung',e.target.value)}>{['offen','rechnung_gestellt','bezahlt'].map(p => <option key={p} value={p}>{LABEL[p]}</option>)}</select></Field>
     {[['zeitraum_von','Kampagne von'],['zeitraum_bis','Kampagne bis'],['faellig_am','Zahlung fällig'],['wiedervorlage','Wiedervorlage']].map(([key,label]) => <Field key={key} label={label}><input type="date" value={String(form[key] ?? '')} onChange={e => set(key,e.target.value)} /></Field>)}
     {[['leistung','Leistung'],['briefing','Briefing'],['notiz','Notiz'],['wiedervorlage_notiz','Wiedervorlage-Notiz']].map(([key,label]) => <Field key={key} label={label}><textarea value={String(form[key] ?? '')} onChange={e => set(key,e.target.value)} /></Field>)}
-    <Field label="Drive-Ordner"><input type="url" value={String(form.drive_ordner ?? '')} onChange={e => set('drive_ordner',e.target.value)} /></Field>
+    {ablage && id !== 'neu' && <button type="button" className="button small" disabled={busy} onClick={async () => { setBusy(true); setFehler(undefined); try { const o = await drive.ordnerFuer('kooperationen', `${id} ${String(form.titel || form.partner)}`); set('drive_ordner', o.url); } catch (e) { setFehler(e); } finally { setBusy(false); } }}>Drive-Ordner anlegen / öffnen</button>}<Field label="Drive-Ordner"><input type="url" value={String(form.drive_ordner ?? '')} onChange={e => set('drive_ordner',e.target.value)} /></Field>
     <label><input type="checkbox" checked={form.ueber_agentur === true} onChange={e => set('ueber_agentur',e.target.checked)} /> Über Deal-Agentur</label><label><input type="checkbox" checked={form.werbung === true} onChange={e => set('werbung',e.target.checked)} /> Werbekennzeichnung erforderlich</label></div>
     <FormError error={fehler} /><button className="button primary" disabled={busy}>{busy ? 'Speichert …' : 'Speichern'}</button>
   </form>{id !== 'neu' && <><FreigabeKnopf objektTyp="kooperation" objektId={id} titel={String(form.titel || form.partner)} bereich="kooperationen" link={`/kooperationen?id=${id}`} /><button className="button small" disabled={busy} onClick={async () => { setBusy(true); try { await api.post('/c/kooperationen/archivieren',{id,archiviert:!start?.archiviert});done();close(); } catch(e){setFehler(e);} finally{setBusy(false);} }}>{start?.archiviert ? 'Wiederherstellen' : 'Archivieren'}</button></>}</Card>;

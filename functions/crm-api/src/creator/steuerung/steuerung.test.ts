@@ -59,7 +59,7 @@ describe('Steuerung einer Instanz aus dem Velonify Hub', { timeout: 60_000 }, ()
     expect(s.bausteine).toContain('contentplan');
     expect(s.zugaenge).toMatchObject({ aktiv: 3, inaktiv: 1, rollen: { admin: 1, team: 1, schnitt: 1 }, aktiv_7_tage: 1 });
     expect(s.zugaenge.letzter_login).not.toBe('');
-    expect(s.kanaele).toEqual([{ plattform: 'youtube', status: 'fehler', beispiel: false, verbunden_am: '', letzte_abholung: '2026-11-04T04:00:00.000Z', fehler: 'Token abgelaufen' }]);
+    expect(s.kanaele).toEqual([{ plattform: 'youtube', status: 'fehler', beispiel: false, verbunden_am: '', letzte_abholung: '2026-11-04T04:00:00.000Z', fehler: 'Abruf fehlgeschlagen. Details im Kanalbereich der Instanz.' }]);
     // November in Berlin starts at 2026-10-31 23:00 UTC: the call at 22:30 UTC still counts for October.
     expect(s.ki).toMatchObject({ monat: '2026-11', aufrufe: 2, tokens_ein: 1100, tokens_aus: 420 });
     expect(s.speicher.datenbank_bytes).toBeGreaterThan(0);
@@ -138,24 +138,21 @@ describe('Home einer Instanz', { timeout: 60_000 }, () => {
     expect(antwort.status).toBe(200);
     const d = antwort.daten as StartDaten;
     expect(d).toMatchObject({ heute: '2026-11-04', woche: { von: '2026-11-02', bis: '2026-11-08' }, person: 'Kim', rundgang: true });
-    expect(d.kacheln).toEqual(['uploads', 'fristen', 'freigaben', 'zahlen', 'bericht']);
+    expect(d.kacheln).toEqual(['uploads', 'fristen', 'kooperationen', 'freigaben', 'zahlen', 'bericht']);
     expect(d.uploads.map((u) => u.id)).toEqual(['I-1']);
     // Upload deadlines are in the uploads tile already; overdue ones come along.
     expect(d.fristen.map((f) => f.id)).toEqual(['FR-2', 'FR-1']);
     expect(d.freigaben.map((f) => f.id)).toEqual(['FG-1']);
-    expect(d.zahlen).toEqual([{ id: 'K-1', plattform: 'tiktok', handle: '@beispiel', status: 'beispiel', datum: '2026-11-03', follower: 1120, follower_plus: 120, aufrufe_7: 100, beispiel: true }]);
+    expect(d.zahlen).toEqual([{ id: 'K-1', plattform: 'tiktok', handle: '@beispiel', status: 'beispiel', datum: '2026-11-03', follower: 1120, follower_plus: 120, aufrufe: 30, beispiel: true }]);
     expect(d.bericht).toMatchObject({ id: 'B-2', status: 'entwurf', beispiel: true });
     // Whiteboard is off in this instance: its news stays away.
     expect(d.neuigkeiten.map((n) => [n.titel, n.neu])).toEqual([['Für alle', true]]);
-    // No cooperations table yet (module Kooperationen): no tile.
-    expect(d.kacheln).not.toContain('kooperationen');
+    expect(d.kooperationen).toEqual([]);
   });
 
   it('leaves out tiles of switched-off blocks and reads cooperations when the table exists, amounts only for those who see them', async () => {
     const { pool, als, steuer } = await aufbau();
     await steuer('POST', '/steuerung/bausteine', { bausteine: { contentplan: false, berichte: false } });
-    await pool.exec?.('');
-    await pool.query(`CREATE TABLE kooperationen (id text PRIMARY KEY, partner text, faellig_am date, stand text, zahlung text, betrag numeric, waehrung text, archiviert boolean NOT NULL DEFAULT false)`);
     await pool.query(`INSERT INTO kooperationen (id, partner, faellig_am, stand, zahlung, betrag, waehrung, archiviert) VALUES
       ('KO-1', 'Marke A', '2026-11-07', 'umsetzung', 'offen', 1500, 'EUR', false),
       ('KO-2', 'Marke B', '2026-11-03', 'rechnung', 'bezahlt', 900, 'EUR', false),

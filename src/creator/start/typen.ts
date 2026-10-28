@@ -53,8 +53,8 @@ export interface StartKanal {
   follower: number | null;
   /** Follower change against the values a week earlier. */
   follower_plus: number | null;
-  /** Views of the last seven days of values. */
-  aufrufe_7: number | null;
+  /** Views in the latest platform snapshot; do not sum cumulative counters. */
+  aufrufe: number | null;
   /** Invented sample numbers until the channel is connected. */
   beispiel: boolean;
 }
