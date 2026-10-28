@@ -145,7 +145,7 @@ function StudioImport({ felder }: { felder: string[] }) {
     }, 'Vorschau erstellt');
 
   return (
-    <Card title="TikTok-Studio-Export einlesen">
+    <Card title="TikTok-Studio-Export einlesen" className="analytics-import">
       <p className="small">In TikTok Studio die Video-Statistik als CSV exportieren und hier einlesen. Die Spalten werden automatisch erkannt; wo nicht, ordnet ihr sie zu.</p>
       <CsvFeld
         wert={csv}
@@ -173,7 +173,7 @@ function StudioImport({ felder }: { felder: string[] }) {
       {aktion.feedback}
       {vorschau && (
         <>
-          <div className="filters">
+          <div className="analytics-zuordnung">
             {felder.map((f) => (
               <Field key={f} label={f}>
                 <select

@@ -41,7 +41,7 @@ async function routes(methode:string,pfad:string,raw:unknown,ctx:CreatorKontext,
  const bezug=methode==='GET'?/^\/c\/content\/(?:inhalte|skripte|thumbnails|upload)\/([^/]+)/.exec(pfad)?.[1]:b.inhalt_id;
  if(bezug){const i=await inhalt(ctx.pool,feld(bezug,'Inhalt',80,true));if(!kanalAn(ctx,i.kanal))throw new ContentFehler('Dieser Kanal ist nicht freigeschaltet.',403);}
  if((pfad==='/c/content'||pfad==='/c/content/inhalte'||pfad==='/c/content/auswahl')&&methode==='GET'){
-  const {rows}=await ctx.pool.query<Record<string,unknown>>('SELECT *,geplant_am::text AS geplant_am FROM inhalte WHERE NOT archiviert ORDER BY geplant_am NULLS LAST,erstellt_am DESC');
+  const {rows}=await ctx.pool.query<Record<string,unknown>>('SELECT *,geplant_am::text AS geplant_am FROM inhalte WHERE NOT archiviert ORDER BY inhalte.geplant_am NULLS LAST,inhalte.erstellt_am DESC');
   const {rows:videos}=await ctx.pool.query(`SELECT id,titel,plattform,url,beispiel,vorschaubild FROM videos WHERE NOT beispiel ORDER BY veroeffentlicht_am DESC NULLS LAST LIMIT 500`);
   const {rows:team}=await ctx.pool.query<{wert:string}>(`SELECT wert FROM listen WHERE liste='team' ORDER BY nr`);
   return ok({inhalte:rows.map(zuInhalt).filter(i=>kanalAn(ctx,i.kanal)),videos,team:team.map(t=>t.wert),kanaele:kanale(ctx)});

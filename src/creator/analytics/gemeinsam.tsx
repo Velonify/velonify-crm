@@ -67,7 +67,8 @@ export function MerkmalVergleich({ vergleich }: { vergleich: Vergleich[] }) {
       {arten.map(({ art, label }) => (
         <section key={art}>
           <h3 className="small">{label}</h3>
-          <table className="table compact">
+          <div className="analytics-scroll">
+            <table className="table compact">
             <thead>
               <tr>
                 <th>{label}</th>
@@ -92,6 +93,7 @@ export function MerkmalVergleich({ vergleich }: { vergleich: Vergleich[] }) {
                 ))}
             </tbody>
           </table>
+          </div>
         </section>
       ))}
     </div>

@@ -3,7 +3,13 @@
 .analytics-kachel { padding: 14px 16px; border: 1px solid var(--line, rgba(127, 127, 127, 0.25)); }
 .analytics-kachel .zahl { font-family: var(--font-display); font-size: 22px; line-height: 1.2; }
 .analytics-balken { display: inline-block; height: 8px; min-width: 2px; background: var(--eisblau, #c5d8e6); vertical-align: middle; margin-right: 6px; }
-.analytics-vergleich { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.analytics-vergleich { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 16px; }
+.analytics-vergleich > section, .analytics-kacheln > * { min-width: 0; }
+.analytics-scroll, .table-wrap { overflow-x: auto; max-width: 100%; }
+/* Column mapping of an import: a tidy grid instead of a long row of fields. */
+.analytics-zuordnung { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 8px 16px; margin: 12px 0; }
+.analytics-zuordnung .field { margin: 0; }
+.analytics-import > * + * { margin-top: 12px; }
 .analytics-vorschau { max-height: 320px; overflow: auto; }
 .analytics-zeile-fehler td { color: var(--rot, #b23a3a); }
 @media print {
