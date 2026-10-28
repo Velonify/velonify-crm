@@ -139,3 +139,6 @@ CREATE TABLE content_caption_vorschlaege (
   erstellt_am timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX content_caption_vorschlaege_video_idx ON content_caption_vorschlaege (video_id);
+
+-- Scheduled retries must not create a second batch for the same week.
+CREATE UNIQUE INDEX content_recherche_takt_woche_idx ON content_recherche_laeufe (woche) WHERE ausgeloest_von = 'takt';

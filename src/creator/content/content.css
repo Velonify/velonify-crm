@@ -1,0 +1,27 @@
+.content-plan-controls { display:flex; flex-wrap:wrap; gap:var(--space-3,12px); align-items:end; margin-block:16px; }
+.content-plan-controls .field { min-width:150px; }
+.content-view-switch { display:flex; flex-wrap:wrap; gap:8px; }
+.content-board { display:grid; grid-template-columns:repeat(6,minmax(220px,1fr)); gap:16px; overflow-x:auto; padding-bottom:16px; }
+.content-board-column { min-height:160px; padding:12px; background:var(--surface-2,#f6f3f4); border-radius:12px; }
+.content-board-column h2 { font-size:1rem; margin:0 0 12px; }
+.content-board-item { background:var(--surface,#fff); padding:12px; margin-bottom:10px; border:1px solid var(--border,#ddd5d8); border-radius:8px; }
+.content-board-item select { width:100%; margin-top:8px; }
+.content-calendar { display:grid; grid-template-columns:repeat(7,minmax(120px,1fr)); min-width:840px; border-top:1px solid var(--border,#ddd5d8); border-left:1px solid var(--border,#ddd5d8); }
+.content-calendar-day { min-height:120px; padding:8px; border-right:1px solid var(--border,#ddd5d8); border-bottom:1px solid var(--border,#ddd5d8); }
+.content-calendar-day.is-muted { opacity:.65; }
+.content-calendar-day time { font-weight:600; display:block; margin-bottom:8px; }
+.content-calendar-item { display:block; padding-block:5px; overflow-wrap:anywhere; }
+.content-form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-block:16px; }
+.content-form-grid .wide { grid-column:1 / -1; }
+.content-form-grid input,.content-form-grid select,.content-form-grid textarea { width:100%; }
+.content-long-text { min-height:240px; }
+.content-feedback { margin-block:12px; }
+.content-checklist { padding:0; list-style:none; }
+.content-checklist li { padding-block:10px; border-bottom:1px solid var(--border,#ddd5d8); }
+.content-checklist small { display:block; margin-top:4px; }
+.content-reference-list { display:flex; flex-wrap:wrap; gap:12px; padding:0; list-style:none; }
+.content-reference-list img { width:140px; height:80px; object-fit:cover; border-radius:6px; }
+.content-reference-list li { max-width:180px; }
+.content-result { white-space:pre-wrap; overflow-wrap:anywhere; padding-block:12px; }
+.content-detail-actions { display:flex; flex-wrap:wrap; gap:12px; margin-block:16px; }
+@media(max-width:600px) { .content-form-grid { grid-template-columns:1fr; } .content-plan-controls .field { flex:1 1 140px; } }
