@@ -28,6 +28,8 @@ const MandantContext = createContext<MandantContextValue | null>(null);
 /** Tools only Velonify's admins see, and tools only tenants see. */
 const NUR_ADMINS = ['plattform'];
 const NUR_MANDANTEN = ['leadmarkt'];
+/** Tools of the creator profile: only in own instances (src/data/instanz.ts). */
+const NUR_INSTANZEN = ['kalender', 'content', 'analytics', 'kooperationen', 'einnahmen', 'ablage'];
 
 export function MandantProvider({ children }: { children: ReactNode }) {
   const { getToken, userEmail, signOut } = useAuth();
@@ -62,7 +64,7 @@ export function MandantProvider({ children }: { children: ReactNode }) {
     (werkzeug: string) => {
       if (instanzModus) return instanz?.werkzeuge.includes(werkzeug) ?? false;
       if (mandantenModus) return sicht?.werkzeuge.includes(werkzeug) ?? false;
-      if (NUR_MANDANTEN.includes(werkzeug)) return false;
+      if (NUR_MANDANTEN.includes(werkzeug) || NUR_INSTANZEN.includes(werkzeug)) return false;
       if (NUR_ADMINS.includes(werkzeug)) return istAdmin;
       return true;
     },

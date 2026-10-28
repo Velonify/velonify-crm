@@ -1,4 +1,4 @@
-import { lazy, type ComponentType } from 'react';
+import { lazy, Suspense, type ComponentType } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
 import { instanzModus } from './config';
@@ -31,6 +31,15 @@ const EingangPage = seite(() => import('./eingang/EingangPage'), 'EingangPage');
 const DatenPage = seite(() => import('./pages/DatenPage'), 'DatenPage');
 const EinrichtungPage = seite(() => import('./pages/EinrichtungPage'), 'EinrichtungPage');
 const InstanzEinrichtungPage = seite(() => import('./instanz/EinrichtungPage'), 'InstanzEinrichtungPage');
+// Creator profile (own instances): one route tree per module, see src/creator/.
+const FreigabenPage = seite(() => import('./creator/freigaben/FreigabenPage'), 'FreigabenPage');
+const KalenderRouten = seite(() => import('./creator/kalender/Routen'), 'KalenderRouten');
+const AblageRouten = seite(() => import('./creator/ablage/Routen'), 'AblageRouten');
+const ContentRouten = seite(() => import('./creator/content/Routen'), 'ContentRouten');
+const AnalyticsRouten = seite(() => import('./creator/analytics/Routen'), 'AnalyticsRouten');
+const KooperationenRouten = seite(() => import('./creator/kooperationen/Routen'), 'KooperationenRouten');
+const EinnahmenRouten = seite(() => import('./creator/einnahmen/Routen'), 'EinnahmenRouten');
+const OeffentlicheSeite = seite(() => import('./creator/oeffentlich/OeffentlicheSeite'), 'OeffentlicheSeite');
 const EinstellungenPage = seite(() => import('./pages/EinstellungenPage'), 'EinstellungenPage');
 const FirmaAktePage = seite(() => import('./pages/FirmaAktePage'), 'FirmaAktePage');
 const FirmaNeuPage = seite(() => import('./pages/FirmaNeuPage'), 'FirmaNeuPage');
@@ -71,6 +80,14 @@ function AlteCrmAdresse() {
 
 export function App() {
   const { state } = useAuth();
+  // Public pages of an instance (request form, media kit, partner report) need no login.
+  if (instanzModus && window.location.hash.startsWith('#/oeffentlich/')) {
+    return (
+      <Suspense fallback={null}>
+        <OeffentlicheSeite />
+      </Suspense>
+    );
+  }
   if (state.status === 'signedOut') return <LoginPage />;
 
   // HashRouter: GitHub Pages has no server-side rewrites, so /#/firmen/123 survives a reload.
@@ -154,6 +171,17 @@ export function App() {
                 </Route>
                 <Route path="einstellungen" element={<EinstellungenPage />} />
                 <Route path="einrichtung" element={instanzModus ? <InstanzEinrichtungPage /> : <EinrichtungPage />} />
+                {instanzModus && (
+                  <>
+                    <Route path="freigaben" element={<FreigabenPage />} />
+                    <Route path="fristen/*" element={<KalenderRouten />} />
+                    <Route path="ablage/*" element={<AblageRouten />} />
+                    <Route path="content/*" element={<ContentRouten />} />
+                    <Route path="analytics/*" element={<AnalyticsRouten />} />
+                    <Route path="kooperationen/*" element={<KooperationenRouten />} />
+                    <Route path="einnahmen/*" element={<EinnahmenRouten />} />
+                  </>
+                )}
                 <Route path="einrichtung/daten" element={<DatenPage />} />
                 <Route path="einrichtung/daten/:tab" element={<DatenPage />} />
                 <Route path="pipeline" element={<AlteCrmAdresse />} />

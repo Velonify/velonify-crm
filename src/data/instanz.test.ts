@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { darfEinrichten, instanzWerkzeuge, istInstanzEinstellung, istProfil, PROFIL_WERKZEUGE, teamName } from './instanz';
+import { BAUSTEINE, darfEinrichten, instanzBausteine, instanzWerkzeuge, istInstanzEinstellung, istProfil, partnerWerkzeuge, PROFIL_WERKZEUGE, teamName } from './instanz';
 import { WERKZEUGE } from '../werkzeuge';
 
 describe('eigene Instanzen', () => {
@@ -10,10 +10,14 @@ describe('eigene Instanzen', () => {
     for (const w of PROFIL_WERKZEUGE.creator) expect(WERKZEUGE.some((x) => x.id === w)).toBe(true);
   });
 
-  it('switches tools off by setting, keeps Home and survives broken JSON', () => {
-    expect(instanzWerkzeuge('creator', {})).toEqual(['home', 'todo', 'whiteboard']);
-    expect(instanzWerkzeuge('creator', { instanz_funktionen: '{"whiteboard":false,"home":false}' })).toEqual(['home', 'todo']);
-    expect(instanzWerkzeuge('creator', { instanz_funktionen: 'kaputt' })).toEqual(['home', 'todo', 'whiteboard']);
+  it('starts with the start scope of the concept and switches building blocks, keeping Home and surviving broken JSON', () => {
+    expect(instanzBausteine({})).toEqual(BAUSTEINE.filter((b) => b.start).map((b) => b.id));
+    expect(instanzWerkzeuge('creator', {})).toEqual(['home', 'todo', 'kalender', 'content', 'analytics', 'kooperationen', 'ablage']);
+    expect(instanzWerkzeuge('creator', { instanz_funktionen: '{"einnahmen":true,"ablage":false}' })).toEqual(['home', 'todo', 'kalender', 'content', 'analytics', 'kooperationen', 'einnahmen']);
+    // A tool stays while one of its blocks is on.
+    expect(instanzWerkzeuge('creator', { instanz_funktionen: '{"contentplan":false,"skripte":true}' })).toContain('content');
+    expect(instanzWerkzeuge('creator', { instanz_funktionen: 'kaputt' })).toEqual(instanzWerkzeuge('creator', {}));
+    expect(partnerWerkzeuge(['home', 'todo', 'content'], { werkzeuge: ['content', 'einnahmen'] })).toEqual(['home', 'content']);
   });
 
   it('names team members by first name and knows who may run the Einrichtung', () => {

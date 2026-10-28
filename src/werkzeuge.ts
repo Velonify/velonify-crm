@@ -1,3 +1,5 @@
+import type { BausteinId } from './data/instanz';
+
 export interface Werkzeug {
   id: string;
   name: string;
@@ -9,7 +11,7 @@ export interface Werkzeug {
   /** Further path prefixes that belong to the tool, for tools whose start path is "/". */
   bereiche?: string[];
   /** Pages of the tool, shown as tabs above the page. `versteckt` pages keep their name but get no tab (reached via buttons). */
-  navigation: { label: string; pfad: string; end?: boolean; versteckt?: boolean }[];
+  navigation: { label: string; pfad: string; end?: boolean; versteckt?: boolean; baustein?: BausteinId }[];
 }
 
 /** The tools of the company page, in the order of the tool switcher. */
@@ -20,10 +22,12 @@ export const WERKZEUGE: Werkzeug[] = [
     kurz: 'Home',
     beschreibung: 'Überblick, Kunden und Links',
     pfad: '/',
-    bereiche: ['/eingang', '/kalender', '/anfragen', '/wort'],
+    bereiche: ['/eingang', '/kalender', '/anfragen', '/wort', '/freigaben'],
     navigation: [
       { label: 'Übersicht', pfad: '/', end: true },
       { label: 'Eingang', pfad: '/eingang' },
+      // Own instances only (building block "Rollen und Freigaben").
+      { label: 'Freigaben', pfad: '/freigaben', baustein: 'freigaben' },
       { label: 'Kalender', pfad: '/kalender' },
       { label: 'Anfragen', pfad: '/anfragen', versteckt: true },
       { label: 'Wort des Tages', pfad: '/wort' },
@@ -152,6 +156,75 @@ export const WERKZEUGE: Werkzeug[] = [
     pfad: '/leadmarkt',
     navigation: [{ label: 'Lead-Markt', pfad: '/leadmarkt', end: true }],
   },
+  // Creator profile (own instances only, see src/data/instanz.ts): Konzept v2, Bauplan section 11.
+  {
+    id: 'kalender',
+    name: 'Kalender',
+    kurz: 'Kalender',
+    beschreibung: 'Fristen für Uploads, Drehtage, Kampagnen, Abgaben, Buchhaltung und GK, als Abo in jedem Kalender',
+    pfad: '/fristen',
+    navigation: [{ label: 'Kalender', pfad: '/fristen', end: true }],
+  },
+  {
+    id: 'content',
+    name: 'Content',
+    kurz: 'Content',
+    beschreibung: 'Content-Plan je Kanal, Recherche, Skripte, Thumbnail-Briefings und Upload-Hygiene',
+    pfad: '/content',
+    navigation: [
+      { label: 'Plan', pfad: '/content', end: true, baustein: 'contentplan' },
+      { label: 'Recherche', pfad: '/content/recherche', baustein: 'recherche' },
+      { label: 'Skripte', pfad: '/content/skripte', baustein: 'skripte' },
+      { label: 'Thumbnails', pfad: '/content/thumbnails', baustein: 'thumbnails' },
+      { label: 'Upload', pfad: '/content/upload', baustein: 'upload' },
+    ],
+  },
+  {
+    id: 'analytics',
+    name: 'Analytics',
+    kurz: 'Zahlen',
+    beschreibung: 'Zahlen aller Kanäle, Merkmale je Video, Wochen- und Monatsbericht, Benchmarking',
+    pfad: '/analytics',
+    navigation: [
+      { label: 'Übersicht', pfad: '/analytics', end: true, baustein: 'kanaele' },
+      { label: 'Videos', pfad: '/analytics/videos', baustein: 'kanaele' },
+      { label: 'Merkmale', pfad: '/analytics/merkmale', baustein: 'merkmale' },
+      { label: 'Berichte', pfad: '/analytics/berichte', baustein: 'berichte' },
+      { label: 'Benchmarking', pfad: '/analytics/benchmarking', baustein: 'benchmarking' },
+      { label: 'Twitch', pfad: '/analytics/twitch', baustein: 'twitch' },
+      { label: 'Kanäle', pfad: '/analytics/kanaele', baustein: 'kanaele' },
+    ],
+  },
+  {
+    id: 'kooperationen',
+    name: 'Kooperationen',
+    kurz: 'Koops',
+    beschreibung: 'Partner, Stand, Betrag und Zahlung; Pipeline, Anfragen, Mediakit und Reporting an Partner',
+    pfad: '/kooperationen',
+    navigation: [
+      { label: 'Übersicht', pfad: '/kooperationen', end: true, baustein: 'kooperationen' },
+      { label: 'Pipeline', pfad: '/kooperationen/pipeline', baustein: 'pipeline' },
+      { label: 'Anfragen', pfad: '/kooperationen/anfragen', baustein: 'anfrageformular' },
+      { label: 'Mediakit', pfad: '/kooperationen/mediakit', baustein: 'mediakit' },
+      { label: 'Reportings', pfad: '/kooperationen/reportings', baustein: 'partnerreporting' },
+    ],
+  },
+  {
+    id: 'einnahmen',
+    name: 'Einnahmen',
+    kurz: 'Einnahmen',
+    beschreibung: 'Kooperationen, AdSense, Twitch und Affiliate in einer Übersicht, in EUR und JPY',
+    pfad: '/einnahmen',
+    navigation: [{ label: 'Übersicht', pfad: '/einnahmen', end: true }],
+  },
+  {
+    id: 'ablage',
+    name: 'Ablage',
+    kurz: 'Ablage',
+    beschreibung: 'Feste Ordnerstruktur in Google Drive, auch für Rohmaterial, Schnitte und Belege',
+    pfad: '/ablage',
+    navigation: [{ label: 'Ablage', pfad: '/ablage', end: true }],
+  },
   {
     id: 'plattform',
     name: 'Plattform',
@@ -207,6 +280,27 @@ export const LEISTE: { titel?: string; eintraege: LeistenEintrag[] }[] = [
     eintraege: [
       { werkzeug: 'kunden', label: 'Kunden', pfad: '/kunden', icon: 'kunden' },
       { werkzeug: 'social', label: 'Social Media', pfad: '/social', icon: 'social' },
+    ],
+  },
+  {
+    titel: 'Content & Zahlen',
+    eintraege: [
+      { werkzeug: 'content', label: 'Content', pfad: '/content', icon: 'content' },
+      { werkzeug: 'analytics', label: 'Analytics', pfad: '/analytics', icon: 'analytics' },
+    ],
+  },
+  {
+    titel: 'Kooperationen',
+    eintraege: [
+      { werkzeug: 'kooperationen', label: 'Kooperationen', pfad: '/kooperationen', icon: 'kooperationen' },
+      { werkzeug: 'einnahmen', label: 'Einnahmen', pfad: '/einnahmen', icon: 'einnahmen' },
+    ],
+  },
+  {
+    titel: 'Organisation',
+    eintraege: [
+      { werkzeug: 'kalender', label: 'Kalender', pfad: '/fristen', icon: 'kalender' },
+      { werkzeug: 'ablage', label: 'Ablage', pfad: '/ablage', icon: 'ablage' },
     ],
   },
   {
