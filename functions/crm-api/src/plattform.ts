@@ -2,6 +2,7 @@ import { PlattformFehler, type PlattformStore } from '../../../src/data/postgres
 import type { DbPool, PostgresStore } from '../../../src/data/postgres/postgresStore';
 import { FEEDBACK_FRAGEN, PAKETE, zugriff, type FeedbackAnlass, type Mandant, type Paket, type Zugang } from '../../../src/data/plattform';
 import { behandle, behandleDaten, type Antwort } from './routen';
+import { behandleInstanzen, steuerDiensteAusUmgebung, type SteuerDienste } from './creator/steuerung/instanzen';
 
 const istObjekt = (wert: unknown): wert is Record<string, unknown> => typeof wert === 'object' && wert !== null && !Array.isArray(wert);
 const fehler = (status: number, meldung: string): Antwort => ({ status, daten: { fehler: meldung } });
@@ -119,9 +120,22 @@ async function ergaenzeTeam(ctx: MandantKontext): Promise<void> {
   if (fehlt.length > 0) await ctx.store.setzeListe('team', [...team, ...fehlt]);
 }
 
-/** Admin tool "Plattform" in Velonify's hub (admins only, checked by the caller): GET and POST /plattform/<route>. */
-export async function behandlePlattformAdmin(methode: string, pfad: string, query: Record<string, unknown>, body: unknown, plattform: PlattformStore, email: string): Promise<Antwort> {
+/**
+ * Admin tool "Plattform" in Velonify's hub (admins only, checked by the caller): GET and POST /plattform/<route>.
+ * `steuerung` reaches own instances and GitHub (Plattform → Instanzen); by default from the environment.
+ */
+export async function behandlePlattformAdmin(
+  methode: string,
+  pfad: string,
+  query: Record<string, unknown>,
+  body: unknown,
+  plattform: PlattformStore,
+  email: string,
+  steuerung: SteuerDienste = steuerDiensteAusUmgebung(),
+): Promise<Antwort> {
   try {
+    const instanzen = await behandleInstanzen(methode, pfad, query, body, plattform, email, steuerung);
+    if (instanzen) return instanzen;
     if (methode === 'GET') {
       switch (pfad) {
         case '/plattform/mandanten':

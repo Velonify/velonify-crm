@@ -6,6 +6,7 @@ import {
   faelligeFrage,
   gesundheit,
   heuteBerlin,
+  ist_instanz_kennung,
   ist_mandanten_id,
   kontingentAb,
   PAKETE,
@@ -15,9 +16,11 @@ import {
   testTageUebrig,
   zugriff,
   type FeedbackAnlass,
+  type InstanzProtokoll,
   type Mandant,
   type MandantSicht,
   type Paket,
+  type PlattformInstanz,
   type Rolle,
   type Zugang,
 } from '../plattform';
@@ -70,6 +73,20 @@ function zuZugang(z: Record<string, unknown>): Zugang {
     rolle: text(z.rolle) === 'inhaber' ? 'inhaber' : 'mitarbeiter',
     aktiv: z.aktiv === true,
     letzter_login: text(z.letzter_login),
+  };
+}
+
+function zuInstanz(z: Record<string, unknown>): PlattformInstanz {
+  return {
+    kennung: text(z.kennung),
+    name: text(z.name),
+    domain: text(z.domain),
+    api_url: text(z.api_url),
+    repo: text(z.repo),
+    notiz: text(z.notiz),
+    aktiv: z.aktiv === true,
+    angelegt_am: text(z.angelegt_am),
+    geaendert_am: text(z.geaendert_am),
   };
 }
 
@@ -610,5 +627,62 @@ export class PlattformStore {
       FROM plattform_lead_markt m`);
     const z = rows[0] ?? {};
     return { gesamt: Number(z.gesamt ?? 0), frei: Number(z.frei ?? 0), mit_helpdesk: Number(z.mit_helpdesk ?? 0), vergeben: Number(z.vergeben ?? 0), koeder: Number(z.koeder ?? 0) };
+  }
+
+  // Own instances (Plattform → Instanzen): where they run and what Velonify did there.
+
+  async instanzen(): Promise<PlattformInstanz[]> {
+    const { rows } = await this.db.query('SELECT * FROM plattform_instanzen ORDER BY aktiv DESC, name');
+    return rows.map(zuInstanz);
+  }
+
+  async instanz(kennung: string): Promise<PlattformInstanz | null> {
+    const { rows } = await this.db.query('SELECT * FROM plattform_instanzen WHERE kennung = $1', [kennung]);
+    return rows[0] ? zuInstanz(rows[0]) : null;
+  }
+
+  /** Creates or updates an instance entry; fields left out keep their value. */
+  async speichereInstanz(eingabe: Partial<Omit<PlattformInstanz, 'angelegt_am' | 'geaendert_am'>> & { kennung: string }, von: string): Promise<PlattformInstanz> {
+    if (!ist_instanz_kennung(eingabe.kennung)) throw new PlattformFehler('Die Kennung darf nur a–z, 0–9 und - enthalten (2–30 Zeichen).');
+    const bisher = await this.instanz(eingabe.kennung);
+    const neu = {
+      name: (eingabe.name ?? bisher?.name ?? '').trim(),
+      domain: (eingabe.domain ?? bisher?.domain ?? '').trim().replace(/^https?:\/\//, '').replace(/\/+$/, ''),
+      api_url: (eingabe.api_url ?? bisher?.api_url ?? '').trim().replace(/\/+$/, ''),
+      repo: (eingabe.repo ?? bisher?.repo ?? '').trim(),
+      notiz: (eingabe.notiz ?? bisher?.notiz ?? '').trim(),
+      aktiv: eingabe.aktiv ?? bisher?.aktiv ?? true,
+    };
+    if (!neu.name || neu.name.length > 60) throw new PlattformFehler('Die Instanz braucht einen Namen (bis 60 Zeichen).');
+    if (neu.domain && !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(neu.domain)) throw new PlattformFehler('Die Domain sieht nicht richtig aus, z. B. beispiel.velonify.de.');
+    if (!/^https:\/\/[^\s/]+(\/\S*)?$/.test(neu.api_url)) throw new PlattformFehler('Die Adresse von crm-api beginnt mit https://.');
+    if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(neu.repo)) throw new PlattformFehler('Das Repo im Format Besitzer/Name, z. B. Velonify/velonify-hub-beispiel.');
+    const { rows } = await this.db.query(
+      `INSERT INTO plattform_instanzen (kennung, name, domain, api_url, repo, notiz, aktiv, geaendert_von)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (kennung) DO UPDATE SET name = $2, domain = $3, api_url = $4, repo = $5, notiz = $6, aktiv = $7, geaendert_von = $8, geaendert_am = now()
+       RETURNING *`,
+      [eingabe.kennung, neu.name, neu.domain || null, neu.api_url, neu.repo, neu.notiz || null, neu.aktiv, von],
+    );
+    return zuInstanz(rows[0]);
+  }
+
+  async protokolliereInstanz(kennung: string, art: InstanzProtokoll['art'], detail: Record<string, unknown>, von: string): Promise<void> {
+    await this.db.query('INSERT INTO plattform_instanz_protokoll (kennung, art, detail, von) VALUES ($1, $2, $3::jsonb, $4)', [kennung, art, JSON.stringify(detail), von]);
+  }
+
+  async instanzProtokoll(kennung: string, anzahl = 50): Promise<InstanzProtokoll[]> {
+    const { rows } = await this.db.query('SELECT art, detail, von, am FROM plattform_instanz_protokoll WHERE kennung = $1 ORDER BY am DESC, id DESC LIMIT $2', [kennung, anzahl]);
+    return rows.map((z) => ({ art: text(z.art) as InstanzProtokoll['art'], detail: json(z.detail) as Record<string, unknown>, von: text(z.von), am: text(z.am) }));
+  }
+
+  /** The tag Velonify rolled out for a commit, so the status can show "commit (tag)". */
+  async tagFuer(kennung: string, sha: string): Promise<string> {
+    if (!sha) return '';
+    const { rows } = await this.db.query<{ tag: string }>(
+      `SELECT detail->>'tag' AS tag FROM plattform_instanz_protokoll WHERE kennung = $1 AND art = 'update' AND detail->>'sha' = $2 ORDER BY am DESC LIMIT 1`,
+      [kennung, sha],
+    );
+    return rows[0]?.tag ?? '';
   }
 }
