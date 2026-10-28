@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { isDemo, mandantenModus } from '../config';
+import { instanzModus, isDemo, mandantenModus, offenerLogin } from '../config';
+import { darfEinrichten } from '../data/instanz';
 import { Gesperrt, MandantLeiste } from '../plattform/MandantLeiste';
 import { useMandant, useMarke } from '../plattform/MandantContext';
 import { useRolle } from '../lib/useRolle';
@@ -32,11 +33,11 @@ export function Layout() {
     if (gefunden) setZuletzt(gefunden);
   }, [gefunden]);
   const werkzeug = gefunden ?? zuletzt;
-  const { api, sicht } = useMandant();
+  const { api, sicht, instanz } = useMandant();
   const { erlaubt } = useRolle();
   const marke = useMarke();
   useEffect(() => {
-    document.title = seitentitel(werkzeug, mandantenModus ? marke : undefined);
+    document.title = seitentitel(werkzeug, offenerLogin ? marke : undefined);
   }, [werkzeug, marke]);
   // Tenants: which tool was opened, once per tool and session, for the usage in the admin tool.
   useEffect(() => {
@@ -53,7 +54,8 @@ export function Layout() {
   // Pages of a tool that is off (tenant package, admin tool) and Velonify-only pages are closed, not just hidden.
   const gesperrt =
     (gefunden && !erlaubt(gefunden.id)) ||
-    (mandantenModus && (pathname.startsWith('/einrichtung') || pathname === '/kalender' || pathname.startsWith('/crm/linkedin') || pathname.startsWith('/kunden')));
+    (offenerLogin && (pathname === '/kalender' || pathname.startsWith('/crm/linkedin') || pathname.startsWith('/kunden'))) ||
+    (pathname.startsWith('/einrichtung') && (mandantenModus || (instanzModus && !darfEinrichten(instanz?.rolle))));
   // The soft styles also reach what renders outside the frame: side sheet, dialogs and portals on body.
   useEffect(() => {
     document.documentElement.classList.add('soft');
@@ -70,7 +72,7 @@ export function Layout() {
   useEffect(() => setMenue(false), [pathname]);
 
   const kunden = gefunden?.id === 'kunden' && db ? kundenListe(db) : [];
-  const reiter = gefunden ? gefunden.navigation.filter((n) => !n.versteckt && !(mandantenModus && ['/kalender', '/crm/anfragen'].includes(n.pfad)) && (n.pfad !== '/wort' || zeigeStart(ansicht, 'wort') || pathname === '/wort')) : [];
+  const reiter = gefunden ? gefunden.navigation.filter((n) => !n.versteckt && !(offenerLogin && ['/kalender', '/crm/anfragen'].includes(n.pfad)) && (n.pfad !== '/wort' || zeigeStart(ansicht, 'wort') || pathname === '/wort')) : [];
 
   return (
     <PraesenzProvider>
@@ -89,7 +91,10 @@ export function Layout() {
               <span className="brand-zeichen">
                 <img src="./zeichen-eisblau.png" alt="" />
               </span>
-              <span className="brand-wort">{marke}</span>
+              <span className="brand-text">
+                <span className="brand-wort">{marke}</span>
+                {instanzModus && <span className="brand-by">by Velonify</span>}
+              </span>
             </Link>
           </header>
 

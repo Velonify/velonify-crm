@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { instanzModus } from '../config';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { brauchtAufmerksamkeit } from '../data/aufmerksamkeit';
@@ -76,7 +77,10 @@ export function Seitenleiste({ offen }: { offen: boolean }) {
           <span className="brand-zeichen">
             <img src="./zeichen-eisblau.png" alt="" />
           </span>
-          <span className="brand-wort">{marke}</span>
+          <span className="brand-text">
+            <span className="brand-wort">{marke}</span>
+            {instanzModus && <span className="brand-by">by Velonify</span>}
+          </span>
         </Link>
         <Glocke />
       </div>

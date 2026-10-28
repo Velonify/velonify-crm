@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { config, isDemo, mandantenModus } from '../config';
+import { config, isDemo, offenerLogin } from '../config';
 import { useToast } from '../components/Toasts';
 import { errorMessage } from '../lib/errors';
 import { CrmService } from './crm';
@@ -62,10 +62,10 @@ export function CrmProvider({ children }: { children: ReactNode }) {
       // The data lives in Postgres behind crm-api; the Sheets client is only used for the offer calculations.
       const service = new CrmService({
         store: new ApiStore(config.crmApiUrl, getToken),
-        drive: mandantenModus ? ohneDrive : new GoogleDrive(getToken),
-        calendar: mandantenModus ? ohneKalender : new GoogleCalendar(getToken),
+        drive: offenerLogin ? ohneDrive : new GoogleDrive(getToken),
+        calendar: offenerLogin ? ohneKalender : new GoogleCalendar(getToken),
         currentUser: userEmail,
-        tabelle: mandantenModus ? undefined : (spreadsheetId) => new SheetsClient(spreadsheetId, getToken),
+        tabelle: offenerLogin ? undefined : (spreadsheetId) => new SheetsClient(spreadsheetId, getToken),
         ich: gemerktesIch,
         internesBoard: internesBoardTitel(mandantName),
       });

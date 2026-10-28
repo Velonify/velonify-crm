@@ -1,13 +1,19 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { config, isDemo, mandantenModus } from '../config';
+import { config, instanzModus, instanzName, isDemo, mandantenModus, offenerLogin } from '../config';
+import type { InstanzSicht } from '../data/instanz';
 import type { MandantSicht } from '../data/plattform';
-import { MandantApi } from './api';
+import { InstanzApi, MandantApi } from './api';
 
 interface MandantContextValue {
   /** Set in the tenants' hub once /ich answered; null in Velonify's own hub. */
   sicht: MandantSicht | null;
   api: MandantApi;
+  /** Set in an own instance once /instanz/ich answered: name, role and tools. */
+  instanz: InstanzSicht | null;
+  instanzApi: InstanzApi;
+  /** Takes the answer of a settings change without another round trip. */
+  setzeInstanz(sicht: InstanzSicht): void;
   neuLaden(): Promise<void>;
   /** Whether a tool shows up: tenants get what their package and switches allow, Velonify everything but the Lead-Markt. */
   erlaubt(werkzeug: string): boolean;
@@ -26,44 +32,48 @@ const NUR_MANDANTEN = ['leadmarkt'];
 export function MandantProvider({ children }: { children: ReactNode }) {
   const { getToken, userEmail, signOut } = useAuth();
   const api = useMemo(() => new MandantApi(getToken), [getToken]);
+  const instanzApi = useMemo(() => new InstanzApi(getToken), [getToken]);
   const [sicht, setSicht] = useState<MandantSicht | null>(null);
+  const [instanz, setInstanz] = useState<InstanzSicht | null>(null);
   const [fehler, setFehler] = useState<{ text: string; status?: number } | null>(null);
   const [bedingungenOffen, zeigeBedingungen] = useState(true);
 
   const neuLaden = useCallback(async () => {
-    if (!mandantenModus) return;
+    if (!offenerLogin) return;
     try {
-      setSicht(await api.ich());
+      if (instanzModus) setInstanz(await instanzApi.ich());
+      else setSicht(await api.ich());
       setFehler(null);
     } catch (err) {
       setFehler({ text: err instanceof Error ? err.message : String(err), status: (err as { status?: number }).status });
     }
-  }, [api]);
+  }, [api, instanzApi]);
 
   useEffect(() => {
     void neuLaden();
-    if (!mandantenModus) return;
+    if (!offenerLogin) return;
     // Days left and quota stay current while the tab is open.
     const takt = window.setInterval(() => void neuLaden(), 10 * 60 * 1000);
     return () => window.clearInterval(takt);
   }, [neuLaden]);
 
-  const istAdmin = !mandantenModus && !isDemo && config.admins.includes(userEmail().toLowerCase());
+  const istAdmin = !offenerLogin && !isDemo && config.admins.includes(userEmail().toLowerCase());
   const erlaubt = useCallback(
     (werkzeug: string) => {
+      if (instanzModus) return instanz?.werkzeuge.includes(werkzeug) ?? false;
       if (mandantenModus) return sicht?.werkzeuge.includes(werkzeug) ?? false;
       if (NUR_MANDANTEN.includes(werkzeug)) return false;
       if (NUR_ADMINS.includes(werkzeug)) return istAdmin;
       return true;
     },
-    [sicht, istAdmin],
+    [sicht, instanz, istAdmin],
   );
   const value = useMemo(
-    () => ({ sicht, api, neuLaden, erlaubt, istAdmin, bedingungenOffen, zeigeBedingungen }),
-    [sicht, api, neuLaden, erlaubt, istAdmin, bedingungenOffen],
+    () => ({ sicht, api, instanz, instanzApi, setzeInstanz: setInstanz, neuLaden, erlaubt, istAdmin, bedingungenOffen, zeigeBedingungen }),
+    [sicht, api, instanz, instanzApi, neuLaden, erlaubt, istAdmin, bedingungenOffen],
   );
 
-  if (mandantenModus && !sicht) {
+  if ((mandantenModus && !sicht) || (instanzModus && !instanz)) {
     return (
       <div className="login">
         <main className="login-main">
@@ -92,9 +102,10 @@ export function MandantProvider({ children }: { children: ReactNode }) {
   return <MandantContext.Provider value={value}>{children}</MandantContext.Provider>;
 }
 
-/** Brand at the top left: "Velonify" in our hub, "<tenant> Hub" in a tenant's. */
+/** Brand at the top left: "Velonify" in our hub, "<tenant> Hub" in a tenant's, "<name> HUB" (by Velonify) in an own instance. */
 export function useMarke(): string {
-  const { sicht } = useMandant();
+  const { sicht, instanz } = useMandant();
+  if (instanzModus) return `${instanz?.name || instanzName || 'Velonify'} HUB`;
   return mandantenModus ? `${sicht?.mandant.name ?? 'Velonify'} Hub` : 'Velonify';
 }
 

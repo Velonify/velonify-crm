@@ -1,6 +1,7 @@
 import { lazy, type ComponentType } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
+import { instanzModus } from './config';
 import { Layout } from './components/Layout';
 import { ReauthDialog } from './components/ReauthDialog';
 import { ToastProvider } from './components/Toasts';
@@ -29,6 +30,7 @@ const AnfragenPage = seite(() => import('./eingang/AnfragenPage'), 'AnfragenPage
 const EingangPage = seite(() => import('./eingang/EingangPage'), 'EingangPage');
 const DatenPage = seite(() => import('./pages/DatenPage'), 'DatenPage');
 const EinrichtungPage = seite(() => import('./pages/EinrichtungPage'), 'EinrichtungPage');
+const InstanzEinrichtungPage = seite(() => import('./instanz/EinrichtungPage'), 'InstanzEinrichtungPage');
 const EinstellungenPage = seite(() => import('./pages/EinstellungenPage'), 'EinstellungenPage');
 const FirmaAktePage = seite(() => import('./pages/FirmaAktePage'), 'FirmaAktePage');
 const FirmaNeuPage = seite(() => import('./pages/FirmaNeuPage'), 'FirmaNeuPage');
@@ -151,7 +153,7 @@ export function App() {
                   <Route path=":id" element={<MandantPage />} />
                 </Route>
                 <Route path="einstellungen" element={<EinstellungenPage />} />
-                <Route path="einrichtung" element={<EinrichtungPage />} />
+                <Route path="einrichtung" element={instanzModus ? <InstanzEinrichtungPage /> : <EinrichtungPage />} />
                 <Route path="einrichtung/daten" element={<DatenPage />} />
                 <Route path="einrichtung/daten/:tab" element={<DatenPage />} />
                 <Route path="pipeline" element={<AlteCrmAdresse />} />

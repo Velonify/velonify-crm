@@ -19,6 +19,9 @@ import { slackBenachrichtiger, slackDirekt } from '../../../src/data/slack';
 import { leseTeamZuordnung } from '../../../src/data/selectors';
 import { PraesenzRaum, pruefeMeldung } from '../../../src/data/praesenz';
 import { behandleWhiteboard, cloudStorage, speicherAblage, type Ablage } from './whiteboard';
+import { behandleInstanz, instanzRolle } from './instanz';
+import { InstanzStore } from '../../../src/data/postgres/instanzStore';
+import { istProfil, type Profil } from '../../../src/data/instanz';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 /** OAuth client of the tenants' hub (app.velonify.de, own Google project with an external audience, only openid/email/profile). */
@@ -37,6 +40,11 @@ const mandantenLimit = new Limit(300, 10 * 60 * 1000);
 /** Who may take the sheet over into Postgres (Einrichtung → Übernahme). */
 const ADMINS = (process.env.ADMINS ?? 'lukas@velonify.de,julian@velonify.de').split(',').map((a) => a.trim().toLowerCase());
 const HAUPT_DB = process.env.DB_NAME ?? 'crm';
+/**
+ * Set in an own instance (<kennung>.velonify.de, own project and database "hub"): any invited Google account signs in,
+ * roles come from instanz_zugaenge, ADMINS are Velonify's support logins. See src/data/instanz.ts and INSTANZ.md.
+ */
+const INSTANZ_PROFIL: Profil | null = istProfil(process.env.INSTANZ_PROFIL) ? process.env.INSTANZ_PROFIL : null;
 
 const verbindungen = new Map<string, Promise<Verbindung>>();
 /** The main database, or crm_test for dry runs of the takeover. */
@@ -195,6 +203,8 @@ functions.http('crmApi', async (req, res) => {
     return void fehler(502, 'Die Anmeldung konnte gerade nicht geprüft werden.');
   }
 
+  if (INSTANZ_PROFIL) return void (await instanzAnfrage(req, res, pfad, email, INSTANZ_PROFIL, fehler));
+
   // Tenants: any verified address on the whitelist, signed in through the tenants' own client, into their own database.
   if (client === MANDANTEN_CLIENT_ID && !CLIENT_ID.split(',').map((c) => c.trim()).includes(client)) {
     if (email.endsWith(`@${DOMAIN}`)) return void fehler(403, 'Velonify meldet sich unter crm.velonify.de an.');
@@ -271,6 +281,46 @@ functions.http('crmApi', async (req, res) => {
     fehler(500, 'Die Datenbank hat mit einem Fehler geantwortet.');
   }
 });
+
+/** A request in an own instance: login and role from the instance's database, then the instance's routes. */
+async function instanzAnfrage(
+  req: functions.Request,
+  res: functions.Response,
+  pfad: string,
+  email: string,
+  profil: Profil,
+  fehler: (status: number, meldung: string) => unknown,
+): Promise<void> {
+  if (!limit.erlaubt(email)) return void fehler(429, 'Zu viele Anfragen in kurzer Zeit. Bitte kurz warten.');
+  const start = Date.now();
+  try {
+    const { pool } = await datenbank();
+    const instanz = new InstanzStore(pool);
+    const rolle = await instanzRolle(instanz, email, ADMINS);
+    if (!rolle) return void fehler(403, 'Für diese Adresse gibt es keinen Zugang. Bittet einen Admin eures Teams, euch einzuladen.');
+
+    if (pfad === '/praesenz') {
+      if (req.method !== 'POST') return void fehler(405, 'Nur POST.');
+      const meldung = pruefeMeldung(req.body);
+      if (!meldung) return void fehler(400, 'Meldung ungültig.');
+      if ('weg' in meldung) praesenz.weg(email, meldung.tab);
+      else praesenz.melde(email, meldung);
+      return void res.json({ anwesende: praesenz.anwesende(email) });
+    }
+    const wb = await behandleWhiteboard(req.method, pfad, req.body, { pool, ablage: whiteboardAblage, email, roh: req.rawBody, typ: req.get('content-type') });
+    if (wb && 'inhalt' in wb) {
+      res.set('Cache-Control', 'private, max-age=31536000, immutable');
+      return void res.status(200).type(wb.typ).send(wb.inhalt);
+    }
+    const antwort = wb ?? (await behandleInstanz(req.method, pfad, req.body, { profil, instanz, pool, email, rolle }));
+    if (req.method !== 'GET') console.log(JSON.stringify({ email, rolle, pfad, tab: (req.body as { tab?: string })?.tab, status: antwort.status, dauer_ms: Date.now() - start }));
+    res.status(antwort.status).json(antwort.daten);
+  } catch (err) {
+    if (err instanceof GesperrtError) return void fehler(403, err.message);
+    console.error(`Instanz ${req.method} ${pfad} fehlgeschlagen`, err);
+    fehler(500, 'Die Datenbank hat mit einem Fehler geantwortet.');
+  }
+}
 
 /** A request of a tenant: whitelist, own database, own presence room, KI through the quota, everything else via behandleMandant. */
 async function mandantenAnfrage(

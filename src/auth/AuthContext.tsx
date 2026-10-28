@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { config, GOOGLE_SCOPES, isDemo, mandantenModus } from '../config';
+import { config, GOOGLE_SCOPES, isDemo, offenerLogin } from '../config';
 import { DEMO_START, DEMO_TEAM } from '../data/demo/agentur';
 import { ICH_GEWECHSELT, read as gemerktesIch } from '../lib/useIch';
 import { AuthExpiredError } from '../data/errors';
@@ -107,12 +107,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = await requestToken({
         clientId: config.googleClientId,
         scopes: GOOGLE_SCOPES,
-        // Tenants sign in with any Google account; crm-api checks the whitelist.
-        domain: mandantenModus ? undefined : config.allowedDomain,
+        // Tenants and own instances sign in with any Google account; crm-api checks the whitelist.
+        domain: offenerLogin ? undefined : config.allowedDomain,
         loginHint: previousUser?.email,
       });
       const user = await fetchGoogleUser(token.accessToken);
-      if (!mandantenModus && !user.email.toLowerCase().endsWith(`@${config.allowedDomain}`)) {
+      if (!offenerLogin && !user.email.toLowerCase().endsWith(`@${config.allowedDomain}`)) {
         revokeToken(token.accessToken);
         throw new Error(`Nur Google-Konten mit @${config.allowedDomain} haben Zugriff. Angemeldet war: ${user.email}`);
       }

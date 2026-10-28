@@ -1,4 +1,5 @@
 import { ConflictError, GesperrtError, NotFoundError } from '../../../src/data/errors';
+import { istInstanzEinstellung } from '../../../src/data/instanz';
 import { MITARBEITER_SCHLUESSEL } from '../../../src/data/rollen';
 import { SCHEMA, type EntityTab } from '../../../src/data/schema';
 import type { RecordUpdate, Store } from '../../../src/data/store';
@@ -85,6 +86,8 @@ export async function behandle(methode: string, pfad: string, body: unknown, sto
       const werte = body.werte;
       if (!istObjekt(werte) || !Object.values(werte).every((w) => typeof w === 'string')) return fehler(400, 'Einstellungen ungültig.');
       if (MITARBEITER_SCHLUESSEL in werte && !optionen.darfRollen) return fehler(403, 'Rollen dürfen nur Admins vergeben.');
+      // Name, switches and the support login of an own instance only change through /instanz/einstellungen.
+      if (Object.keys(werte).some(istInstanzEinstellung)) return fehler(403, 'Diese Einstellungen gibt es nur in der Einrichtung der Instanz.');
       await store.saveEinstellungen(werte as Record<string, string>);
       return { status: 200, daten: { ok: true } };
     }

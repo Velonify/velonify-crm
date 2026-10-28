@@ -1,3 +1,5 @@
+import { istProfil, type Profil } from './data/instanz';
+
 const env = import.meta.env;
 
 /**
@@ -5,6 +7,16 @@ const env = import.meta.env;
  * Login with any whitelisted Google account, data in the tenant's own database, no Drive/Sheets/Calendar.
  */
 export const mandantenModus = env.VITE_MANDANTEN === '1';
+/**
+ * An own instance (<kennung>.velonify.de): own project, database and crm-api, built with VITE_PROFIL. Login with any Google
+ * account the instance's admins invited; tools and roles come from crm-api (/instanz/ich). See src/data/instanz.ts.
+ */
+export const profil: Profil | null = istProfil(env.VITE_PROFIL) ? env.VITE_PROFIL : null;
+export const instanzModus = profil !== null;
+/** Name of the instance for the login page, before crm-api can tell it (repo variable of the instance, never in this repo). */
+export const instanzName = (env.VITE_INSTANZ_NAME || '').trim();
+/** Sign-in with any Google account, without Drive, Sheets and Calendar: tenants and own instances. */
+export const offenerLogin = mandantenModus || instanzModus;
 const crmApi = (env.VITE_CRM_API_URL || '').replace(/\/$/, '');
 
 export const config = {
@@ -34,7 +46,7 @@ export const isDemo = !config.googleClientId || !config.crmApiUrl;
 //   created by the app, so drive.file would not see them. Full drive would also cover the Sheets API; the spreadsheets
 //   scope stays anyway until that has been tried live.
 // - Calendar: Meet appointments.
-export const GOOGLE_SCOPES = mandantenModus ? ['openid', 'email', 'profile'] : [
+export const GOOGLE_SCOPES = offenerLogin ? ['openid', 'email', 'profile'] : [
   'openid',
   'email',
   'profile',
