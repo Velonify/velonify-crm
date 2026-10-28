@@ -71,6 +71,8 @@ const LeadMarktPage = seite(() => import('./plattform/LeadMarktPage'), 'LeadMark
 const PlattformPage = seite(() => import('./plattform/PlattformPage'), 'PlattformPage');
 const MandantPage = seite(() => import('./plattform/MandantPage'), 'MandantPage');
 const MarktVerwaltungPage = seite(() => import('./plattform/MarktVerwaltungPage'), 'MarktVerwaltungPage');
+const InstanzenPage = seite(() => import('./plattform/InstanzenPage'), 'InstanzenPage');
+const InstanzPage = seite(() => import('./plattform/InstanzenPage'), 'InstanzPage');
 
 /** Links from before the start page (/#/firmen/…) now live under /crm. */
 function AlteCrmAdresse() {
@@ -167,6 +169,8 @@ export function App() {
                 <Route path="plattform">
                   <Route index element={<PlattformPage />} />
                   <Route path="markt" element={<MarktVerwaltungPage />} />
+                  <Route path="instanzen" element={<InstanzenPage />} />
+                  <Route path="instanzen/:kennung" element={<InstanzPage />} />
                   <Route path=":id" element={<MandantPage />} />
                 </Route>
                 <Route path="einstellungen" element={<EinstellungenPage />} />

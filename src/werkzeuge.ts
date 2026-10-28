@@ -234,6 +234,7 @@ export const WERKZEUGE: Werkzeug[] = [
     navigation: [
       { label: 'Mandanten', pfad: '/plattform', end: true },
       { label: 'Lead-Markt', pfad: '/plattform/markt' },
+      { label: 'Instanzen', pfad: '/plattform/instanzen' },
     ],
   },
 ];
