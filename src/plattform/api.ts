@@ -1,5 +1,6 @@
 import { config } from '../config';
 import { AuthExpiredError } from '../data/errors';
+import type { InstanzRolle, InstanzSicht, InstanzZugang } from '../data/instanz';
 import type { FeedbackAnlass, Mandant, MandantSicht, Paket, Rolle, Zugang } from '../data/plattform';
 import type { MandantUebersicht, MarktDaten, MarktFilter, MarktVorschau } from '../data/postgres/plattformStore';
 
@@ -49,6 +50,20 @@ export class MandantApi {
   buchen = (paket: Paket) => this.los<{ ok: true }>('/buchen', { paket });
   markt = (filter: MarktFilter) => this.los<MarktSeite>('/leadmarkt', filter);
   freischalten = (id: string) => this.los<{ firma_id: string; neu: boolean }>('/leadmarkt/freischalten', { id });
+}
+
+/** What an own instance's hub asks its crm-api about itself, its team and its settings. */
+export class InstanzApi {
+  constructor(private readonly getToken: () => Promise<string>) {}
+
+  private los<T>(pfad: string, body?: unknown) {
+    return anfrage<T>(this.getToken, config.crmApiUrl, pfad, body);
+  }
+
+  ich = () => this.los<InstanzSicht>('/instanz/ich');
+  zugaenge = () => this.los<{ zugaenge: InstanzZugang[]; name: string; velonify_zugang: boolean }>('/instanz/zugaenge');
+  zugang = (eingabe: { email: string; name?: string; rolle?: InstanzRolle; aktiv?: boolean }) => this.los<{ zugang: InstanzZugang }>('/instanz/zugang', eingabe);
+  einstellungen = (werte: { name?: string; velonify_zugang?: boolean; funktionen?: Record<string, boolean> }) => this.los<InstanzSicht>('/instanz/einstellungen', werte);
 }
 
 export interface MandantDetail {

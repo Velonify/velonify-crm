@@ -4,7 +4,9 @@ import { useAuth } from '../auth/AuthContext';
 import { Schalter } from '../components/Schalter';
 import { useHilfe } from '../components/Tastatur';
 import { FormError, PageHeader } from '../components/ui';
-import { isDemo } from '../config';
+import { instanzModus, isDemo } from '../config';
+import { darfEinrichten } from '../data/instanz';
+import { useMandant } from '../plattform/MandantContext';
 import { useCrm } from '../data/CrmContext';
 import { ANSICHT_STANDARD, START_BEREICHE, zeigeStart } from '../data/ansicht';
 import { useAnsicht } from '../lib/useAnsicht';
@@ -48,6 +50,7 @@ export function EinstellungenPage() {
   const { state, signOut } = useAuth();
   const user = state.status === 'signedOut' ? null : state.user;
   const { db } = useCrm();
+  const { instanz } = useMandant();
   const [ich, setIch] = useIch(db?.listen.team ?? []);
   const { ansicht, setze, fehler } = useAnsicht();
   const [theme, setTheme] = useTheme();
@@ -137,11 +140,21 @@ export function EinstellungenPage() {
                 Anzeigen
               </button>
             </Zeile>
-            <Zeile titel="Einrichtung" text="Drive-Ordner, Links, Team und Daten – für alle im Team">
-              <Link to="/einrichtung" className="button small">
-                Öffnen
-              </Link>
-            </Zeile>
+            {!instanzModus ? (
+              <Zeile titel="Einrichtung" text="Drive-Ordner, Links, Team und Daten – für alle im Team">
+                <Link to="/einrichtung" className="button small">
+                  Öffnen
+                </Link>
+              </Zeile>
+            ) : (
+              darfEinrichten(instanz?.rolle) && (
+                <Zeile titel="Einrichtung" text="Name, Team, Rollen und Zugang für Velonify – nur für Admins">
+                  <Link to="/einrichtung" className="button small">
+                    Öffnen
+                  </Link>
+                </Zeile>
+              )
+            )}
           </Abschnitt>
         </div>
 

@@ -25,9 +25,9 @@ import { useKundenDaten } from '../kunden/useKundenDaten';
 import { useTodoDaten } from '../todo/useTodoDaten';
 import { istZustaendig } from '../data/zustaendig';
 import { zeigeStart } from '../data/ansicht';
-import { mandantenModus } from '../config';
+import { instanzModus, offenerLogin } from '../config';
 
-/** Start sections tenants do not get (see config.mandantenModus). */
+/** Start sections tenants and own instances do not get (see config.offenerLogin). */
 const OHNE_MANDANT: string[] = ['kalender', 'kunden', 'dateiname'];
 import { useAnsicht } from '../lib/useAnsicht';
 import { useRolle } from '../lib/useRolle';
@@ -318,7 +318,7 @@ export function StartPage() {
   const [ich] = useIch(db?.listen.team ?? []);
   const { ansicht } = useAnsicht();
   // Tenants have no Google calendar, no Shared Drive and no client hub.
-  const zeige = (b: Parameters<typeof zeigeStart>[1]) => !(mandantenModus && OHNE_MANDANT.includes(b)) && zeigeStart(ansicht, b);
+  const zeige = (b: Parameters<typeof zeigeStart>[1]) => !(offenerLogin && OHNE_MANDANT.includes(b)) && zeigeStart(ansicht, b);
   const heute = isoDate(new Date());
 
   const cockpit = useMemo(() => {
@@ -358,7 +358,7 @@ export function StartPage() {
   const teile = [
     cockpit.eintraege.length === 0 ? 'Heute ist nichts fällig' : `${cockpit.eintraege.length} ${cockpit.eintraege.length === 1 ? 'Sache ist' : 'Dinge sind'} heute dran${cockpit.ueberfaellig > 0 ? `, ${cockpit.ueberfaellig} davon überfällig` : ''}`,
     ...(cockpit.anfragen ? [`${cockpit.anfragen} ${cockpit.anfragen === 1 ? 'neue Anfrage' : 'neue Anfragen'}`] : []),
-    ...(siehtGeld ? [`${ich ? 'deine' : 'die'} Pipeline steht bei ${formatEuro(cockpit.pipelineWert)}`] : []),
+    ...(siehtGeld && !instanzModus ? [`${ich ? 'deine' : 'die'} Pipeline steht bei ${formatEuro(cockpit.pipelineWert)}`] : []),
   ];
   const satz = `${teile.join(' · ')}.`;
 
