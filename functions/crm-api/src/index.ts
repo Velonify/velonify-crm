@@ -19,7 +19,10 @@ import { slackBenachrichtiger, slackDirekt } from '../../../src/data/slack';
 import { leseTeamZuordnung } from '../../../src/data/selectors';
 import { PraesenzRaum, pruefeMeldung } from '../../../src/data/praesenz';
 import { behandleWhiteboard, cloudStorage, speicherAblage, type Ablage } from './whiteboard';
-import { behandleInstanz, instanzRolle } from './instanz';
+import { behandleInstanz, behandleOeffentlich, behandleTakt, instanzRolle, type InstanzDienste } from './instanz';
+import { claudeKi, ohneKi } from './creator/ki';
+import { behandleSteuerung } from './creator/steuerung';
+import { secretManagerGeheimnisse, speicherGeheimnisse } from './creator/geheimnisse';
 import { InstanzStore } from '../../../src/data/postgres/instanzStore';
 import { istProfil, type Profil } from '../../../src/data/instanz';
 
@@ -45,6 +48,27 @@ const HAUPT_DB = process.env.DB_NAME ?? 'crm';
  * roles come from instanz_zugaenge, ADMINS are Velonify's support logins. See src/data/instanz.ts and INSTANZ.md.
  */
 const INSTANZ_PROFIL: Profil | null = istProfil(process.env.INSTANZ_PROFIL) ? process.env.INSTANZ_PROFIL : null;
+
+/** Database, Claude, secrets and addresses of the instance; Claude only with the instance's own ANTHROPIC_API_KEY. */
+async function instanzDienste(profil: Profil): Promise<InstanzDienste> {
+  const { pool } = await datenbank();
+  const schluessel = process.env.ANTHROPIC_API_KEY?.trim();
+  return {
+    profil,
+    pool,
+    instanz: new InstanzStore(pool),
+    ki: schluessel ? claudeKi(schluessel, pool) : ohneKi,
+    geheimnisse: process.env.GCP_PROJEKT ? secretManagerGeheimnisse(process.env.GCP_PROJEKT) : speicherGeheimnisse(),
+    umgebung: {
+      hubUrl: (process.env.HUB_URL ?? '').replace(/\/$/, ''),
+      apiUrl: (process.env.CRM_API_URL ?? '').replace(/\/$/, ''),
+      wert: (name) => process.env[name]?.trim() || undefined,
+    },
+  };
+}
+
+/** Public paths of an instance (forms, media kit): enough for people, too few for a script. */
+const oeffentlichLimit = new Limit(120, 10 * 60 * 1000);
 
 const verbindungen = new Map<string, Promise<Verbindung>>();
 /** The main database, or crm_test for dry runs of the takeover. */
@@ -191,6 +215,50 @@ functions.http('crmApi', async (req, res) => {
     return;
   }
 
+  if (INSTANZ_PROFIL && pfad.startsWith('/oeffentlich/')) {
+    const herkunft = (req.get('x-forwarded-for') ?? '').split(',')[0].trim();
+    if (!oeffentlichLimit.erlaubt(herkunft || 'unbekannt')) return void fehler(429, 'Zu viele Anfragen in kurzer Zeit. Bitte kurz warten.');
+    try {
+      const query = Object.fromEntries(Object.entries(req.query).map(([k, v]) => [k, String(v)]));
+      const antwort = await behandleOeffentlich(req.method, pfad, req.body, query, await instanzDienste(INSTANZ_PROFIL), herkunft);
+      // Modules may answer with a redirect (OAuth callbacks) or a non-JSON body (ICS feed).
+      const daten = antwort.daten as { umleiten?: string; inhalt?: string; typ?: string } | null;
+      if (daten?.umleiten) return void res.redirect(302, daten.umleiten);
+      if (daten && typeof daten.inhalt === 'string' && daten.typ) return void res.status(antwort.status).type(daten.typ).send(daten.inhalt);
+      res.status(antwort.status).json(antwort.daten);
+    } catch (err) {
+      console.error(`Öffentlich ${req.method} ${pfad} fehlgeschlagen`, err);
+      fehler(500, 'Gerade nicht erreichbar.');
+    }
+    return;
+  }
+  // Velonify's hub steering the instance (status, building blocks, news): own token, only metadata.
+  if (INSTANZ_PROFIL && pfad.startsWith('/steuerung/')) {
+    if (!passt(mitgegebenesToken(req), process.env.STEUER_TOKEN)) return void fehler(403, 'Falsches Token.');
+    try {
+      const antwort = await behandleSteuerung(req.method, pfad, req.body, await instanzDienste(INSTANZ_PROFIL));
+      console.log(JSON.stringify({ pfad, status: antwort.status }));
+      res.status(antwort.status).json(antwort.daten);
+    } catch (err) {
+      console.error(`Steuerung ${pfad} fehlgeschlagen`, err);
+      fehler(500, 'Die Instanz hat mit einem Fehler geantwortet.');
+    }
+    return;
+  }
+  // Timed jobs of an instance: Cloud Scheduler with its own token.
+  if (INSTANZ_PROFIL && pfad.startsWith('/takt/')) {
+    if (req.method !== 'POST' || !passt(mitgegebenesToken(req), process.env.TAKT_TOKEN)) return void fehler(403, 'Falsches Token.');
+    try {
+      const antwort = await behandleTakt(pfad.slice('/takt/'.length), await instanzDienste(INSTANZ_PROFIL));
+      console.log(JSON.stringify({ pfad, status: antwort.status }));
+      res.status(antwort.status).json(antwort.daten);
+    } catch (err) {
+      console.error(`Takt ${pfad} fehlgeschlagen`, err);
+      fehler(500, err instanceof Error ? err.message : String(err));
+    }
+    return;
+  }
+
   const token = /^Bearer (.+)$/i.exec(req.get('authorization') ?? '')?.[1] ?? '';
   if (!token) return void fehler(401, 'Nicht angemeldet.');
   let email: string;
@@ -294,8 +362,8 @@ async function instanzAnfrage(
   if (!limit.erlaubt(email)) return void fehler(429, 'Zu viele Anfragen in kurzer Zeit. Bitte kurz warten.');
   const start = Date.now();
   try {
-    const { pool } = await datenbank();
-    const instanz = new InstanzStore(pool);
+    const dienste = await instanzDienste(profil);
+    const { pool, instanz } = dienste;
     const rolle = await instanzRolle(instanz, email, ADMINS);
     if (!rolle) return void fehler(403, 'Für diese Adresse gibt es keinen Zugang. Bittet einen Admin eures Teams, euch einzuladen.');
 
@@ -312,7 +380,7 @@ async function instanzAnfrage(
       res.set('Cache-Control', 'private, max-age=31536000, immutable');
       return void res.status(200).type(wb.typ).send(wb.inhalt);
     }
-    const antwort = wb ?? (await behandleInstanz(req.method, pfad, req.body, { profil, instanz, pool, email, rolle }));
+    const antwort = wb ?? (await behandleInstanz(req.method, pfad, req.body, { ...dienste, email, rolle }));
     if (req.method !== 'GET') console.log(JSON.stringify({ email, rolle, pfad, tab: (req.body as { tab?: string })?.tab, status: antwort.status, dauer_ms: Date.now() - start }));
     res.status(antwort.status).json(antwort.daten);
   } catch (err) {

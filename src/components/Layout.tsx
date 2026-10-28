@@ -72,7 +72,13 @@ export function Layout() {
   useEffect(() => setMenue(false), [pathname]);
 
   const kunden = gefunden?.id === 'kunden' && db ? kundenListe(db) : [];
-  const reiter = gefunden ? gefunden.navigation.filter((n) => !n.versteckt && !(offenerLogin && ['/kalender', '/crm/anfragen'].includes(n.pfad)) && (n.pfad !== '/wort' || zeigeStart(ansicht, 'wort') || pathname === '/wort')) : [];
+  // Tabs of a building block only show in instances that have it switched on.
+  const bausteinAn = (b: string | undefined) => !b || (instanzModus && (instanz?.bausteine as string[] | undefined)?.includes(b));
+  const reiter = gefunden
+    ? gefunden.navigation.filter(
+        (n) => !n.versteckt && bausteinAn(n.baustein) && !(offenerLogin && ['/kalender', '/crm/anfragen'].includes(n.pfad)) && (n.pfad !== '/wort' || zeigeStart(ansicht, 'wort') || pathname === '/wort'),
+      )
+    : [];
 
   return (
     <PraesenzProvider>

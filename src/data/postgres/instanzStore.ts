@@ -1,4 +1,4 @@
-import { INSTANZ_EINSTELLUNG, istInstanzRolle, teamName, type InstanzRolle, type InstanzZugang } from '../instanz';
+import { INSTANZ_EINSTELLUNG, istInstanzRolle, listeAus, PROFIL_WERKZEUGE, teamName, type InstanzRolle, type InstanzZugang } from '../instanz';
 import type { Db } from './postgresStore';
 
 /** A refused change with the HTTP status crm-api answers. */
@@ -15,6 +15,9 @@ interface ZugangZeile {
   email: string;
   name: string | null;
   rolle: string;
+  werkzeuge: string | null;
+  boards: string | null;
+  ohne_betraege: boolean;
   aktiv: boolean;
   letzter_login: Date | string | null;
   angelegt_am: Date | string;
@@ -23,7 +26,17 @@ interface ZugangZeile {
 const zeit = (wert: Date | string | null) => (wert ? new Date(wert).toISOString() : '');
 
 function zuZugang(z: ZugangZeile): InstanzZugang {
-  return { email: z.email, name: z.name ?? '', rolle: istInstanzRolle(z.rolle) ? z.rolle : 'team', aktiv: z.aktiv, letzter_login: zeit(z.letzter_login), angelegt_am: zeit(z.angelegt_am) };
+  return {
+    email: z.email,
+    name: z.name ?? '',
+    rolle: istInstanzRolle(z.rolle) ? z.rolle : 'team',
+    werkzeuge: listeAus(z.werkzeuge),
+    boards: listeAus(z.boards),
+    ohne_betraege: z.ohne_betraege,
+    aktiv: z.aktiv,
+    letzter_login: zeit(z.letzter_login),
+    angelegt_am: zeit(z.angelegt_am),
+  };
 }
 
 /** Logins and settings of an own instance, in the instance's database (migration 014). */
@@ -45,20 +58,30 @@ export class InstanzStore {
     await this.db.query(`UPDATE instanz_zugaenge SET letzter_login = now() WHERE email = $1 AND (letzter_login IS NULL OR letzter_login < now() - interval '30 minutes')`, [email]);
   }
 
-  async speichereZugang(eingabe: { email: string; name?: string; rolle?: InstanzRolle; aktiv?: boolean }, von: string): Promise<InstanzZugang> {
+  async speichereZugang(
+    eingabe: { email: string; name?: string; rolle?: InstanzRolle; aktiv?: boolean; werkzeuge?: string[]; boards?: string[]; ohne_betraege?: boolean },
+    von: string,
+  ): Promise<InstanzZugang> {
     const email = eingabe.email.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(email)) throw new InstanzFehler('Keine gültige E-Mail-Adresse.');
     if (eingabe.rolle !== undefined && !istInstanzRolle(eingabe.rolle)) throw new InstanzFehler('Unbekannte Rolle.');
     if (email === von.toLowerCase() && (eingabe.aktiv === false || (eingabe.rolle && eingabe.rolle !== 'admin'))) {
       throw new InstanzFehler('Den eigenen Admin-Zugang kann man nicht selbst entfernen oder herabstufen.');
     }
+    const unbekannt = (eingabe.werkzeuge ?? []).filter((w) => !Object.values(PROFIL_WERKZEUGE).some((l) => l.includes(w)));
+    if (unbekannt.length > 0) throw new InstanzFehler(`Unbekanntes Werkzeug: ${unbekannt.join(', ')}`);
+    if ((eingabe.boards ?? []).some((b) => !/^[A-Za-z0-9_-]{1,40}$/.test(b))) throw new InstanzFehler('Ungültige Board-Id.');
     if (eingabe.aktiv === false || (eingabe.rolle && eingabe.rolle !== 'admin')) await this.pruefeLetztenAdmin(email);
+    const liste = (werte: string[] | undefined) => (werte === undefined ? null : werte.join(','));
     const { rows } = await this.db.query<ZugangZeile>(
-      `INSERT INTO instanz_zugaenge (email, name, rolle, aktiv, angelegt_von) VALUES ($1, $2, COALESCE($3, 'team'), COALESCE($4, true), $5)
+      `INSERT INTO instanz_zugaenge (email, name, rolle, aktiv, werkzeuge, boards, ohne_betraege, angelegt_von)
+       VALUES ($1, $2, COALESCE($3, 'team'), COALESCE($4, true), $5, $6, COALESCE($7, false), $8)
        ON CONFLICT (email) DO UPDATE SET name = COALESCE($2, instanz_zugaenge.name), rolle = COALESCE($3, instanz_zugaenge.rolle),
-         aktiv = COALESCE($4, instanz_zugaenge.aktiv), geaendert_am = now(), geaendert_von = $5
+         aktiv = COALESCE($4, instanz_zugaenge.aktiv), werkzeuge = COALESCE($5, instanz_zugaenge.werkzeuge),
+         boards = COALESCE($6, instanz_zugaenge.boards), ohne_betraege = COALESCE($7, instanz_zugaenge.ohne_betraege),
+         geaendert_am = now(), geaendert_von = $8
        RETURNING *`,
-      [email, eingabe.name?.trim() || null, eingabe.rolle ?? null, eingabe.aktiv ?? null, von],
+      [email, eingabe.name?.trim() || null, eingabe.rolle ?? null, eingabe.aktiv ?? null, liste(eingabe.werkzeuge), liste(eingabe.boards), eingabe.ohne_betraege ?? null, von],
     );
     return zuZugang(rows[0]);
   }

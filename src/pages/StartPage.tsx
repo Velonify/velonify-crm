@@ -26,6 +26,7 @@ import { useTodoDaten } from '../todo/useTodoDaten';
 import { istZustaendig } from '../data/zustaendig';
 import { zeigeStart } from '../data/ansicht';
 import { instanzModus, offenerLogin } from '../config';
+import { CREATOR_START_FERTIG, CreatorStart } from '../creator/start/CreatorStart';
 
 /** Start sections tenants and own instances do not get (see config.offenerLogin). */
 const OHNE_MANDANT: string[] = ['kalender', 'kunden', 'dateiname'];
@@ -307,7 +308,12 @@ function Dateiname({ db, heute }: { db: Database; heute: string }) {
   );
 }
 
+/** Start page: an own instance gets the creator Home once its module is built (src/creator/start/CreatorStart.tsx). */
 export function StartPage() {
+  return instanzModus && CREATOR_START_FERTIG ? <CreatorStart /> : <StandardStart />;
+}
+
+function StandardStart() {
   const { db, service, loading, error, refresh } = useCrm();
   const { siehtGeld } = useRolle();
   // Word game and plant share one request, so opening the start page stays a small load for Google.

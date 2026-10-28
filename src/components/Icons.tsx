@@ -22,6 +22,12 @@ const PFADE: Record<string, string> = {
   eingang: 'M2.5 11h4.5l1.5 2.5h3L13 11h4.5M2.5 11 5 4h10l2.5 7v5h-15z',
   plattform: 'M3 3h14v5H3zM3 12h14v5H3zM6 5.5h1M6 14.5h1',
   schloss: 'M5 9h10v8H5zM7 9V6a3 3 0 0 1 6 0v3',
+  content: 'M3 4h14v12H3zM8 7.5v5l4.5-2.5z',
+  analytics: 'M3 17V3M3 17h14M6 13V9M10 13V6M14 13v-3',
+  kooperationen: 'M2 9l4-4 4 3 4-3 4 4-8 7zM6 5l4 4',
+  einnahmen: 'M3 5h14v10H3zM10 7.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM5 7v.5M15 12.5v.5',
+  kalender: 'M3 5h14v12H3zM3 9h14M7 3v4M13 3v4',
+  ablage: 'M2 5h6l2 2h8v10H2z',
 };
 
 export function WerkzeugIcon({ id }: { id: string }) {

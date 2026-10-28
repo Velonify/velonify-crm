@@ -1,6 +1,6 @@
 import { config } from '../config';
 import { AuthExpiredError } from '../data/errors';
-import type { InstanzRolle, InstanzSicht, InstanzZugang } from '../data/instanz';
+import type { BausteinId, InstanzRolle, InstanzSicht, InstanzZugang } from '../data/instanz';
 import type { FeedbackAnlass, Mandant, MandantSicht, Paket, Rolle, Zugang } from '../data/plattform';
 import type { MandantUebersicht, MarktDaten, MarktFilter, MarktVorschau } from '../data/postgres/plattformStore';
 
@@ -16,7 +16,7 @@ export class PlattformApiFehler extends Error {
   }
 }
 
-async function anfrage<T>(getToken: () => Promise<string>, basis: string, pfad: string, body?: unknown): Promise<T> {
+export async function anfrage<T>(getToken: () => Promise<string>, basis: string, pfad: string, body?: unknown): Promise<T> {
   const antwort = await fetch(`${basis.replace(/\/$/, '')}${pfad}`, {
     method: body === undefined ? 'GET' : 'POST',
     headers: { Authorization: `Bearer ${await getToken()}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
@@ -62,8 +62,9 @@ export class InstanzApi {
 
   ich = () => this.los<InstanzSicht>('/instanz/ich');
   zugaenge = () => this.los<{ zugaenge: InstanzZugang[]; name: string; velonify_zugang: boolean }>('/instanz/zugaenge');
-  zugang = (eingabe: { email: string; name?: string; rolle?: InstanzRolle; aktiv?: boolean }) => this.los<{ zugang: InstanzZugang }>('/instanz/zugang', eingabe);
-  einstellungen = (werte: { name?: string; velonify_zugang?: boolean; funktionen?: Record<string, boolean> }) => this.los<InstanzSicht>('/instanz/einstellungen', werte);
+  zugang = (eingabe: { email: string; name?: string; rolle?: InstanzRolle; aktiv?: boolean; werkzeuge?: string[]; boards?: string[]; ohne_betraege?: boolean }) =>
+    this.los<{ zugang: InstanzZugang }>('/instanz/zugang', eingabe);
+  einstellungen = (werte: { name?: string; velonify_zugang?: boolean; bausteine?: Partial<Record<BausteinId, boolean>> }) => this.los<InstanzSicht>('/instanz/einstellungen', werte);
 }
 
 export interface MandantDetail {
