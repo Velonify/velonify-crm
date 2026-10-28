@@ -1,0 +1,171 @@
+# Template for an own hub instance (see INSTANZ.md). Copy to .github/workflows/instanz.yml in Velonify/velonify-hub-<kennung>.
+# Rolls out one state of Velonify/velonify-crm on demand: migrations → crm-api → frontend (GitHub Pages).
+# Never runs automatically with main. Signs in to Google Cloud via Workload Identity Federation, no JSON keys.
+#
+# Repo variables (Settings → Secrets and variables → Actions → Variables):
+#   GCP_PROJEKT       velonify-<kennung>
+#   GCP_REGION        europe-west3
+#   WIF_PROVIDER      projects/<number>/locations/global/workloadIdentityPools/github/providers/github
+#   DB_INSTANZ        velonify-<kennung>:europe-west3:hub
+#   GOOGLE_CLIENT_ID  OAuth client of the instance
+#   CRM_API_URL       https://europe-west3-velonify-<kennung>.cloudfunctions.net/crm-api
+#   HUB_DOMAIN        <kennung>.velonify.de
+#   ADMINS            Velonify support addresses, comma separated (always have access)
+#
+# The repo is public (GitHub Pages on the free plan), so the logs are public too: nothing here prints secrets or env vars.
+name: Instanz aktualisieren
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Stand aus Velonify/velonify-crm (Tag wie instanz-2026-11-03, Branch oder Commit)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# One rollout at a time; never cancel a running one (it may be in the middle of a migration).
+concurrency:
+  group: instanz
+  cancel-in-progress: false
+
+jobs:
+  migration:
+    name: Migrationen
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      sha: ${{ steps.stand.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: Velonify/velonify-crm
+          ref: ${{ inputs.ref }}
+      # Pin the commit, so all jobs deploy exactly the same state even if a branch moves meanwhile.
+      - id: stand
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Tests before anything in the instance changes.
+      - run: npm test
+      # Impersonates hub-migration; the Cloud SQL Connector in db/verbindung.ts picks this up as ADC and signs in with IAM.
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: hub-migration@${{ vars.GCP_PROJEKT }}.iam.gserviceaccount.com
+      - name: Migrationen gegen hub
+        run: npm run db:migrieren -- hub
+        env:
+          DB_INSTANZ: ${{ vars.DB_INSTANZ }}
+          DB_NUTZER: hub-migration@${{ vars.GCP_PROJEKT }}.iam
+
+  api:
+    name: crm-api deployen
+    needs: migration
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: Velonify/velonify-crm
+          ref: ${{ needs.migration.outputs.sha }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/crm-api/package-lock.json
+      # The function bundles ../../src/data and ../../db; its tests use the root's dev dependencies.
+      - run: npm ci
+      - name: Bauen wie im README
+        working-directory: functions/crm-api
+        run: npm ci && npm test && npm run build
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: hub-deploy@${{ vars.GCP_PROJEKT }}.iam.gserviceaccount.com
+      - uses: google-github-actions/setup-gcloud@v3
+      # Exactly the instance contract; --env-vars-file replaces all variables (ADMINS contains commas, so no --set-env-vars).
+      - name: Variablen der Function
+        env:
+          PROJEKT: ${{ vars.GCP_PROJEKT }}
+          DB_INSTANZ: ${{ vars.DB_INSTANZ }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          ADMINS: ${{ vars.ADMINS }}
+          HUB_DOMAIN: ${{ vars.HUB_DOMAIN }}
+          HUB_VERSION: ${{ needs.migration.outputs.sha }}
+        run: |
+          cat > "$RUNNER_TEMP/crm-api-env.yaml" <<EOF
+          TZ: "Europe/Berlin"
+          INSTANZ_PROFIL: "creator"
+          DB_INSTANZ: "$DB_INSTANZ"
+          DB_NUTZER: "crm-api@$PROJEKT.iam"
+          DB_NAME: "hub"
+          GOOGLE_CLIENT_ID: "$GOOGLE_CLIENT_ID"
+          ADMINS: "$ADMINS"
+          ALLOWED_ORIGINS: "https://$HUB_DOMAIN"
+          HUB_VERSION: "$HUB_VERSION"
+          EOF
+      - name: Deploy
+        working-directory: functions/crm-api
+        env:
+          PROJEKT: ${{ vars.GCP_PROJEKT }}
+          REGION: ${{ vars.GCP_REGION }}
+        # Same flags as functions/crm-api/README.md (one instance, 40 requests at a time), own build account.
+        # --format prints only the URL instead of the whole function with its variables (public log).
+        run: |
+          gcloud functions deploy crm-api --gen2 --region="$REGION" --runtime=nodejs24 --source=. --entry-point=crmApi \
+            --trigger-http --no-allow-unauthenticated --service-account="crm-api@$PROJEKT.iam.gserviceaccount.com" \
+            --build-service-account="projects/$PROJEKT/serviceAccounts/hub-build@$PROJEKT.iam.gserviceaccount.com" \
+            --memory=512Mi --cpu=1 --concurrency=40 --max-instances=1 --min-instances=0 --timeout=300s --project="$PROJEKT" \
+            --env-vars-file="$RUNNER_TEMP/crm-api-env.yaml" --quiet --format="value(serviceConfig.uri)"
+          # The org policy forbids allUsers; the function checks every request itself.
+          gcloud run services update crm-api --region="$REGION" --no-invoker-iam-check --project="$PROJEKT" --quiet --format=none
+
+  frontend:
+    name: Frontend bauen
+    needs: [migration, api]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: Velonify/velonify-crm
+          ref: ${{ needs.migration.outputs.sha }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_PROFIL: creator
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          VITE_CRM_API_URL: ${{ vars.CRM_API_URL }}
+      - run: touch dist/.nojekyll
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  pages:
+    name: Auf Pages veröffentlichen
+    needs: frontend
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
