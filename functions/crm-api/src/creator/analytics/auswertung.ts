@@ -27,12 +27,12 @@ export async function listeSpeichern(body:Zeile,ctx:CreatorKontext){if(!darfEinr
 export function berichtZeitraum(typ:string,jetzt:Date){const heute=tag(jetzt);if(typ==='monat'){const d=new Date(`${heute.slice(0,7)}-01T12:00:00Z`);d.setUTCMonth(d.getUTCMonth()-1);return {von:d.toISOString().slice(0,10),bis:plusTage(`${heute.slice(0,7)}-01`,-1)};}if(typ!=='woche')problem('Berichtstyp muss Woche oder Monat sein.');const d=new Date(`${heute}T12:00:00Z`);const montag=plusTage(heute,-((d.getUTCDay()+6)%7));return {von:plusTage(montag,-7),bis:plusTage(montag,-1)};}
 async function zeitraumZahlen(db:Db,von:string,bis:string){
   const {rows}=await db.query<Zeile>(`SELECT k.id,k.plattform,k.handle,k.beispiel,
-    (SELECT follower FROM kanal_werte w WHERE w.konto_id=k.id AND w.datum<=$3 AND follower IS NOT NULL ORDER BY datum DESC LIMIT 1) AS follower,
-    (SELECT follower FROM kanal_werte w WHERE w.konto_id=k.id AND w.datum<$2 AND follower IS NOT NULL ORDER BY datum DESC LIMIT 1) AS vorher,
-    (SELECT sum(aufrufe) FROM kanal_werte w WHERE w.konto_id=k.id AND w.datum BETWEEN $2 AND $3) AS aufrufe,
-    (SELECT count(aufrufe) FROM kanal_werte w WHERE w.konto_id=k.id AND w.datum BETWEEN $2 AND $3) AS tage_mit_aufrufen,
-    (SELECT count(*) FROM videos v WHERE v.konto_id=k.id AND v.veroeffentlicht_am::date BETWEEN $2 AND $3) AS videos
-    FROM kanal_konten k ORDER BY k.plattform`,[null,von,bis]);
+    (SELECT follower FROM kanal_werte w WHERE w.konto_id=k.id AND w.datum<=$2::date AND follower IS NOT NULL ORDER BY datum DESC LIMIT 1) AS follower,
+    (SELECT follower FROM kanal_werte w WHERE w.konto_id=k.id AND w.datum<$1::date AND follower IS NOT NULL ORDER BY datum DESC LIMIT 1) AS vorher,
+    (SELECT sum(aufrufe) FROM kanal_werte w WHERE w.konto_id=k.id AND w.datum BETWEEN $1::date AND $2::date) AS aufrufe,
+    (SELECT count(aufrufe) FROM kanal_werte w WHERE w.konto_id=k.id AND w.datum BETWEEN $1::date AND $2::date) AS tage_mit_aufrufen,
+    (SELECT count(*) FROM videos v WHERE v.konto_id=k.id AND v.veroeffentlicht_am::date BETWEEN $1::date AND $2::date) AS videos
+    FROM kanal_konten k ORDER BY k.plattform`,[von,bis]);
   return rows.map(r=>({id:r.id,plattform:r.plattform,handle:r.handle,beispiel:r.beispiel,follower:zahl(r.follower),follower_delta:zahl(r.follower)!==null&&zahl(r.vorher)!==null?Number(r.follower)-Number(r.vorher):null,aufrufe:zahl(r.aufrufe),tage_mit_aufrufen:Number(r.tage_mit_aufrufen),videos:Number(r.videos)}));
 }
 export async function berichtErstellen(d:Dienste,typ:string){const {von,bis}=berichtZeitraum(typ,d.jetzt());const existing=(await d.pool.query<{id:string}>('SELECT id FROM berichte WHERE typ=$1 AND von=$2',[typ,von])).rows[0];if(existing)return {id:existing.id,vorhanden:true};
