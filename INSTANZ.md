@@ -248,6 +248,8 @@ gh variable set GOOGLE_CLIENT_ID --repo ${REPO} --body "${GOOGLE_CLIENT_ID}"
 gh variable set CRM_API_URL --repo ${REPO} --body "${CRM_API_URL}"
 gh variable set HUB_DOMAIN --repo ${REPO} --body "${DOMAIN}"
 gh variable set ADMINS --repo ${REPO} --body "${ADMINS}"
+# Name auf der Login-Seite („<Name> HUB · by Velonify“); im Hub selbst kommt er aus der Einrichtung
+gh variable set INSTANZ_NAME --repo ${REPO} --body "<Name>"
 
 # Pages aus GitHub Actions, eigene Domain (vor dem DNS-Eintrag setzen, damit niemand die Subdomain übernehmen kann)
 gh api -X POST repos/${REPO}/pages -f build_type=workflow
