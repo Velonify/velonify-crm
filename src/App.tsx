@@ -99,6 +99,8 @@ export function App() {
         <CrmProvider>
           <HashRouter>
             <Routes>
+              {/* Public pages of an instance also open from inside the hub (links in the Einrichtung), without the layout. */}
+              {instanzModus && <Route path="oeffentlich/*" element={<OeffentlicheSeite />} />}
               <Route element={<Layout />}>
                 <Route index element={<StartPage />} />
                 <Route path="eingang" element={<EingangPage />} />
