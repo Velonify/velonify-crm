@@ -12,6 +12,7 @@ import { useAnsicht } from '../lib/useAnsicht';
 import { WERKZEUGE, seitentitel, werkzeugFuerPfad } from '../werkzeuge';
 import { BlattProvider } from './Blatt';
 import { HubInsel } from './HubInsel';
+import { CreatorRundgang } from '../creator/start/Rundgang';
 import { PraesenzProvider } from './Praesenz';
 import { Seitenleiste } from './Seitenleiste';
 import { Seitenrahmen } from './Seitenrahmen';
@@ -134,6 +135,7 @@ export function Layout() {
           </div>
 
           <HubInsel />
+          {instanzModus && <CreatorRundgang />}
           <Tastatur />
         </div>
       </BlattProvider>

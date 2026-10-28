@@ -5,6 +5,7 @@ import { Card, ErrorBox, Field, FormError, Loading, PageHeader } from '../compon
 import { useCrm } from '../data/CrmContext';
 import { BAUSTEINE, INSTANZ_ROLLEN, type BausteinId, type InstanzRolle, type InstanzZugang } from '../data/instanz';
 import { OrganisationEinrichtung } from '../creator/ablage/EinrichtungKarten';
+import { RechtKarte } from '../creator/start/recht';
 import type { Zustaendigkeit } from '../creator/freigaben/typen';
 import { useCreatorApi } from '../creator/api';
 import { useMandant } from '../plattform/MandantContext';
@@ -45,6 +46,7 @@ export function InstanzEinrichtungPage() {
           <TeamKarte zugaenge={daten.zugaenge} neuLaden={laden} />
           {instanz?.bausteine.includes('freigaben') && <ZustaendigkeitenKarte />}
           <OrganisationEinrichtung />
+          <RechtKarte />
           <VelonifyKarte an={daten.velonify_zugang} />
           {instanz?.rolle === 'velonify' && <BausteineKarte />}
         </>
