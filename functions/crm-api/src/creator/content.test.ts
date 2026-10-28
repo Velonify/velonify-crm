@@ -16,6 +16,9 @@ const script={skript:'Szene eins: Kamera vor dem Bahnhof.',titel:['Titel eins','
 describe('Creator Content integration', {timeout:60000},()=>{
  beforeEach(async()=>{const t=await testDb();pg=t.pg;const sicht:InstanzSicht={profil:'creator',name:'Beispiel',email:'mara@example.com',person:'Mara',rolle:'admin',werkzeuge:['home','content','todo','kooperationen'],bausteine:BAUSTEINE.map(b=>b.id),betraege:true,velonify_zugang:true};ctx={pool:t.pool,email:sicht.email,person:'Mara',rolle:'admin',sicht,ki:testKi(()=> '{}'),geheimnisse:speicherGeheimnisse(),umgebung:{hubUrl:'https://hub.example',apiUrl:'https://api.example',wert:()=>undefined},jetzt:()=>new Date('2026-10-28T12:00:00Z')};modul=erzeugeContentModul(fakeFetch);});
  afterEach(async()=>{await pg.close();});
+ it('lists the plan with planned and unplanned entries (no ambiguous sort column)',async()=>{
+  await anlegen();await anlegen({geplant_am:''});const r=await call('');expect(r?.status).toBe(200);
+ });
  it('creates, updates and removes linked upload deadlines atomically',async()=>{
   const i=await anlegen();let r=await ctx.pool.query<{datum:string;bezug_id:string}>("SELECT datum::text,bezug_id FROM fristen WHERE quelle='inhalt'");expect(r.rows).toEqual([{datum:'2026-11-03',bezug_id:i.id}]);
   expect((await call('/inhalte/speichern',{id:i.id,titel:'Neuer Titel',geplant_am:'2026-11-04'}))?.status).toBe(200);r=await ctx.pool.query("SELECT datum::text,bezug_id FROM fristen WHERE quelle='inhalt'");expect(r.rows).toHaveLength(1);expect(r.rows[0].datum).toBe('2026-11-04');
