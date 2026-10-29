@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { instanzModus } from '../config';
+import { useInstanzSicht } from '../plattform/MandantContext';
 import { findeTeamMitglied } from '../data/selectors';
 
 const KEY = 'velonify-crm.ich';
@@ -17,12 +19,13 @@ export function read(): string | null {
 
 /**
  * Which team member the signed-in person is ("Lugge", "Julian" …). Guessed from the Google profile,
- * or picked once and remembered in this browser.
+ * or picked once and remembered in this browser. In an own instance it is the login's team name (Velonify support has none).
  */
 export function useIch(team: readonly string[]): [string | null, (name: string) => void] {
   const { state } = useAuth();
   const [gewaehlt, setGewaehlt] = useState<string | null>(read);
   const user = state.status === 'signedOut' ? null : state.user;
+  const instanz = useInstanzSicht();
 
   useEffect(() => {
     const neu = (e: Event) => setGewaehlt((e as CustomEvent<string | null>).detail);
@@ -30,7 +33,9 @@ export function useIch(team: readonly string[]): [string | null, (name: string) 
     return () => window.removeEventListener(ICH_GEWECHSELT, neu);
   }, []);
 
-  const ich = gewaehlt && team.includes(gewaehlt) ? gewaehlt : user ? findeTeamMitglied(team, user.name, user.email) : null;
+  const ich = instanzModus
+    ? instanz && instanz.rolle !== 'velonify' && team.includes(instanz.person) ? instanz.person : null
+    : gewaehlt && team.includes(gewaehlt) ? gewaehlt : user ? findeTeamMitglied(team, user.name, user.email) : null;
 
   const setIch = useCallback((name: string) => {
     setGewaehlt(name || null);

@@ -60,10 +60,13 @@ const spaltenListe = (schema: TabSchema) => schema.columns.join(', ');
 export class PostgresStore implements Store {
   private readonly db: DbPool;
   private readonly person: () => string;
+  /** Values of lists the database doesn't have yet (own instances start without Velonify's team). */
+  private readonly vorgaben: Listen;
 
-  constructor(db: DbPool, person: () => string = () => '') {
+  constructor(db: DbPool, person: () => string = () => '', vorgaben: Listen = LISTEN_DEFAULTS) {
     this.db = db;
     this.person = person;
+    this.vorgaben = vorgaben;
   }
 
   private async tabelle<K extends EntityTab>(tab: K, db: Db = this.db): Promise<EntityMap[K][]> {
@@ -99,7 +102,7 @@ export class PostgresStore implements Store {
       deals: deals as Database['deals'],
       aktivitaeten: aktivitaeten as Database['aktivitaeten'],
       wiedervorlagen: wiedervorlagen as Database['wiedervorlagen'],
-      listen: { ...LISTEN_DEFAULTS, ...listen },
+      listen: { ...this.vorgaben, ...listen },
       einstellungen,
     };
   }

@@ -116,3 +116,8 @@ export function useMandant(): MandantContextValue {
   if (!context) throw new Error('useMandant must be used inside MandantProvider');
   return context;
 }
+
+/** The instance view if inside MandantProvider, else null (hooks that also run outside it, e.g. useIch). */
+export function useInstanzSicht(): InstanzSicht | null {
+  return useContext(MandantContext)?.instanz ?? null;
+}
