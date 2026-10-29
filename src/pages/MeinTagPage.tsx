@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { instanzModus } from '../config';
 import { DealDialog } from '../components/dialogs/DealDialog';
 import { VernetzungKnoepfe } from '../components/dialogs/Vernetzung';
 import { WiedervorlageDialog } from '../components/dialogs/WiedervorlageDialog';
@@ -132,7 +133,7 @@ export function MeinTagPage() {
       />
       {error && <ErrorBox error={error} onRetry={refresh} />}
 
-      {!ich && team.length > 0 && (
+      {!instanzModus && !ich && team.length > 0 && (
         <div className="hint-box ich-auswahl">
           <span>Wer bist du? Dann zeigt „Mein Tag“ nur deine Aufgaben.</span>
           <select value="" onChange={(e) => setIch(e.target.value)} aria-label="Teammitglied auswählen">

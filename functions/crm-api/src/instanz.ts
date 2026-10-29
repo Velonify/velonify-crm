@@ -16,6 +16,7 @@ import {
 import { InstanzFehler, type InstanzStore } from '../../../src/data/postgres/instanzStore';
 import { MitarbeiterStore } from '../../../src/data/postgres/mitarbeiterStore';
 import { PostgresStore, type DbPool } from '../../../src/data/postgres/postgresStore';
+import { LISTEN_DEFAULTS } from '../../../src/data/schema';
 import type { TodoDaten } from '../../../src/data/types';
 import { MODUL_WERKZEUG, MODULE } from './creator';
 import type { Geheimnisse } from './creator/geheimnisse';
@@ -58,6 +59,9 @@ export async function instanzRolle(instanz: InstanzStore, email: string, support
   return null;
 }
 
+/** The team of an instance is its logins (ergaenzeTeam), never Velonify's default team. */
+const INSTANZ_LISTEN = { ...LISTEN_DEFAULTS, team: [] };
+
 /**
  * Requests in an own instance: who am I, team and logins, the instance's settings, the creator modules below /c/ and the
  * hub's normal data routes on the instance's database. "schnitt" and partners without amounts work like Velonify's
@@ -68,7 +72,7 @@ export async function behandleInstanz(methode: string, pfad: string, body: unkno
   try {
     const zugang = rolle === 'velonify' ? null : await instanz.zugang(email);
     const s = await sicht(ctx, zugang);
-    const store = s.betraege ? new PostgresStore(ctx.pool, () => email) : new MitarbeiterStore(ctx.pool, () => email);
+    const store = s.betraege ? new PostgresStore(ctx.pool, () => email, INSTANZ_LISTEN) : new MitarbeiterStore(ctx.pool, () => email, INSTANZ_LISTEN);
 
     switch (pfad) {
       case '/instanz/ich': {

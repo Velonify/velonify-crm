@@ -125,7 +125,7 @@ export function EinstellungenPage() {
                 )}
               </Zeile>
             )}
-            {db && db.listen.team.length > 0 && (
+            {!instanzModus && db && db.listen.team.length > 0 && (
               <Zeile titel="Wer bist du?" text="Bestimmt „Mein Tag“, die Zahlen in der Seitenleiste und Erwähnungen">
                 <select value={ich ?? ''} onChange={(e) => setIch(e.target.value)} aria-label="Teammitglied">
                   <option value="">Bitte wählen …</option>

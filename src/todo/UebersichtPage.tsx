@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Dialog } from '../components/Dialog';
 import { useToast } from '../components/Toasts';
 import { useMandant } from '../plattform/MandantContext';
+import { instanzModus } from '../config';
 import { ErrorBox, FormError, Loading, PageHeader } from '../components/ui';
 import { useCrm } from '../data/CrmContext';
 import { addDays, isoDate } from '../data/ids';
@@ -368,7 +369,7 @@ export function UebersichtPage({ nurIch = false }: { nurIch?: boolean }) {
     <div className="page wide">
       <PageHeader
         title={nurIch ? 'Meine Aufgaben' : 'To-Dos'}
-        subtitle={nurIch ? 'Alles, wofür du zuständig bist – über alle Boards' : 'Alle offenen Karten, intern und von allen Kunden, auf einen Blick'}
+        subtitle={nurIch ? 'Alles, wofür du zuständig bist – über alle Boards' : instanzModus ? 'Alle offenen Karten aus allen Boards auf einen Blick' : 'Alle offenen Karten, intern und von allen Kunden, auf einen Blick'}
         zahlen={
           data
             ? [
