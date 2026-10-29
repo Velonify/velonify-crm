@@ -471,7 +471,7 @@ export function registriereAngebote(k: Werkzeugkasten): void {
     {
       title: 'Kalkulations-Sheet anlegen',
       description:
-        'Legt für ein gespeichertes Angebot das Kalkulations-Sheet an (Unterpunkte als Zeilen, Preise trägt das Team im Sheet ein): im Drive-Ordner der Firma (00_Account, falls vorhanden), sonst in 02_Sales/02_Proposals. Status „Entwurf“ wird „In Kalkulation“. Geht nur einmal pro Angebot; spätere Änderungen an der Auswahl kommen nicht ins Sheet.',
+        'Legt für ein gespeichertes Angebot das Kalkulations-Sheet an (Unterpunkte als Zeilen, Preise trägt das Team im Sheet ein): im Drive-Ordner der Firma unter 00_Account/01_Finanzen (nur für Manager der Shared Drive sichtbar, wird bei Bedarf angelegt und gesperrt), sonst in 02_Sales/02_Proposals. Status „Entwurf“ wird „In Kalkulation“. Geht nur einmal pro Angebot; spätere Änderungen an der Auswahl kommen nicht ins Sheet.',
       inputSchema: { angebot_id: z.string() },
       annotations: schreiben,
     },

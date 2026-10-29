@@ -1,4 +1,4 @@
-import { CrmService } from '../crm';
+import { CrmService, FINANZ_ORDNER } from '../crm';
 import { DemoShopAudit } from '../shopAudit';
 import { EINSTELLUNG } from '../constants';
 import { addDays, isoDate } from '../ids';
@@ -59,7 +59,8 @@ export async function createDemoBackend(currentUser: () => string, optionen: { s
   const templates = drive.add('03_Templates', shared.id);
   const vorlage = drive.add('01_Client-Folder-Template', templates.id);
   for (const name of ['00_Account', '01_Onboarding', '02_Strategy', '04_Delivery', '05_Reporting', '06_Meetings', '07_Client-Share', '99_Archive']) {
-    drive.add(name, vorlage.id);
+    const ordner = drive.add(name, vorlage.id);
+    if (name === '00_Account') await drive.restrictToManagers(drive.add(FINANZ_ORDNER, ordner.id).id);
   }
   const creative = drive.add('03_Creative', vorlage.id);
   for (const name of ['01_Briefings', '02_Assets-In', '03_WIP', '04_Final']) drive.add(name, creative.id);

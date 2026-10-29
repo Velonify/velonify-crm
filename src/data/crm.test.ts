@@ -147,7 +147,8 @@ describe('CrmService', () => {
     leadsId = drive.add('01_Leads', root.id).id;
     clientsId = drive.add('01_Clients', root.id).id;
     vorlageId = drive.add('01_Client-Folder-Template', root.id).id;
-    drive.add('00_Account', vorlageId);
+    const account = drive.add('00_Account', vorlageId);
+    await drive.restrictToManagers(drive.add('01_Finanzen', account.id).id);
     const creative = drive.add('03_Creative', vorlageId);
     drive.add('01_Briefings', creative.id);
     drive.add('Briefing-Vorlage', creative.id, 'application/vnd.google-apps.document');
@@ -313,6 +314,9 @@ describe('CrmService', () => {
     expect(inhalt.map((f) => f.name)).toEqual(['00_Account', '03_Creative']);
     const creative = inhalt.find((f) => f.name === '03_Creative')!;
     expect((await drive.listChildren(creative.id)).map((f) => f.name).sort()).toEqual(['01_Briefings', 'Briefing-Vorlage']);
+    // The template's 01_Finanzen is limited to the drive's managers, the copy too.
+    const account = inhalt.find((f) => f.name === '00_Account')!;
+    expect(await drive.listChildren(account.id)).toMatchObject([{ name: '01_Finanzen', inheritedPermissionsDisabled: true }]);
 
     // Running it again adds nothing twice.
     await crm.verschiebeNachClients(firma.id);

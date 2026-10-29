@@ -12,6 +12,8 @@ export interface DriveFile {
   modifiedTime?: string;
   webViewLink?: string;
   iconLink?: string;
+  /** Set on folders only the shared drive's managers can open (see restrictToManagers). */
+  inheritedPermissionsDisabled?: boolean;
 }
 
 export const isFolder = (file: DriveFile) => file.mimeType === FOLDER_MIME;
@@ -26,11 +28,13 @@ export interface DriveApi {
   copyFile(fileId: string, name: string, parentId: string): Promise<DriveFile>;
   move(fileId: string, fromParentId: string, toParentId: string): Promise<DriveFile>;
   findFoldersByName(name: string): Promise<DriveFile[]>;
+  /** Limits a folder in a shared drive to its managers (finance). Only managers of the drive may do this. */
+  restrictToManagers(folderId: string): Promise<void>;
 }
 
 const BASE_URL = 'https://www.googleapis.com/drive/v3/files';
 const UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
-const FIELDS = 'id,name,mimeType,parents,modifiedTime,webViewLink,iconLink';
+const FIELDS = 'id,name,mimeType,parents,modifiedTime,webViewLink,iconLink,inheritedPermissionsDisabled';
 // Shared drives need these flags on every call, otherwise their files are invisible to the API.
 const SHARED = 'supportsAllDrives=true';
 
@@ -135,6 +139,13 @@ export class GoogleDrive implements DriveApi {
   move(fileId: string, fromParentId: string, toParentId: string): Promise<DriveFile> {
     const params = new URLSearchParams({ addParents: toParentId, removeParents: fromParentId, fields: FIELDS, supportsAllDrives: 'true' });
     return this.request(`${BASE_URL}/${encodeURIComponent(fileId)}?${params}`, { method: 'PATCH', body: '{}' });
+  }
+
+  async restrictToManagers(folderId: string): Promise<void> {
+    await this.request(`${BASE_URL}/${encodeURIComponent(folderId)}?fields=id&${SHARED}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ inheritedPermissionsDisabled: true }),
+    });
   }
 }
 

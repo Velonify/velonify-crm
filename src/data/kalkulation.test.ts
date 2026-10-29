@@ -109,8 +109,10 @@ describe('Kalkulations-Sheet anlegen', () => {
     expect(e1.ort).toBe('firma');
     expect(e1.datei).toMatchObject({ mimeType: SPREADSHEET_MIME, name: expect.stringMatching(/^\d{4}-\d{2}-\d{2}_NLO_kalkulation-shopify-migration_v01$/) });
     expect(e1.angebot).toMatchObject({ sheet_id: e1.datei.id, status: 'kalkulation' });
-    // Nordlicht's folder came from the client template, so the sheet goes into its 00_Account.
-    expect((await service.ordnerInhalt(mitOrdner)).find((f) => f.name === '00_Account')?.id).toBe(e1.datei.parents?.[0]);
+    // Nordlicht's folder came from the client template, so the sheet goes into 00_Account/01_Finanzen, which only managers see.
+    const account = (await service.ordnerInhalt(mitOrdner)).find((f) => f.name === '00_Account')!;
+    const finanzen = (await service.ordnerInhalt({ ...mitOrdner, drive_ordner_id: account.id })).find((f) => f.name === '01_Finanzen')!;
+    expect(finanzen).toMatchObject({ id: e1.datei.parents?.[0], inheritedPermissionsDisabled: true });
 
     const e2 = await service.legeKalkulationAn(a2.id, a2.geaendert_am);
     expect(e2.ort).toBe('proposals');
@@ -119,6 +121,22 @@ describe('Kalkulations-Sheet anlegen', () => {
     await expect(service.legeKalkulationAn(a2.id, a2.geaendert_am)).rejects.toBeInstanceOf(ValidationError);
     const verlauf = (await service.load()).aktivitaeten.filter((a) => a.firma_id === mitOrdner.id).map((a) => a.text);
     expect(verlauf.some((t) => t.startsWith('Kalkulations-Sheet für Angebot 2026/49 angelegt'))).toBe(true);
+  });
+
+  it('creates and limits 01_Finanzen when the firm folder lacks it, and falls back to 02_Proposals if limiting fails', async () => {
+    const { service, drive } = await createDemoBackend(() => 'test@velonify.de');
+    const db = await service.load();
+    const firma = db.firmen.find((f) => !f.drive_ordner_id)!;
+    const ordner = drive.add('ALT_Altkunde', null);
+    const ohneFinanzen = { ...firma, drive_ordner_id: ordner.id };
+
+    const ziel = await service.angebotsOrdner(db, ohneFinanzen);
+    expect(ziel?.ort).toBe('firma');
+    expect(await drive.getFile(ziel!.id)).toMatchObject({ name: '01_Finanzen', parents: [ordner.id], inheritedPermissionsDisabled: true });
+
+    const zweiter = { ...firma, drive_ordner_id: drive.add('NEU_Neukunde', null).id };
+    drive.restrictToManagers = () => Promise.reject(new Error('403'));
+    expect((await service.angebotsOrdner(db, zweiter))?.ort).toBe('proposals');
   });
 
   it('explains what is missing when neither a firm folder nor 02_Proposals is set up', async () => {

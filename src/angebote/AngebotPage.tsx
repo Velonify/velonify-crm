@@ -169,7 +169,7 @@ function KalkulationKarte({ angebot, db, dirty, aendern }: { angebot?: Angebot; 
         <>
           <p className="muted small">
             {firma?.drive_ordner_id
-              ? 'Wird im Drive-Ordner der Firma angelegt (in 00_Account, falls vorhanden).'
+              ? 'Wird im Drive-Ordner der Firma in 00_Account/01_Finanzen angelegt. Den Ordner sehen nur die Manager der Shared Drive.'
               : proposals
                 ? 'Die Firma hat noch keinen Drive-Ordner. Das Sheet wird in 02_Sales/02_Proposals angelegt.'
                 : ''}
