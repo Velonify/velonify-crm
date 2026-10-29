@@ -69,6 +69,13 @@ export class MemoryDrive implements DriveApi {
   async findFoldersByName(name: string): Promise<DriveFile[]> {
     return [...this.files.values()].filter((f) => f.name === name && f.mimeType === FOLDER_MIME).map((f) => ({ ...f }));
   }
+
+  async restrictToManagers(folderId: string): Promise<void> {
+    const file = this.files.get(folderId);
+    if (!file) throw new NotFoundError();
+    file.inheritedPermissionsDisabled = true;
+    this.beiAenderung();
+  }
 }
 
 function alsTermin(daten: TerminDaten, bisher?: CalendarEvent) {

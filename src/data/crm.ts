@@ -168,7 +168,7 @@ export interface CrmDeps {
 export interface KalkulationsErgebnis {
   angebot: Angebot;
   datei: DriveFile;
-  /** Where the file was put: the firm's folder (or its 00_Account) or the central proposals folder */
+  /** Where the file was put: the firm's 01_Finanzen folder or the central proposals folder */
   ort: 'firma' | 'proposals';
 }
 
@@ -232,6 +232,9 @@ export interface LinkedinLeadErgebnis {
   kontakt: Kontakt | null;
   deal: Deal | null;
 }
+
+/** Subfolder of a client's 00_Account for offers and calculations; only the shared drive's managers can open it. */
+export const FINANZ_ORDNER = '01_Finanzen';
 
 /**
  * All business operations of the CRM. Validation and side effects (activity log, firm status, Drive folders)
@@ -798,13 +801,28 @@ export class CrmService {
     return angebot;
   }
 
-  /** Folder for an offer's files: the firm's 00_Account (or the firm folder itself), otherwise 02_Sales/02_Proposals. */
+  /**
+   * Folder for an offer's files: 01_Finanzen in the firm's 00_Account (or in the firm folder), created and limited to the
+   * shared drive's managers if needed, so employees never see prices. Otherwise 02_Sales/02_Proposals.
+   */
   async angebotsOrdner(db: Database, firma: Firma): Promise<{ id: string; ort: 'firma' | 'proposals' } | null> {
+    const proposals = db.einstellungen[EINSTELLUNG.proposalsOrdner];
     if (firma.drive_ordner_id) {
       const account = (await this.drive.listChildren(firma.drive_ordner_id)).find((f) => isFolder(f) && f.name === '00_Account');
-      return { id: account?.id ?? firma.drive_ordner_id, ort: 'firma' };
+      const basis = account?.id ?? firma.drive_ordner_id;
+      const finanzen =
+        (await this.drive.listChildren(basis)).find((f) => isFolder(f) && f.name === FINANZ_ORDNER) ?? (await this.drive.createFolder(FINANZ_ORDNER, basis));
+      if (finanzen.inheritedPermissionsDisabled) return { id: finanzen.id, ort: 'firma' };
+      try {
+        await this.drive.restrictToManagers(finanzen.id);
+        return { id: finanzen.id, ort: 'firma' };
+      } catch {
+        // Only managers of the shared drive may limit a folder; an open folder must not get prices.
+        if (!proposals) {
+          throw new ValidationError('drive_ordner_id', `${FINANZ_ORDNER} von „${firma.name}“ ließ sich nicht sperren. Das dürfen nur Manager der Shared Drive.`);
+        }
+      }
     }
-    const proposals = db.einstellungen[EINSTELLUNG.proposalsOrdner];
     return proposals ? { id: proposals, ort: 'proposals' } : null;
   }
 
@@ -2070,13 +2088,19 @@ export class CrmService {
       if (!von) throw new ValidationError('drive_ordner_id', 'Der Ordner liegt nicht in einem verschiebbaren Ordner.');
       await this.drive.move(ordner.id, von, konfig.clients);
     }
-    const ergaenzt = konfig.vorlage ? await this.ergaenzeAusVorlage(konfig.vorlage, ordner.id) : 0;
-    const teile = [bereitsDort ? '' : `Ordner „${ordner.name}“ nach 01_Clients verschoben`, ergaenzt > 0 ? `${ergaenzt} Elemente aus der Vorlage ergänzt` : ''];
+    const offen: string[] = [];
+    const ergaenzt = konfig.vorlage ? await this.ergaenzeAusVorlage(konfig.vorlage, ordner.id, offen) : 0;
+    const teile = [
+      bereitsDort ? '' : `Ordner „${ordner.name}“ nach 01_Clients verschoben`,
+      ergaenzt > 0 ? `${ergaenzt} Elemente aus der Vorlage ergänzt` : '',
+      offen.length ? `${offen.map((n) => `„${n}“`).join(', ')} nicht gesperrt (nur Manager der Shared Drive)` : '',
+    ];
     const text = teile.filter(Boolean).join(', ');
     if (text) await this.log({ firma_id: firmaId, kontakt_id: '', deal_id: '', typ: 'system', text });
   }
 
-  private async ergaenzeAusVorlage(vorlageId: string, zielId: string, tiefe = 0): Promise<number> {
+  /** Copies what the template has and the folder lacks; folders limited in the template get limited too (`offen`: where that failed). */
+  private async ergaenzeAusVorlage(vorlageId: string, zielId: string, offen: string[], tiefe = 0): Promise<number> {
     if (tiefe > 4) return 0;
     const [vorlage, ziel] = await Promise.all([this.drive.listChildren(vorlageId), this.drive.listChildren(zielId)]);
     let anzahl = 0;
@@ -2085,7 +2109,10 @@ export class CrmService {
       if (isFolder(eintrag)) {
         const unterordner = gleich ?? (await this.drive.createFolder(eintrag.name, zielId));
         if (!gleich) anzahl++;
-        anzahl += await this.ergaenzeAusVorlage(eintrag.id, unterordner.id, tiefe + 1);
+        if (eintrag.inheritedPermissionsDisabled && !unterordner.inheritedPermissionsDisabled) {
+          await this.drive.restrictToManagers(unterordner.id).catch(() => offen.push(eintrag.name));
+        }
+        anzahl += await this.ergaenzeAusVorlage(eintrag.id, unterordner.id, offen, tiefe + 1);
       } else if (!gleich) {
         await this.drive.copyFile(eintrag.id, eintrag.name, zielId);
         anzahl++;

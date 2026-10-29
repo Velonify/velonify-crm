@@ -14,6 +14,7 @@ export const ohneDrive: DriveApi = {
   copyFile: nichtDa('Google Drive'),
   move: nichtDa('Google Drive'),
   findFoldersByName: async () => [],
+  restrictToManagers: nichtDa('Google Drive'),
 };
 
 export const ohneKalender: CalendarApi = {
