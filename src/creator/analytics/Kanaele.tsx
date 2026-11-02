@@ -248,7 +248,7 @@ export function AnalyticsTwitch() {
       {!r.daten && !r.fehler && <Loading />}
       {r.daten && (
         <>
-          {r.daten.videos.length === 0 && <p className="muted">Noch keine Streams. Verbindet Twitch unter „Kanäle“.</p>}
+          {r.daten.videos.length === 0 && <p className="muted">Noch keine Streams. Verbindet Twitch unter „Verbindungen“.</p>}
           {r.daten.boards.length > 0 && (
             <div className="filters">
               <Field label="Aufgaben auf Board">

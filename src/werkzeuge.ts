@@ -213,9 +213,9 @@ export const WERKZEUGE: Werkzeug[] = [
   },
   {
     id: 'einnahmen',
-    name: 'Einnahmen',
-    kurz: 'Einnahmen',
-    beschreibung: 'Kooperationen, AdSense, Twitch und Affiliate in einer Übersicht, in EUR und JPY',
+    name: 'Budget',
+    kurz: 'Budget',
+    beschreibung: 'Einnahmen und Ausgaben je Monat gegengerechnet, in EUR und JPY',
     pfad: '/einnahmen',
     navigation: [{ label: 'Übersicht', pfad: '/einnahmen', end: true }],
   },

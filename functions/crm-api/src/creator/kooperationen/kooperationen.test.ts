@@ -48,3 +48,24 @@ describe('cooperation contracts', () => {
     expect((await call('/c/kooperationen/mediakit/speichern', { name: 'Beispiel', veroeffentlicht: true }))?.status).toBe(409);
   });
 });
+describe('budget', () => {
+  const ecall = (path: string, body?: unknown) => eink.routen!(body === undefined ? 'GET' : 'POST', path, body, ctx);
+  it('nets paid income against expenses per month, for the year and as an average month', async () => {
+    expect((await ecall('/c/einnahmen/speichern', { quelle: 'adsense', monat: '2026-10', betrag: 1000, waehrung: 'EUR', status: 'bezahlt' }))?.status).toBe(200);
+    expect((await ecall('/c/einnahmen/speichern', { quelle: 'twitch', monat: '2026-10', betrag: 500, waehrung: 'EUR', status: 'erwartet' }))?.status).toBe(200);
+    expect((await ecall('/c/einnahmen/ausgabe/speichern', { kategorie: 'Steuern', monat: '2026-10', betrag: 300, waehrung: 'EUR' }))?.status).toBe(200);
+    expect((await ecall('/c/einnahmen/ausgabe/speichern', { kategorie: 'Tickets', monat: '2026-09', betrag: '120,50', waehrung: 'EUR' }))?.status).toBe(200);
+    expect((await ecall('/c/einnahmen/ausgabe/speichern', { kategorie: '', monat: '2026-09', betrag: 1, waehrung: 'EUR' }))?.status).toBe(400);
+    const daten = (await ecall('/c/einnahmen'))!.daten as { budget: { monate: { monat: string; ergebnis: { eur: number } }[]; jahr: { einnahmen: { eur: number }; ausgaben: { eur: number }; ergebnis: { eur: number } }; monat_schnitt: { eur: number } }; kategorien: string[] };
+    expect(daten.budget.monate.find((m) => m.monat === '2026-10')?.ergebnis.eur).toBe(700);
+    expect(daten.budget.monate.find((m) => m.monat === '2026-09')?.ergebnis.eur).toBe(-120.5);
+    expect(daten.budget.jahr).toMatchObject({ einnahmen: { eur: 1000 }, ausgaben: { eur: 420.5 }, ergebnis: { eur: 579.5 } });
+    expect(daten.budget.monat_schnitt.eur).toBe(57.95);
+    expect(daten.kategorien).toContain('Spesen');
+  });
+  it('keeps expenses away from people without amounts', async () => {
+    ctx = { ...ctx, sicht: { ...ctx.sicht, betraege: false } };
+    expect((await ecall('/c/einnahmen/ausgabe/speichern', { kategorie: 'Spesen', monat: '2026-10', betrag: 10, waehrung: 'EUR' }))?.status).toBe(403);
+    expect((await ecall('/c/einnahmen'))!.daten).not.toHaveProperty('ausgaben');
+  });
+});
