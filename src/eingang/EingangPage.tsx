@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { instanzModus } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { useBlatt } from '../components/Blatt';
 import { WerkzeugIcon } from '../components/Icons';
@@ -216,8 +217,8 @@ export function EingangPage() {
     <div className="page">
       <PageHeader
         eyebrow="Home"
-        title="Eingang"
-        subtitle={sichtbar.length ? `${sichtbar.length} ${sichtbar.length === 1 ? 'Sache braucht' : 'Dinge brauchen'} heute eine Entscheidung.` : 'Alles entschieden.'}
+        title={instanzModus ? 'Heute' : 'Eingang'}
+        subtitle={`${instanzModus ? 'Fällige To-dos und @-Erwähnungen an dich. ' : ''}${sichtbar.length ? `${sichtbar.length} ${sichtbar.length === 1 ? 'Sache braucht' : 'Dinge brauchen'} heute eine Entscheidung.` : 'Alles entschieden.'}`}
         actions={
           <div className="segmented" role="radiogroup" aria-label="Filter">
             {FILTER.map((f) => (

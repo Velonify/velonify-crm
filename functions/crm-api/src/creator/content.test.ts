@@ -33,10 +33,16 @@ describe('Creator Content integration', {timeout:60000},()=>{
  });
  it('links only a real same-channel video once and clears the previous relationship',async()=>{
   const i=await anlegen();await ctx.pool.query("INSERT INTO videos(id,konto_id,plattform,extern_id,beispiel) VALUES('V1','K','youtube','1',false),('V2','K','tiktok','2',true),('V3','K','tiktok','3',false)");
-  expect((await call('/inhalte/speichern',{id:i.id,status:'live'}))?.status).toBe(400);expect((await call('/inhalte/speichern',{id:i.id,video_id:'V1'}))?.status).toBe(400);expect((await call('/inhalte/speichern',{id:i.id,video_id:'V2'}))?.status).toBe(400);
+  expect((await call('/inhalte/speichern',{id:i.id,video_id:'V1'}))?.status).toBe(400);expect((await call('/inhalte/speichern',{id:i.id,video_id:'V2'}))?.status).toBe(400);
   expect((await call('/inhalte/speichern',{id:i.id,status:'live',video_id:'V3'}))?.status).toBe(200);expect((await ctx.pool.query("SELECT inhalt_id FROM videos WHERE id='V3'")).rows[0]).toEqual({inhalt_id:i.id});
   const other=await anlegen();expect((await call('/inhalte/speichern',{id:other.id,video_id:'V3'}))?.status).toBe(409);
   await call('/inhalte/speichern',{id:i.id,status:'idee',video_id:''});expect((await ctx.pool.query("SELECT inhalt_id FROM videos WHERE id='V3'")).rows[0]).toEqual({inhalt_id:null});
+ });
+ it('keeps free-text channels and statuses and recognises known ones by label',async()=>{
+  const r=await call('/inhalte/speichern',{titel:'Podcast-Folge',kanal:'Podcast',status:'Wartet auf Gast'});expect(r?.status).toBe(200);
+  expect((r!.daten as {inhalt:{kanal:string;status:string}}).inhalt).toMatchObject({kanal:'Podcast',status:'Wartet auf Gast'});
+  const k=await call('/inhalte/speichern',{titel:'Reel',kanal:'TikTok',status:'Schnitt'});expect((k!.daten as {inhalt:{kanal:string;status:string}}).inhalt).toMatchObject({kanal:'tiktok',status:'schnitt'});
+  expect((await call('/inhalte/speichern',{titel:'Ohne Kanal',kanal:''}))?.status).toBe(400);
  });
  it('retains script versions and requires approval of the current version before shooting',async()=>{
   const i=await anlegen();ki(script);const r=await call('/skripte/erstellen',{inhalt_id:i.id});expect(r?.status).toBe(200);const s=(r!.daten as {skript:{id:string}}).skript;

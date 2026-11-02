@@ -284,6 +284,13 @@ export const LEISTE: { titel?: string; eintraege: LeistenEintrag[] }[] = [
     ],
   },
   {
+    titel: 'Organisation',
+    eintraege: [
+      { werkzeug: 'kalender', label: 'Kalender', pfad: '/fristen', icon: 'kalender' },
+      { werkzeug: 'ablage', label: 'Ablage', pfad: '/ablage', icon: 'ablage' },
+    ],
+  },
+  {
     titel: 'Content & Zahlen',
     eintraege: [
       { werkzeug: 'content', label: 'Content', pfad: '/content', icon: 'content' },
@@ -291,17 +298,10 @@ export const LEISTE: { titel?: string; eintraege: LeistenEintrag[] }[] = [
     ],
   },
   {
-    titel: 'Kooperationen',
+    titel: 'Budget',
     eintraege: [
       { werkzeug: 'kooperationen', label: 'Kooperationen', pfad: '/kooperationen', icon: 'kooperationen' },
-      { werkzeug: 'einnahmen', label: 'Einnahmen', pfad: '/einnahmen', icon: 'einnahmen' },
-    ],
-  },
-  {
-    titel: 'Organisation',
-    eintraege: [
-      { werkzeug: 'kalender', label: 'Kalender', pfad: '/fristen', icon: 'kalender' },
-      { werkzeug: 'ablage', label: 'Ablage', pfad: '/ablage', icon: 'ablage' },
+      { werkzeug: 'einnahmen', label: 'Budget', pfad: '/einnahmen', icon: 'einnahmen' },
     ],
   },
   {

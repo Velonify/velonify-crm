@@ -96,7 +96,7 @@ export function Seitenleiste({ offen }: { offen: boolean }) {
               return (
                 <Link key={e.pfad} to={e.pfad} className={`leiste-eintrag${istAktiv ? ' is-active' : ''}`} aria-current={istAktiv ? 'page' : undefined}>
                   <WerkzeugIcon id={e.icon} />
-                  <span className="leiste-text">{e.label}</span>
+                  <span className="leiste-text">{instanzModus && e.pfad === '/eingang' ? 'Heute' : e.label}</span>
                   {zahl ? <span className={`leiste-zahl${e.zahl === 'heute' || e.zahl === 'todo' ? ' is-warn' : ''}`}>{zahl}</span> : null}
                 </Link>
               );

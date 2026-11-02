@@ -3,7 +3,7 @@ import type { BausteinId } from '../../../../src/data/instanz';
 import { PLATTFORM_REGELN, begriffe, suchbegriffeVon, istKennzeichnung, type Kanal } from '../../../../src/creator/content/regeln';
 import { baustein, fehler, istObjekt, neueId, ok, type CreatorKontext, type Modul } from './modul';
 import { frageJson } from './ki';
-import { ContentFehler, admin, datum, einstellungen, erlaubteBoards, feld, inhalt, kanalAn, kanale, objekt, speichern, text, ton, uploadDaten, url, zuInhalt } from './content/daten';
+import { ContentFehler, admin, datum, einstellungen, erlaubteBoards, feld, inhalt, kanalAn, kanalSichtbar, kanale, objekt, speichern, text, ton, uploadDaten, url, zuInhalt } from './content/daten';
 import { KI_SYSTEM, recherchiere, rechercheTakt } from './content/recherche';
 
 function block(pfad:string,ctx:CreatorKontext):BausteinId|null {
@@ -39,16 +39,16 @@ async function routes(methode:string,pfad:string,raw:unknown,ctx:CreatorKontext,
  if(methode!=='GET'&&methode!=='POST')return null;
  const b=methode==='POST'?objekt(raw):{};
  const bezug=methode==='GET'?/^\/c\/content\/(?:inhalte|skripte|thumbnails|upload)\/([^/]+)/.exec(pfad)?.[1]:b.inhalt_id;
- if(bezug){const i=await inhalt(ctx.pool,feld(bezug,'Inhalt',80,true));if(!kanalAn(ctx,i.kanal))throw new ContentFehler('Dieser Kanal ist nicht freigeschaltet.',403);}
+ if(bezug){const i=await inhalt(ctx.pool,feld(bezug,'Inhalt',80,true));if(!kanalSichtbar(ctx,i.kanal))throw new ContentFehler('Dieser Kanal ist nicht freigeschaltet.',403);}
  if((pfad==='/c/content'||pfad==='/c/content/inhalte'||pfad==='/c/content/auswahl')&&methode==='GET'){
   const {rows}=await ctx.pool.query<Record<string,unknown>>('SELECT *,geplant_am::text AS geplant_am FROM inhalte WHERE NOT archiviert ORDER BY inhalte.geplant_am NULLS LAST,inhalte.erstellt_am DESC');
   const {rows:videos}=await ctx.pool.query(`SELECT id,titel,plattform,url,beispiel,vorschaubild FROM videos WHERE NOT beispiel ORDER BY veroeffentlicht_am DESC NULLS LAST LIMIT 500`);
   const {rows:team}=await ctx.pool.query<{wert:string}>(`SELECT wert FROM listen WHERE liste='team' ORDER BY nr`);
-  return ok({inhalte:rows.map(zuInhalt).filter(i=>kanalAn(ctx,i.kanal)),videos,team:team.map(t=>t.wert),kanaele:kanale(ctx)});
+  return ok({inhalte:rows.map(zuInhalt).filter(i=>kanalSichtbar(ctx,i.kanal)),videos,team:team.map(t=>t.wert),kanaele:kanale(ctx)});
  }
  if(pfad==='/c/content/inhalte/speichern'&&methode==='POST')return ok({inhalt:await speichern(b,ctx)});
  const detail=/^\/c\/content\/inhalte\/([^/]+)$/.exec(pfad);
- if(detail&&methode==='GET'){const i=await inhalt(ctx.pool,detail[1]);if(!kanalAn(ctx,i.kanal))return fehler(403,'Dieser Kanal ist nicht freigeschaltet.');return ok({inhalt:i});}
+ if(detail&&methode==='GET'){const i=await inhalt(ctx.pool,detail[1]);if(!kanalSichtbar(ctx,i.kanal))return fehler(403,'Dieser Kanal ist nicht freigeschaltet.');return ok({inhalt:i});}
  if(pfad==='/c/content/ton'){
   if(methode==='POST'){admin(ctx);await ctx.pool.query(`INSERT INTO content_ton(id,beschreibung,beispiele,no_gos,geaendert_am,geaendert_von) VALUES('standard',$1,$2,$3,now(),$4) ON CONFLICT(id) DO UPDATE SET beschreibung=$1,beispiele=$2,no_gos=$3,geaendert_am=now(),geaendert_von=$4`,[feld(b.beschreibung,'Ton',5000),feld(b.beispiele,'Beispiele',12000),feld(b.no_gos,'No-Gos',4000),ctx.email]);}
   return ok({ton:await ton(ctx.pool)});

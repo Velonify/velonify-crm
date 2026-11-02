@@ -3,10 +3,10 @@ import { Card, ErrorBox, Field, Loading } from '../../components/ui';
 import { darfEinrichten } from '../../data/instanz';
 import { useCreatorApi, useInstanz } from '../api';
 import { Arbeitsbereich, Bereich, useAktion, useLaden } from './gemeinsam';
-import { fertigeTexte, kanalLabel, PLATTFORM_REGELN, pruefeUpload, type Kanal, type UploadTexte } from './regeln';
+import { fertigeTexte, istKanal, kanalLabel, PLATTFORM_REGELN, pruefeUpload, type Kanal, type UploadTexte } from './regeln';
 import type { CaptionVorschlag, UploadDaten } from './typen';
 
-export function Upload(){const [revision,setRevision]=useState(0);return <Bereich id="upload" titel="Upload-Hygiene"><Arbeitsbereich titel="Upload-Hygiene">{(id,d)=><><UploadEditor revision={revision} key={id} id={id} kanal={d.inhalte.find(i=>i.id===id)?.kanal??'tiktok'} kanaele={d.kanaele}/><UploadEinstellungen onSaved={()=>setRevision(v=>v+1)}/><SchnelleCaptions/></>}</Arbeitsbereich></Bereich>;}
+export function Upload(){const [revision,setRevision]=useState(0);return <Bereich id="upload" titel="Upload-Hygiene"><Arbeitsbereich titel="Upload-Hygiene">{(id,d)=><><UploadEditor revision={revision} key={id} id={id} kanal={((k)=>istKanal(k)?k:'tiktok')(d.inhalte.find(i=>i.id===id)?.kanal)} kanaele={d.kanaele}/><UploadEinstellungen onSaved={()=>setRevision(v=>v+1)}/><SchnelleCaptions/></>}</Arbeitsbereich></Bereich>;}
 const leer:UploadTexte={titel:'',caption:'',beschreibung:'',hashtags:'',suchbegriffe:'',kennzeichnung:'',abgehakt:{}};
 function UploadEditor({id,kanal,kanaele,revision}:{id:string;kanal:Kanal;kanaele:Kanal[];revision:number}){
  const [plattform,setPlattform]=useState<Kanal>(kanal);const r=useLaden<UploadDaten>(`/c/content/upload/${id}/${plattform}`);const [u,setU]=useState<UploadTexte>(leer);const [anweisung,setAnweisung]=useState('');const api=useCreatorApi();const ak=useAktion();

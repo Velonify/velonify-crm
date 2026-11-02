@@ -1,7 +1,7 @@
 import { darfEinrichten, listeAus } from '../../../../../src/data/instanz';
 import type { Db } from '../../../../../src/data/postgres/postgresStore';
 import type { Inhalt, Ton, UploadDaten } from '../../../../../src/creator/content/typen';
-import { KANAELE, istKanal, istStatus, STATUS, standardKennzeichnung, fertigeTexte, pruefeUpload, type Kanal, type UploadTexte } from '../../../../../src/creator/content/regeln';
+import { KANAELE, istKanal, kanalVon, statusVon, STATUS, standardKennzeichnung, fertigeTexte, pruefeUpload, type Kanal, type UploadTexte } from '../../../../../src/creator/content/regeln';
 import { freigabeVon } from '../freigaben';
 import { istObjekt, neueId, type CreatorKontext } from '../modul';
 
@@ -21,8 +21,10 @@ export function datum(v:unknown):string|null {
 }
 export function url(v:unknown):string { const s=feld(v,'Link',2000); if(!s)return ''; try{const u=new URL(s);if(u.protocol==='https:'||u.protocol==='http:')return u.href;}catch{/* Invalid user input. */}throw new ContentFehler('Bitte einen vollständigen http(s)-Link eingeben.'); }
 export const kanalAn = (ctx: Pick<CreatorKontext,'sicht'>, k:unknown):k is Kanal => istKanal(k) && (k!=='twitch'||ctx.sicht.bausteine.includes('twitch'));
+/** Content of a free-text channel is visible to everyone with the content plan; known channels keep their switch. */
+export const kanalSichtbar = (ctx: Pick<CreatorKontext,'sicht'>, k:unknown):boolean => typeof k==='string' && k.trim()!=='' && (!istKanal(k) || kanalAn(ctx,k));
 export const kanale = (ctx:Pick<CreatorKontext,'sicht'>) => KANAELE.filter(k=>kanalAn(ctx,k.id)).map(k=>k.id);
-export function zuInhalt(r:Record<string,unknown>):Inhalt { return {...r,id:text(r.id),titel:text(r.titel),kanal:r.kanal as Kanal,format:text(r.format),status:r.status as Inhalt['status'],geplant_am:r.geplant_am?text(r.geplant_am).slice(0,10):'',zustaendig:text(r.zustaendig),kooperation_id:text(r.kooperation_id),video_id:text(r.video_id),quelle:text(r.quelle),quelle_id:text(r.quelle_id),notiz:text(r.notiz),archiviert:!!r.archiviert,geaendert_am:r.geaendert_am?new Date(r.geaendert_am as string).toISOString():''}; }
+export function zuInhalt(r:Record<string,unknown>):Inhalt { return {...r,id:text(r.id),titel:text(r.titel),kanal:text(r.kanal),format:text(r.format),status:text(r.status),geplant_am:r.geplant_am?text(r.geplant_am).slice(0,10):'',zustaendig:text(r.zustaendig),kooperation_id:text(r.kooperation_id),video_id:text(r.video_id),quelle:text(r.quelle),quelle_id:text(r.quelle_id),notiz:text(r.notiz),archiviert:!!r.archiviert,geaendert_am:r.geaendert_am?new Date(r.geaendert_am as string).toISOString():''}; }
 export async function inhalt(db:Db,id:string,sperren=false):Promise<Inhalt> { const {rows}=await db.query<Record<string,unknown>>(`SELECT *, geplant_am::text AS geplant_am FROM inhalte WHERE id=$1 ${sperren?'FOR UPDATE':''}`,[id]); if(!rows[0])throw new ContentFehler('Inhalt nicht gefunden.',404);return zuInhalt(rows[0]); }
 export async function ton(db:Db):Promise<Ton> { const {rows}=await db.query<Ton>(`SELECT coalesce(beschreibung,'') AS beschreibung,coalesce(beispiele,'') AS beispiele,coalesce(no_gos,'') AS no_gos FROM content_ton WHERE id='standard'`);return rows[0]??{beschreibung:'',beispiele:'',no_gos:''}; }
 export async function einstellungen(db:Db):Promise<Record<string,string>> { const {rows}=await db.query<{schluessel:string;wert:string}>('SELECT schluessel,wert FROM content_einstellungen');return Object.fromEntries(rows.map(r=>[r.schluessel,r.wert??''])); }
@@ -30,15 +32,14 @@ export async function speichern(body:Record<string,unknown>,ctx:CreatorKontext) 
  return ctx.pool.transaktion(async db=>{
   const alt=body.id?await inhalt(db,feld(body.id,'Inhalt',80,true),true):null;
   const b={...alt,...body}; const titel=feld(b.titel,'Titel',200,true);
-  if(!kanalAn(ctx,b.kanal))throw new ContentFehler('Dieser Kanal ist nicht freigeschaltet.');
-  if(!istStatus(b.status??'idee'))throw new ContentFehler('Unbekannter Status.');
-  const status=text(b.status||'idee');
+  const kanal=feld(kanalVon(b.kanal),'Kanal',60,true);
+  if(!kanalSichtbar(ctx,kanal))throw new ContentFehler('Dieser Kanal ist nicht freigeschaltet.');
+  const status=feld(statusVon(b.status||'idee'),'Status',60)||'idee';
   if(alt && body.geaendert_am!==undefined && body.geaendert_am!==alt.geaendert_am)throw new ContentFehler('Der Inhalt wurde inzwischen geändert. Bitte neu laden.',409);
   const geplant=datum(b.geplant_am); const koop=feld(b.kooperation_id,'Kooperation',80);const vid=feld(b.video_id,'Video',80);
   if(koop && koop!==alt?.kooperation_id && !ctx.sicht.werkzeuge.includes('kooperationen'))throw new ContentFehler('Kooperationen sind für dich nicht freigeschaltet.',403);
   if(koop){const {rows}=await db.query('SELECT id FROM kooperationen WHERE id=$1 AND NOT archiviert',[koop]);if(!rows.length)throw new ContentFehler('Kooperation nicht gefunden.');}
-  if(vid){const {rows}=await db.query<{plattform:string;beispiel:boolean;inhalt_id:string}>('SELECT plattform,beispiel,inhalt_id FROM videos WHERE id=$1 FOR UPDATE',[vid]);const v=rows[0];if(!v||v.plattform!==b.kanal||v.beispiel)throw new ContentFehler('Bitte ein echtes Video desselben Kanals wählen.');if(v.inhalt_id&&v.inhalt_id!==alt?.id)throw new ContentFehler('Das Video ist bereits einem anderen Inhalt zugeordnet.',409);}
-  if(status==='live'&&!vid)throw new ContentFehler('Für „Live“ bitte das veröffentlichte Video verknüpfen.');
+  if(vid){const {rows}=await db.query<{plattform:string;beispiel:boolean;inhalt_id:string}>('SELECT plattform,beispiel,inhalt_id FROM videos WHERE id=$1 FOR UPDATE',[vid]);const v=rows[0];if(!v||v.plattform!==kanal||v.beispiel)throw new ContentFehler('Bitte ein echtes Video desselben Kanals wählen.');if(v.inhalt_id&&v.inhalt_id!==alt?.id)throw new ContentFehler('Das Video ist bereits einem anderen Inhalt zugeordnet.',409);}
   if(alt&&STATUS.findIndex(s=>s.id===status)>=2&&ctx.sicht.bausteine.includes('freigaben')&&ctx.sicht.bausteine.includes('skripte')){
    const {rows}=await db.query<{id:string}>('SELECT id FROM content_skripte WHERE inhalt_id=$1 ORDER BY version DESC LIMIT 1',[alt.id]);
    if(rows[0]&&(await freigabeVon(db,'skript',rows[0].id))?.status!=='freigegeben')throw new ContentFehler('Die aktuelle Skriptfassung braucht vor dem Dreh eine Freigabe.',409);
@@ -47,7 +48,7 @@ export async function speichern(body:Record<string,unknown>,ctx:CreatorKontext) 
   await db.query(`INSERT INTO inhalte(id,titel,kanal,format,status,geplant_am,zustaendig,kooperation_id,video_id,notiz,archiviert,erstellt_von,geaendert_von,geaendert_am)
    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12,$13)
    ON CONFLICT(id) DO UPDATE SET titel=$2,kanal=$3,format=$4,status=$5,geplant_am=$6,zustaendig=$7,kooperation_id=$8,video_id=$9,notiz=$10,archiviert=$11,geaendert_von=$12,geaendert_am=$13`,
-   [id,titel,b.kanal,feld(b.format,'Format',100),status,geplant,feld(b.zustaendig,'Zuständigkeit',100),koop||null,vid||null,feld(b.notiz,'Notiz',12000),archiviert,ctx.email,ctx.jetzt().toISOString()]);
+   [id,titel,kanal,feld(b.format,'Format',100),status,geplant,feld(b.zustaendig,'Zuständigkeit',100),koop||null,vid||null,feld(b.notiz,'Notiz',12000),archiviert,ctx.email,ctx.jetzt().toISOString()]);
   if(alt?.video_id&&alt.video_id!==vid)await db.query('UPDATE videos SET inhalt_id=NULL WHERE id=$1 AND inhalt_id=$2',[alt.video_id,id]);
   if(vid)await db.query('UPDATE videos SET inhalt_id=$1 WHERE id=$2',[id,vid]);
   if(geplant)await db.query(`INSERT INTO fristen(id,titel,datum,art,quelle,bezug_id,link,zustaendig,erledigt,archiviert,erstellt_von) VALUES($1,$2,$3,'upload','inhalt',$4,$5,$6,$7,$8,$9)

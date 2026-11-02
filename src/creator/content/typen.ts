@@ -1,7 +1,7 @@
-import type { InhaltStatus, Kanal, UploadTexte, UploadUmfeld, CheckPunkt } from './regeln';
+import type { Kanal, UploadTexte, UploadUmfeld, CheckPunkt } from './regeln';
 
 export interface Inhalt {
-  id: string; titel: string; kanal: Kanal; format: string; status: InhaltStatus; geplant_am: string;
+  id: string; titel: string; kanal: string; format: string; status: string; geplant_am: string;
   zustaendig: string; kooperation_id: string; video_id: string; quelle: string; quelle_id: string;
   notiz: string; archiviert: boolean; geaendert_am: string;
 }
