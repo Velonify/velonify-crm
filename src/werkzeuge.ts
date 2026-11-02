@@ -187,12 +187,14 @@ export const WERKZEUGE: Werkzeug[] = [
     pfad: '/analytics',
     navigation: [
       { label: 'Übersicht', pfad: '/analytics', end: true, baustein: 'kanaele' },
-      { label: 'Videos', pfad: '/analytics/videos', baustein: 'kanaele' },
+      { label: 'YouTube', pfad: '/analytics/kanal/youtube', baustein: 'kanaele' },
+      { label: 'Instagram', pfad: '/analytics/kanal/instagram', baustein: 'kanaele' },
+      { label: 'TikTok', pfad: '/analytics/kanal/tiktok', baustein: 'kanaele' },
+      { label: 'Twitch', pfad: '/analytics/twitch', baustein: 'twitch' },
       { label: 'Merkmale', pfad: '/analytics/merkmale', baustein: 'merkmale' },
       { label: 'Berichte', pfad: '/analytics/berichte', baustein: 'berichte' },
       { label: 'Benchmarking', pfad: '/analytics/benchmarking', baustein: 'benchmarking' },
-      { label: 'Twitch', pfad: '/analytics/twitch', baustein: 'twitch' },
-      { label: 'Kanäle', pfad: '/analytics/kanaele', baustein: 'kanaele' },
+      { label: 'Verbindungen', pfad: '/analytics/kanaele', baustein: 'kanaele' },
     ],
   },
   {

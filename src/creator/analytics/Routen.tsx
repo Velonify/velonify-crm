@@ -4,7 +4,7 @@ import { AnalyticsBenchmark } from './Benchmark';
 import { AnalyticsBericht, AnalyticsBerichte } from './Berichte';
 import { AnalyticsKanaele, AnalyticsTwitch } from './Kanaele';
 import { AnalyticsMerkmale } from './Merkmale';
-import { AnalyticsUebersicht, AnalyticsVideos } from './Uebersicht';
+import { AnalyticsKanal, AnalyticsUebersicht, AnalyticsVideos } from './Uebersicht';
 import './analytics.css';
 
 /** Pages of the module below /analytics (App.tsx mounts it with "/*"); each page needs its building block. */
@@ -13,7 +13,8 @@ export function AnalyticsRouten() {
     <Routes>
       <Route index element={<Bereich id="kanaele" titel="Analytics"><AnalyticsUebersicht /></Bereich>} />
       <Route path="videos" element={<Bereich id="kanaele" titel="Videos"><AnalyticsVideos /></Bereich>} />
-      <Route path="kanaele" element={<Bereich id="kanaele" titel="Kanäle"><AnalyticsKanaele /></Bereich>} />
+      <Route path="kanal/:plattform" element={<Bereich id="kanaele" titel="Kanal"><AnalyticsKanal /></Bereich>} />
+      <Route path="kanaele" element={<Bereich id="kanaele" titel="Verbindungen"><AnalyticsKanaele /></Bereich>} />
       <Route path="merkmale" element={<Bereich id="merkmale" titel="Merkmale"><AnalyticsMerkmale /></Bereich>} />
       <Route path="berichte" element={<Bereich id="berichte" titel="Berichte"><AnalyticsBerichte /></Bereich>} />
       <Route path="berichte/:id" element={<Bereich id="berichte" titel="Bericht"><AnalyticsBericht /></Bereich>} />

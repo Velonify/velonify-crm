@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { Card, ErrorBox, Field, Loading, PageHeader } from '../../components/ui';
 import { darfEinrichten } from '../../data/instanz';
 import { useInstanz } from '../api';
@@ -23,7 +23,7 @@ export function AnalyticsUebersicht() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Analytics" title="Alle Kanäle auf einen Blick" subtitle="Ein Bericht statt fünf Plattform-Dashboards." />
+      <PageHeader eyebrow="Analytics" title="Übersicht" subtitle="Alle Kanäle zusammengestellt. Details und Video-Performance je Kanal in den Reitern." />
       {r.fehler ? <ErrorBox error={r.fehler} onRetry={() => void r.laden()} /> : null}
       {!r.daten && !r.fehler && <Loading />}
       {r.daten && (
@@ -31,7 +31,7 @@ export function AnalyticsUebersicht() {
           <BeispielBand an={r.daten.beispiel} />
           {r.daten.konten.length === 0 ? (
             <Card title="Noch keine Zahlen">
-              <p>Verbindet eure Kanäle unter „Kanäle“. Bis dahin könnt ihr mit klar markierten Beispielzahlen sehen, wie der Hub aussieht.</p>
+              <p>Verbindet eure Kanäle unter „Verbindungen“. Bis dahin könnt ihr mit klar markierten Beispielzahlen sehen, wie der Hub aussieht.</p>
               {admin && (
                 <div className="form-actions">
                   <button type="button" className="button primary" disabled={aktion.busy} onClick={() => void aktion.run(async () => (await api.post('/c/analytics/beispiele'), await r.laden()), 'Beispielzahlen eingespielt')}>
@@ -45,9 +45,11 @@ export function AnalyticsUebersicht() {
               {aktion.feedback}
             </Card>
           ) : (
+            <>
+            <Summen videos={r.daten.videos} konten={r.daten.konten} />
             <div className="analytics-kacheln">
               {r.daten.konten.map((k) => (
-                <div key={k.id} className="analytics-kachel card">
+                <Link key={k.id} to={k.plattform === 'twitch' ? '/analytics/twitch' : `/analytics/kanal/${k.plattform}`} className="analytics-kachel card">
                   <p className="small muted">
                     {PLATTFORM_LABEL[k.plattform] ?? k.plattform} · {k.handle || k.name}
                     {k.beispiel ? ' · Beispiel' : ''}
@@ -55,16 +57,85 @@ export function AnalyticsUebersicht() {
                   <p className="zahl">{zahlText(k.follower)}</p>
                   <p className="small">Follower · Stand {datum(k.datum)}</p>
                   {k.status === 'fehler' && <p className="small alert error">{k.fehler}</p>}
-                </div>
+                </Link>
               ))}
             </div>
+            </>
           )}
           {r.daten.videos.length > 0 && (
             <Card title="Was funktioniert">
               <MerkmalVergleich vergleich={r.daten.vergleich} />
             </Card>
           )}
-          {r.daten.videos.length > 0 && <VideoTabelle videos={r.daten.videos.slice(0, 10)} titel="Neueste Videos" />}
+          {r.daten.videos.length > 0 && <VideoTabelle videos={besteZuerst(r.daten.videos).slice(0, 10)} titel="Beste Videos über alle Kanäle" />}
+        </>
+      )}
+    </div>
+  );
+}
+
+const besteZuerst = (videos: Video[]) => [...videos].sort((a, b) => (b.aufrufe ?? -1) - (a.aufrufe ?? -1));
+const summe = (werte: (number | null)[]) => (werte.some((w) => w !== null) ? werte.reduce<number>((s, w) => s + (w ?? 0), 0) : null);
+const mittel = (werte: (number | null)[]) => {
+  const da = werte.filter((w): w is number => w !== null);
+  return da.length ? da.reduce((s, w) => s + w, 0) / da.length : null;
+};
+
+/** Key figures of a set of channels and their videos (overview: all, channel tab: one platform). */
+function Summen({ konten, videos }: { konten: Konto[]; videos: Video[] }) {
+  return (
+    <dl className="band-zahlen">
+      <div><dt>Follower</dt><dd>{zahlText(summe(konten.map((k) => k.follower)))}</dd></div>
+      <div><dt>Reichweite</dt><dd>{zahlText(summe(konten.map((k) => k.reichweite)))}</dd></div>
+      <div><dt>Videos</dt><dd>{zahlText(videos.length)}</dd></div>
+      <div><dt>Aufrufe der Videos</dt><dd>{zahlText(summe(videos.map((v) => v.aufrufe)))}</dd></div>
+      <div><dt>Ø Interaktion</dt><dd>{prozent(mittel(videos.map((v) => v.interaktionsrate)))}</dd></div>
+    </dl>
+  );
+}
+
+/** One channel: its insights (account values, totals) and the performance of every video, best first. */
+export function AnalyticsKanal() {
+  const { plattform = '' } = useParams();
+  const r = useLaden<UebersichtDaten>('/c/analytics/uebersicht');
+  const [suche, setSuche] = useState('');
+  const konten = (r.daten?.konten ?? []).filter((k) => k.plattform === plattform);
+  const alle = (r.daten?.videos ?? []).filter((v) => v.plattform === plattform);
+  const videos = besteZuerst(alle.filter((v) => !suche || `${v.titel} ${v.thema} ${v.format} ${v.hook}`.toLowerCase().includes(suche.toLowerCase())));
+  const label = PLATTFORM_LABEL[plattform] ?? plattform;
+  return (
+    <div className="page">
+      <PageHeader eyebrow="Analytics" title={label} subtitle={`Insights und Video-Performance von ${label}.`} />
+      {r.fehler ? <ErrorBox error={r.fehler} onRetry={() => void r.laden()} /> : null}
+      {!r.daten && !r.fehler && <Loading />}
+      {r.daten && (
+        <>
+          <BeispielBand an={konten.some((k) => k.beispiel)} />
+          {konten.length === 0 ? (
+            <Card title="Noch nicht verbunden">
+              <p>{label} ist noch nicht verbunden. Das geht unter <Link to="/analytics/kanaele">Verbindungen</Link>.</p>
+            </Card>
+          ) : (
+            <>
+              <Summen konten={konten} videos={alle} />
+              <div className="analytics-kacheln">
+                {konten.map((k) => (
+                  <div key={k.id} className="analytics-kachel card">
+                    <p className="small muted">{k.handle || k.name}{k.beispiel ? ' · Beispiel' : ''}</p>
+                    <p className="zahl">{zahlText(k.follower)}</p>
+                    <p className="small">Follower · Aufrufe {zahlText(k.aufrufe)} · Reichweite {zahlText(k.reichweite)} · Stand {datum(k.datum)}</p>
+                    {k.status === 'fehler' && <p className="small alert error">{k.fehler}</p>}
+                  </div>
+                ))}
+              </div>
+              <div className="filters">
+                <Field label="Suche">
+                  <input value={suche} onChange={(e) => setSuche(e.target.value)} placeholder="Titel oder Merkmal" />
+                </Field>
+              </div>
+              <VideoTabelle videos={videos} titel={`${videos.length} Videos, die besten zuerst`} />
+            </>
+          )}
         </>
       )}
     </div>
