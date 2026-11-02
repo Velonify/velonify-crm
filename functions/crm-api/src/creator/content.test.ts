@@ -44,6 +44,16 @@ describe('Creator Content integration', {timeout:60000},()=>{
   const k=await call('/inhalte/speichern',{titel:'Reel',kanal:'TikTok',status:'Schnitt'});expect((k!.daten as {inhalt:{kanal:string;status:string}}).inhalt).toMatchObject({kanal:'tiktok',status:'schnitt'});
   expect((await call('/inhalte/speichern',{titel:'Ohne Kanal',kanal:''}))?.status).toBe(400);
  });
+ it('keeps several research documents as blocks, rejects markup tricks and archives them',async()=>{
+  const r=await call('/dokumente/speichern',{titel:'Ideen Japan',bloecke:[{typ:'h2',teile:[{text:'Essen'}]},{typ:'li',teile:[{text:'Ramen',fett:true},{text:' Quelle',link:'https://example.com'}]}]});expect(r?.status).toBe(200);
+  const id=(r!.daten as {dokument:{id:string}}).dokument.id;
+  expect((await call('/dokumente/speichern',{titel:'X',bloecke:[{typ:'script',teile:[]}]}))?.status).toBe(400);
+  expect((await call('/dokumente/speichern',{id,titel:'Ideen Japan',bloecke:[{typ:'p',teile:[{text:'x',link:'javascript:alert(1)'}]}]}))?.status).toBe(400);
+  await call('/dokumente/speichern',{titel:'Zweites Dokument'});
+  expect(((await call('/dokumente'))!.daten as {dokumente:{titel:string}[]}).dokumente.map(d=>d.titel)).toEqual(['Ideen Japan','Zweites Dokument']);
+  expect(((await call(`/dokumente/${id}`))!.daten as {dokument:{bloecke:unknown[]}}).dokument.bloecke).toHaveLength(2);
+  expect((await call('/dokumente/archivieren',{id}))?.status).toBe(200);expect((await call(`/dokumente/${id}`))?.status).toBe(404);
+ });
  it('retains script versions and requires approval of the current version before shooting',async()=>{
   const i=await anlegen();ki(script);const r=await call('/skripte/erstellen',{inhalt_id:i.id});expect(r?.status).toBe(200);const s=(r!.daten as {skript:{id:string}}).skript;
   expect((await call('/inhalte/speichern',{id:i.id,status:'dreh'}))?.status).toBe(409);
