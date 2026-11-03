@@ -1,9 +1,10 @@
 import type { Antwort } from '../routen';
 import type { BausteinId } from '../../../../src/data/instanz';
 import { PLATTFORM_REGELN, begriffe, suchbegriffeVon, istKennzeichnung, type Kanal } from '../../../../src/creator/content/regeln';
+import { pruefeBloecke } from '../../../../src/creator/content/dokument';
 import { baustein, fehler, istObjekt, neueId, ok, type CreatorKontext, type Modul } from './modul';
 import { frageJson } from './ki';
-import { ContentFehler, admin, datum, einstellungen, erlaubteBoards, feld, inhalt, kanalAn, kanale, objekt, speichern, text, ton, uploadDaten, url, zuInhalt } from './content/daten';
+import { ContentFehler, admin, datum, einstellungen, erlaubteBoards, feld, inhalt, kanalAn, kanalSichtbar, kanale, objekt, speichern, text, ton, uploadDaten, url, zuInhalt } from './content/daten';
 import { KI_SYSTEM, recherchiere, rechercheTakt } from './content/recherche';
 
 function block(pfad:string,ctx:CreatorKontext):BausteinId|null {
@@ -33,22 +34,41 @@ async function thumbnailSpeichern(b:Record<string,unknown>,ctx:CreatorKontext,qu
  ON CONFLICT(inhalt_id) DO UPDATE SET bild=$3,text=$4,gesicht=$5,farben=$6,komposition=$7,referenzen=$8,hinweise=$9,quelle=$10,geaendert_von=$11,geaendert_am=now() RETURNING *`,
  [neueId('TH'),id,feld(b.bild,'Bild',3000,true),feld(b.text,'Text',1000),feld(b.gesicht,'Gesicht',2000,true),feld(b.farben,'Farben',1000),feld(b.komposition,'Komposition',3000,true),JSON.stringify(refs),feld(b.hinweise,'Hinweise',4000),quelle,ctx.email]);return rows[0];
 }
+/** Content → Recherche: several formatted documents for the whole team (blocks as JSON, see src/creator/content/dokument.ts). */
+async function dokumente(methode:string,pfad:string,b:Record<string,unknown>,ctx:CreatorKontext):Promise<Antwort|null>{
+ const zuDok=(r:Record<string,unknown>)=>({id:text(r.id),titel:text(r.titel),bloecke:r.bloecke??[],geaendert_am:r.geaendert_am?new Date(r.geaendert_am as string).toISOString():'',geaendert_von:text(r.geaendert_von)});
+ if(pfad==='/c/content/dokumente'&&methode==='GET'){const {rows}=await ctx.pool.query<Record<string,unknown>>(`SELECT id,titel,'[]'::jsonb AS bloecke,coalesce(geaendert_am,erstellt_am) AS geaendert_am,geaendert_von FROM recherche_dokumente WHERE NOT archiviert ORDER BY lower(titel)`);return ok({dokumente:rows.map(zuDok)});}
+ const einzeln=/^\/c\/content\/dokumente\/([^/]+)$/.exec(pfad);
+ if(einzeln&&methode==='GET'){const {rows}=await ctx.pool.query<Record<string,unknown>>(`SELECT id,titel,bloecke,coalesce(geaendert_am,erstellt_am) AS geaendert_am,geaendert_von FROM recherche_dokumente WHERE id=$1 AND NOT archiviert`,[einzeln[1]]);return rows[0]?ok({dokument:zuDok(rows[0])}):fehler(404,'Dokument nicht gefunden.');}
+ if(pfad==='/c/content/dokumente/speichern'&&methode==='POST'){
+  const titel=feld(b.titel,'Titel',200,true);const bloecke=b.bloecke===undefined?undefined:pruefeBloecke(b.bloecke);if(typeof bloecke==='string')throw new ContentFehler(bloecke);
+  if(typeof b.id==='string'&&b.id){
+   const {rows}=await ctx.pool.query<Record<string,unknown>>(`UPDATE recherche_dokumente SET titel=$2,bloecke=coalesce($3::jsonb,bloecke),geaendert_am=now(),geaendert_von=$4 WHERE id=$1 AND NOT archiviert RETURNING id,titel,bloecke,geaendert_am,geaendert_von`,[b.id,titel,bloecke?JSON.stringify(bloecke):null,ctx.person||ctx.email]);
+   return rows[0]?ok({dokument:zuDok(rows[0])}):fehler(404,'Dokument nicht gefunden.');
+  }
+  const {rows}=await ctx.pool.query<Record<string,unknown>>(`INSERT INTO recherche_dokumente(id,titel,bloecke,erstellt_von,geaendert_am,geaendert_von) VALUES($1,$2,$3,$4,now(),$4) RETURNING id,titel,bloecke,geaendert_am,geaendert_von`,[neueId('RD'),titel,JSON.stringify(bloecke??[{typ:'p',teile:[]}]),ctx.person||ctx.email]);
+  return ok({dokument:zuDok(rows[0])});
+ }
+ if(pfad==='/c/content/dokumente/archivieren'&&methode==='POST'){const {rows}=await ctx.pool.query(`UPDATE recherche_dokumente SET archiviert=true,geaendert_am=now(),geaendert_von=$2 WHERE id=$1 RETURNING id`,[feld(b.id,'Dokument',80,true),ctx.person||ctx.email]);return rows.length?ok():fehler(404,'Dokument nicht gefunden.');}
+ return null;
+}
 async function routes(methode:string,pfad:string,raw:unknown,ctx:CreatorKontext,holen:typeof fetch):Promise<Antwort|null>{
  if(!ctx.sicht.werkzeuge.includes('content'))return fehler(403,'Content ist für dich nicht freigeschaltet.');
  const bId=block(pfad,ctx);const zu=bId?baustein(ctx,bId):null;if(zu)return zu;
  if(methode!=='GET'&&methode!=='POST')return null;
  const b=methode==='POST'?objekt(raw):{};
  const bezug=methode==='GET'?/^\/c\/content\/(?:inhalte|skripte|thumbnails|upload)\/([^/]+)/.exec(pfad)?.[1]:b.inhalt_id;
- if(bezug){const i=await inhalt(ctx.pool,feld(bezug,'Inhalt',80,true));if(!kanalAn(ctx,i.kanal))throw new ContentFehler('Dieser Kanal ist nicht freigeschaltet.',403);}
+ if(bezug){const i=await inhalt(ctx.pool,feld(bezug,'Inhalt',80,true));if(!kanalSichtbar(ctx,i.kanal))throw new ContentFehler('Dieser Kanal ist nicht freigeschaltet.',403);}
+ const dok=await dokumente(methode,pfad,b,ctx);if(dok)return dok;
  if((pfad==='/c/content'||pfad==='/c/content/inhalte'||pfad==='/c/content/auswahl')&&methode==='GET'){
   const {rows}=await ctx.pool.query<Record<string,unknown>>('SELECT *,geplant_am::text AS geplant_am FROM inhalte WHERE NOT archiviert ORDER BY inhalte.geplant_am NULLS LAST,inhalte.erstellt_am DESC');
   const {rows:videos}=await ctx.pool.query(`SELECT id,titel,plattform,url,beispiel,vorschaubild FROM videos WHERE NOT beispiel ORDER BY veroeffentlicht_am DESC NULLS LAST LIMIT 500`);
   const {rows:team}=await ctx.pool.query<{wert:string}>(`SELECT wert FROM listen WHERE liste='team' ORDER BY nr`);
-  return ok({inhalte:rows.map(zuInhalt).filter(i=>kanalAn(ctx,i.kanal)),videos,team:team.map(t=>t.wert),kanaele:kanale(ctx)});
+  return ok({inhalte:rows.map(zuInhalt).filter(i=>kanalSichtbar(ctx,i.kanal)),videos,team:team.map(t=>t.wert),kanaele:kanale(ctx)});
  }
  if(pfad==='/c/content/inhalte/speichern'&&methode==='POST')return ok({inhalt:await speichern(b,ctx)});
  const detail=/^\/c\/content\/inhalte\/([^/]+)$/.exec(pfad);
- if(detail&&methode==='GET'){const i=await inhalt(ctx.pool,detail[1]);if(!kanalAn(ctx,i.kanal))return fehler(403,'Dieser Kanal ist nicht freigeschaltet.');return ok({inhalt:i});}
+ if(detail&&methode==='GET'){const i=await inhalt(ctx.pool,detail[1]);if(!kanalSichtbar(ctx,i.kanal))return fehler(403,'Dieser Kanal ist nicht freigeschaltet.');return ok({inhalt:i});}
  if(pfad==='/c/content/ton'){
   if(methode==='POST'){admin(ctx);await ctx.pool.query(`INSERT INTO content_ton(id,beschreibung,beispiele,no_gos,geaendert_am,geaendert_von) VALUES('standard',$1,$2,$3,now(),$4) ON CONFLICT(id) DO UPDATE SET beschreibung=$1,beispiele=$2,no_gos=$3,geaendert_am=now(),geaendert_von=$4`,[feld(b.beschreibung,'Ton',5000),feld(b.beispiele,'Beispiele',12000),feld(b.no_gos,'No-Gos',4000),ctx.email]);}
   return ok({ton:await ton(ctx.pool)});

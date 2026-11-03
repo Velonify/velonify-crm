@@ -5,6 +5,7 @@ import type { Antwort } from '../../routen';
 import { baustein, betraege, fehler, istObjekt, neueId, ok, type CreatorKontext } from '../modul';
 import { einstellungen, EINSTELLUNG, Eingabefehler, ENDE, heuteIn, istTag, istWaehrung, optText, PHASEN, setzeEinstellung, tag, text, zahl, zeit } from './daten';
 import { leseBetrag, leseCsv, leseDatum } from './csv';
+import { AUSGABE_KATEGORIEN, monatsrechnung, sammleAusgaben, speichereAusgabe } from './ausgaben';
 import { holeKurse, inBeiden, ladeKurse, type Holen, type Kurse } from './kurse';
 import { koopTitel, speichereKooperation, KOOP_SPALTEN, zuKooperation, type Kooperation } from './uebersicht';
 
@@ -273,7 +274,17 @@ export async function einnahmenRouten(methode: string, pfad: string, body: unkno
     const kurse = await ladeKurse(db);
     const eintraege = await sammle(db, kurse);
     if (!mitBetrag) return ok({ betraege: false, eintraege: eintraege.map(ohneBetrag), quellen: QUELLE_NAME });
-    return ok({ betraege: true, eintraege, dashboard: await dashboard(db, eintraege, kurse, heute), quellen: QUELLE_NAME, darf_einstellen: darfEinrichten(ctx.rolle) });
+    const ausgaben = await sammleAusgaben(db, kurse);
+    return ok({
+      betraege: true,
+      eintraege,
+      dashboard: await dashboard(db, eintraege, kurse, heute),
+      quellen: QUELLE_NAME,
+      darf_einstellen: darfEinrichten(ctx.rolle),
+      ausgaben,
+      kategorien: [...new Set([...AUSGABE_KATEGORIEN, ...ausgaben.map((a) => a.kategorie)])],
+      budget: monatsrechnung(eintraege, ausgaben, heute),
+    });
   }
 
   const exp = /^\/c\/einnahmen\/export\/(\d{4})$/.exec(pfad);
@@ -305,6 +316,19 @@ export async function einnahmenRouten(methode: string, pfad: string, body: unkno
       [id, ...werte],
     );
     return ok({ id });
+  }
+
+  if (pfad === '/c/einnahmen/ausgabe/speichern') {
+    if (!mitBetrag) return fehler(403, 'Ausgaben erfassen geht nur mit Beträgen.');
+    const id = await speichereAusgabe(db, body, ctx.person);
+    return id ? ok({ id }) : fehler(404, 'Ausgabe nicht gefunden.');
+  }
+
+  if (pfad === '/c/einnahmen/ausgabe/archivieren') {
+    if (!mitBetrag) return fehler(403, 'Ausgaben gibt es nur mit Beträgen.');
+    if (typeof body.id !== 'string') return fehler(400, 'Ausgabe fehlt.');
+    const { rows } = await db.query(`UPDATE ausgaben SET archiviert = true, geaendert_am = now(), geaendert_von = $2 WHERE id = $1 RETURNING id`, [body.id, ctx.person]);
+    return rows.length ? ok() : fehler(404, 'Ausgabe nicht gefunden.');
   }
 
   if (pfad === '/c/einnahmen/status') {

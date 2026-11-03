@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
-import { useAuth } from '../../auth/AuthContext';
 import { useCreatorApi, type CreatorApi } from '../api';
-import { ABLAGE_VORLAGE, HAUPTORDNER, JAHRES_ORDNER, elternVon, schluesselTeil, type AblageOrdner } from './typen';
+import { ABLAGE_VORLAGE, HAUPTORDNER, JAHRES_ORDNER, elternVon, schluesselTeil, type AblageOrdner, type UnterordnerBereich } from './typen';
 
 const MIME = 'application/vnd.google-apps.folder';
 export class DriveFehler extends Error { constructor(message: string, public status: number) { super(message); } }
@@ -69,9 +68,15 @@ export function erstelleAblageDrive({ api, getToken, fetch: holen = fetch }: Dri
     },
   };
 }
+/** Folders per video or cooperation, created by crm-api in the shared Ablage (service account). */
 export function useAblageDrive() {
-  const api = useCreatorApi(); const { getToken } = useAuth();
-  return useMemo(() => erstelleAblageDrive({ api, getToken }), [api, getToken]);
+  const api = useCreatorApi();
+  return useMemo(() => ({
+    async ordnerFuer(bereich: UnterordnerBereich, name: string) {
+      if (!name.trim() || name.length > 200) throw new Error('Bitte einen Ordnernamen mit 1 bis 200 Zeichen angeben.');
+      return (await api.post<{ ordner: AblageOrdner }>('/c/ablage/explorer/unterordner', { bereich, name: name.trim() })).ordner;
+    },
+  }), [api]);
 }
 
 interface PickerView { setIncludeFolders(v: boolean): PickerView; setSelectFolderEnabled(v: boolean): PickerView; setMimeTypes(v: string): PickerView; }

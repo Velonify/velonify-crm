@@ -15,3 +15,6 @@
 @media print {
   .seitenleiste, .reiter, .mobilkopf, .hub-insel, .analytics-nicht-drucken { display: none !important; }
 }
+
+a.analytics-kachel { color: inherit; text-decoration: none; }
+a.analytics-kachel:hover { border-color: var(--line-strong, currentColor); }

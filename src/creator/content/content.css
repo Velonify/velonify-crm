@@ -25,3 +25,22 @@
 .content-result { white-space:pre-wrap; overflow-wrap:anywhere; padding-block:12px; }
 .content-detail-actions { display:flex; flex-wrap:wrap; gap:12px; margin-block:16px; }
 @media(max-width:600px) { .content-form-grid { grid-template-columns:1fr; } .content-plan-controls .field { flex:1 1 140px; } }
+
+/* Content → Recherche: document list beside a simple editor. */
+.recherche-dokumente { display:grid; grid-template-columns:minmax(0,220px) minmax(0,1fr); gap:20px; margin-top:16px; }
+@media (max-width: 760px) { .recherche-dokumente { grid-template-columns:minmax(0,1fr); } }
+.recherche-liste { display:flex; flex-direction:column; gap:6px; align-items:stretch; }
+.recherche-eintrag { text-align:left; padding:8px 10px; border-radius:10px; border:1px solid transparent; background:none; color:inherit; font:inherit; cursor:pointer; overflow-wrap:anywhere; }
+.recherche-eintrag:hover { background:var(--surface-2, rgba(127,127,127,.08)); }
+.recherche-eintrag.is-aktiv { border-color:var(--line, rgba(127,127,127,.3)); background:var(--surface-2, rgba(127,127,127,.12)); font-weight:600; }
+.recherche-editor { display:flex; flex-direction:column; gap:10px; min-width:0; }
+.recherche-titel { font-size:1.25rem; font-weight:600; }
+.recherche-werkzeuge { display:flex; flex-wrap:wrap; gap:6px; }
+.recherche-text { min-height:360px; padding:16px 18px; border:1px solid var(--line, rgba(127,127,127,.3)); border-radius:12px; background:var(--surface, transparent); line-height:1.6; overflow-wrap:anywhere; }
+.recherche-text:focus { outline:2px solid var(--accent, currentColor); outline-offset:2px; }
+.recherche-text h2 { font-size:1.3rem; margin:1em 0 .4em; }
+.recherche-text h3 { font-size:1.1rem; margin:.9em 0 .3em; }
+.recherche-text p { margin:0 0 .6em; }
+.recherche-text blockquote { margin:.6em 0; padding-left:12px; border-left:3px solid var(--line, rgba(127,127,127,.4)); color:var(--muted, inherit); }
+.recherche-text a { color:var(--accent, inherit); text-decoration:underline; }
+.content-anhaenge { grid-column:1 / -1; display:grid; gap:8px; }

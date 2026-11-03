@@ -24,9 +24,12 @@ import {
   serienDaten,
   type Frist,
   type FristSerie,
+  type GoogleTermin,
   type KalenderAbo,
   type Rhythmus,
 } from '../../../../src/creator/kalender/typen';
+import { explorerRouten } from './ablageDrive';
+import { googleKalenderRouten, googleKalenderOeffentlich, gleicheKalenderAb, googleTermine } from './googleKalender';
 import { baustein, fehler, istObjekt, neueId, ok, type CreatorKontext, type Modul, type OeffentlichKontext, type TaktKontext } from './modul';
 
 /**
@@ -327,7 +330,9 @@ async function synchronisiereAufgaben(db: Db) {
   }
 }
 
-async function oeffentlich(methode: string, pfad: string, _body: unknown, ctx: OeffentlichKontext) {
+async function oeffentlich(methode: string, pfad: string, _body: unknown, ctx: OeffentlichKontext, query: Record<string, string> = {}) {
+  const google = await googleKalenderOeffentlich(methode, pfad, query, ctx);
+  if (google) return google;
   const treffer = /^\/oeffentlich\/kalender\/([A-Za-z0-9_-]{20,64})\.ics$/.exec(pfad);
   if (!treffer || methode !== 'GET') return null;
   const nichtDa = fehler(404, 'Dieses Kalender-Abo gibt es nicht (mehr).');
@@ -408,13 +413,24 @@ async function merkeAbweichung(db: Db, frist: Frist, von: string) {
   );
 }
 
+/** Every change of a deadline goes on into the connected Google calendar; a Google problem never fails the change. */
+const SCHREIBEN = ['/c/kalender/speichern', '/c/kalender/erledigt', '/c/kalender/archivieren', '/c/kalender/serie', '/c/kalender/serie/archivieren'];
+
 async function kalenderRouten(methode: string, pfad: string, body: unknown, ctx: CreatorKontext) {
+  const antwort = await kalenderRoutenOhneGoogle(methode, pfad, body, ctx);
+  if (antwort?.status === 200 && methode === 'POST' && SCHREIBEN.includes(pfad)) await gleicheKalenderAb(ctx).catch(() => null);
+  return antwort;
+}
+
+async function kalenderRoutenOhneGoogle(methode: string, pfad: string, body: unknown, ctx: CreatorKontext) {
   if (pfad === '/c/kalender/passwortmanager') return baustein(ctx, 'kalender') ?? passwortmanager(methode, body, ctx);
   const zu = baustein(ctx, 'kalender');
   if (zu) return zu;
   const db = ctx.pool;
   const heute = heuteIn(ctx.jetzt());
   const b = istObjekt(body) ? body : {};
+  const google = await googleKalenderRouten(methode, pfad, body, ctx);
+  if (google) return google;
   const sicht = await zugriff(ctx);
   if (ctx.rolle === 'partner' && !['/c/kalender/liste', '/c/kalender/frist', '/c/kalender/abo', '/c/kalender/abo/beenden'].includes(pfad)) return fehler(403, 'Partner sehen die Fristen ihrer freigegebenen Boards. Bearbeitet sie bitte dort.');
 
@@ -432,7 +448,14 @@ async function kalenderRouten(methode: string, pfad: string, body: unknown, ctx:
       [von, bis, archiv, heute],
     );
     const abw = await abweichungen(db);
-    return ok({ fristen: await sichtbareFristen(db, rows.map((z) => zuFrist(z, abw)), sicht), heute });
+    // The rest of the connected Google calendar; content dates and other modules reach Google at the latest here.
+    let termine: GoogleTermin[] = [];
+    let google_fehler = '';
+    if (ctx.rolle !== 'partner') {
+      await gleicheKalenderAb(ctx, { wennAelterAlsMinuten: 10 }).catch(() => null);
+      termine = await googleTermine(ctx, von, bis).catch((e: Error) => ((google_fehler = e.message), []));
+    }
+    return ok({ fristen: await sichtbareFristen(db, rows.map((z) => zuFrist(z, abw)), sicht), heute, termine, google_fehler });
   }
 
   if (pfad === '/c/kalender/frist' && methode === 'POST') {
@@ -594,6 +617,8 @@ async function ablageRouten(methode: string, pfad: string, body: unknown, ctx: C
   if (pfad === '/c/ablage/passwortmanager') return baustein(ctx, 'ablage') ?? passwortmanager(methode, body, ctx);
   const zu = baustein(ctx, 'ablage');
   if (zu) return zu;
+  const explorer = await explorerRouten(methode, pfad, body, ctx);
+  if (explorer) return explorer;
   const db = ctx.pool;
   const b = istObjekt(body) ? body : {};
 
@@ -657,7 +682,10 @@ async function ablageRouten(methode: string, pfad: string, body: unknown, ctx: C
 
 async function serienTakt(ctx: TaktKontext) {
   if (!ctx.bausteine.includes('kalender')) return { serien: 0 };
-  return { serien: await verlaengereSerien(ctx.pool, heuteIn(ctx.jetzt()), 'Takt') };
+  const serien = await verlaengereSerien(ctx.pool, heuteIn(ctx.jetzt()), 'Takt');
+  await synchronisiereAufgaben(ctx.pool);
+  const google = await gleicheKalenderAb(ctx).catch((e: Error) => ({ fehler: e.message }));
+  return { serien, google };
 }
 
 export const kalenderModul: Modul = { praefix: 'kalender', routen: kalenderRouten, oeffentlich, takte: { 'kalender-serien': serienTakt } };

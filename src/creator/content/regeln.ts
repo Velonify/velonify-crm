@@ -12,6 +12,11 @@ export const KANAELE = [
 export type Kanal = (typeof KANAELE)[number]['id'];
 export const istKanal = (wert: unknown): wert is Kanal => KANAELE.some((k) => k.id === wert);
 export const kanalLabel = (id: string) => KANAELE.find((k) => k.id === id)?.label ?? id;
+/** A typed channel: a known one by id or label ("TikTok" → tiktok), otherwise the text as written. */
+export const kanalVon = (wert: unknown): string => {
+  const t = String(wert ?? '').trim();
+  return KANAELE.find((k) => k.id === t.toLowerCase() || k.label.toLowerCase() === t.toLowerCase())?.id ?? t;
+};
 
 /** Status chain of the content plan, from idea to live. */
 export const STATUS = [
@@ -25,6 +30,11 @@ export const STATUS = [
 export type InhaltStatus = (typeof STATUS)[number]['id'];
 export const istStatus = (wert: unknown): wert is InhaltStatus => STATUS.some((s) => s.id === wert);
 export const statusLabel = (id: string) => STATUS.find((s) => s.id === id)?.label ?? id;
+/** A typed status: a known one by id or label ("Schnitt" → schnitt), otherwise the text as written. */
+export const statusVon = (wert: unknown): string => {
+  const t = String(wert ?? '').trim();
+  return STATUS.find((s) => s.id === t.toLowerCase() || s.label.toLowerCase() === t.toLowerCase())?.id ?? t;
+};
 
 /** Suggestions for the format field; the field stays free text (plus the format list of the Merkmale). */
 export const FORMATE: Record<Kanal, string[]> = {

@@ -187,12 +187,14 @@ export const WERKZEUGE: Werkzeug[] = [
     pfad: '/analytics',
     navigation: [
       { label: 'Übersicht', pfad: '/analytics', end: true, baustein: 'kanaele' },
-      { label: 'Videos', pfad: '/analytics/videos', baustein: 'kanaele' },
+      { label: 'YouTube', pfad: '/analytics/kanal/youtube', baustein: 'kanaele' },
+      { label: 'Instagram', pfad: '/analytics/kanal/instagram', baustein: 'kanaele' },
+      { label: 'TikTok', pfad: '/analytics/kanal/tiktok', baustein: 'kanaele' },
+      { label: 'Twitch', pfad: '/analytics/twitch', baustein: 'twitch' },
       { label: 'Merkmale', pfad: '/analytics/merkmale', baustein: 'merkmale' },
       { label: 'Berichte', pfad: '/analytics/berichte', baustein: 'berichte' },
       { label: 'Benchmarking', pfad: '/analytics/benchmarking', baustein: 'benchmarking' },
-      { label: 'Twitch', pfad: '/analytics/twitch', baustein: 'twitch' },
-      { label: 'Kanäle', pfad: '/analytics/kanaele', baustein: 'kanaele' },
+      { label: 'Verbindungen', pfad: '/analytics/kanaele', baustein: 'kanaele' },
     ],
   },
   {
@@ -211,9 +213,9 @@ export const WERKZEUGE: Werkzeug[] = [
   },
   {
     id: 'einnahmen',
-    name: 'Einnahmen',
-    kurz: 'Einnahmen',
-    beschreibung: 'Kooperationen, AdSense, Twitch und Affiliate in einer Übersicht, in EUR und JPY',
+    name: 'Budget',
+    kurz: 'Budget',
+    beschreibung: 'Einnahmen und Ausgaben je Monat gegengerechnet, in EUR und JPY',
     pfad: '/einnahmen',
     navigation: [{ label: 'Übersicht', pfad: '/einnahmen', end: true }],
   },
@@ -284,6 +286,13 @@ export const LEISTE: { titel?: string; eintraege: LeistenEintrag[] }[] = [
     ],
   },
   {
+    titel: 'Organisation',
+    eintraege: [
+      { werkzeug: 'kalender', label: 'Kalender', pfad: '/fristen', icon: 'kalender' },
+      { werkzeug: 'ablage', label: 'Ablage', pfad: '/ablage', icon: 'ablage' },
+    ],
+  },
+  {
     titel: 'Content & Zahlen',
     eintraege: [
       { werkzeug: 'content', label: 'Content', pfad: '/content', icon: 'content' },
@@ -291,17 +300,10 @@ export const LEISTE: { titel?: string; eintraege: LeistenEintrag[] }[] = [
     ],
   },
   {
-    titel: 'Kooperationen',
+    titel: 'Budget',
     eintraege: [
       { werkzeug: 'kooperationen', label: 'Kooperationen', pfad: '/kooperationen', icon: 'kooperationen' },
-      { werkzeug: 'einnahmen', label: 'Einnahmen', pfad: '/einnahmen', icon: 'einnahmen' },
-    ],
-  },
-  {
-    titel: 'Organisation',
-    eintraege: [
-      { werkzeug: 'kalender', label: 'Kalender', pfad: '/fristen', icon: 'kalender' },
-      { werkzeug: 'ablage', label: 'Ablage', pfad: '/ablage', icon: 'ablage' },
+      { werkzeug: 'einnahmen', label: 'Budget', pfad: '/einnahmen', icon: 'einnahmen' },
     ],
   },
   {
