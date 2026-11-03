@@ -19,3 +19,11 @@
 .organisation-page input[type=checkbox] { width: auto; margin-right: .4rem; }
 .organisation-page .liste-schlicht > li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; padding-block: .6rem; }
 @media (max-width: 760px) { .kalender-raster { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kalender-raster.woche { grid-template-columns: 1fr; } .organisation-form { grid-template-columns: 1fr; } .kalender-tag { min-height: 5rem; } }
+
+.ablage-explorer { display: grid; gap: 0.75rem; }
+.ablage-bereiche, .ablage-werkzeuge { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.ablage-bereiche .is-aktiv { outline: 2px solid currentColor; }
+.ablage-pfad { font-size: 0.95rem; }
+.ablage-aktionen { display: flex; gap: 0.35rem; justify-content: flex-end; flex-wrap: wrap; }
+.kalender-eintrag.google { opacity: 0.85; border-style: dashed; }
+.kalender-google { display: grid; gap: 0.5rem; }

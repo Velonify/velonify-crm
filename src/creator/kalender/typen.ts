@@ -134,3 +134,23 @@ export const SERIEN_VORLAGEN: { titel: string; art: FristArt; rhythmus: Rhythmus
   { titel: 'GK: Jahresformalien', art: 'gk', rhythmus: 'jaehrlich', notiz: 'Fristen der Gesellschaft laut Steuerberater, z. B. Abschluss, Erklärungen, Beschlüsse.' },
   { titel: 'GK: Unterlagen prüfen und ablegen', art: 'gk', rhythmus: 'quartalsweise', notiz: 'Neue Unterlagen der Gesellschaft in Ablage › Gesellschaft (Formalien) ablegen.' },
 ];
+
+/** An event of the connected Google calendar that is no hub deadline (shown, not edited, in the hub). */
+export interface GoogleTermin {
+  id: string;
+  titel: string;
+  datum: string;
+  uhrzeit: string;
+  bis_datum: string;
+  bis_uhrzeit: string;
+  ganztaegig: boolean;
+  ort: string;
+  link: string;
+}
+
+export interface GoogleKalenderStand {
+  /** The OAuth client of the instance is configured. */
+  einrichtbar: boolean;
+  verbunden: { email: string; verbunden_von: string; verbunden_am: string; abgeglichen_am: string; fehler: string } | null;
+}
+

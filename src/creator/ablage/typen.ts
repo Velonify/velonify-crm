@@ -17,6 +17,7 @@ export const ABLAGE_VORLAGE: VorlagenOrdner[] = [
   { schluessel: 'content', name: 'Content', beschreibung: 'Alles rund um Videos und Beiträge' },
   { schluessel: 'content/rohmaterial', name: 'Rohmaterial', beschreibung: 'Aufnahmen vom Dreh, je Video ein Unterordner' },
   { schluessel: 'content/schnitt', name: 'Schnitt', beschreibung: 'Schnittfassungen und fertige Videos, je Video ein Unterordner' },
+  { schluessel: 'content/cutter', name: 'Cutter', beschreibung: 'Aufnahmen für die anstehenden Videos, für den Schnitt' },
   { schluessel: 'content/thumbnails', name: 'Thumbnails', beschreibung: 'Vorschaubilder und ihre Vorlagen' },
   { schluessel: 'kooperationen', name: 'Kooperationen', beschreibung: 'Je Kooperation ein Unterordner: Briefing, Vertrag, Material, Reporting' },
   { schluessel: 'buchhaltung', name: 'Buchhaltung', beschreibung: 'Was die Buchhaltung und der Steuerberater brauchen' },
@@ -55,6 +56,49 @@ export const istSchluessel = (wert: unknown): wert is string =>
 export const istDriveId = (wert: unknown): wert is string => typeof wert === 'string' && /^[A-Za-z0-9_-]{10,120}$/.test(wert);
 
 export const driveOrdnerUrl = (id: string) => `https://drive.google.com/drive/folders/${encodeURIComponent(id)}`;
+
+/** Areas that get one subfolder per video or cooperation (POST /c/ablage/explorer/unterordner). */
+export const UNTERORDNER_BEREICHE = ['content/rohmaterial', 'content/schnitt', 'content/thumbnails', 'content/cutter', 'kooperationen', 'buchhaltung/belege'] as const;
+export type UnterordnerBereich = (typeof UNTERORDNER_BEREICHE)[number];
+
+/** Folder id from a Drive link (…/folders/<id>, ?id=<id>) or a bare id. */
+export function driveIdAusLink(wert: string): string | null {
+  const w = wert.trim();
+  const treffer = /\/folders\/([A-Za-z0-9_-]{10,120})/.exec(w) ?? /[?&]id=([A-Za-z0-9_-]{10,120})/.exec(w);
+  const id = treffer ? treffer[1] : w;
+  return istDriveId(id) ? id : null;
+}
+
+/** One file or folder in the explorer. */
+export interface AblageEintrag {
+  id: string;
+  name: string;
+  ordner: boolean;
+  mime: string;
+  groesse: number | null;
+  geaendert_am: string;
+  geaendert_von: string;
+  link: string;
+  /** Part of the fixed structure (cannot be renamed or moved in the explorer). */
+  fest?: boolean;
+}
+
+export interface ExplorerAntwort {
+  ordner: { id: string; name: string; link: string; fest: boolean };
+  pfad: { id: string; name: string }[];
+  eintraege: AblageEintrag[];
+  bereiche: { schluessel: string; name: string; id: string }[];
+}
+
+/** A document attached to a content item: a file from the Ablage. */
+export interface Anhang {
+  id: string;
+  name: string;
+  link: string;
+}
+
+export const istAnhaenge = (w: unknown): w is Anhang[] =>
+  Array.isArray(w) && w.length <= 30 && w.every((a) => a && typeof a === 'object' && istDriveId(a.id) && typeof a.name === 'string' && a.name.length <= 200 && typeof a.link === 'string' && /^https:\/\/(drive|docs)\.google\.com\//.test(a.link) && a.link.length <= 500);
 
 export interface AblageOrdner {
   schluessel: string;

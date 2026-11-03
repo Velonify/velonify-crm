@@ -1,35 +1,27 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Card, Field, FormError, Loading } from '../../components/ui';
-import { useAuth } from '../../auth/AuthContext';
 import { darfEinrichten } from '../../data/instanz';
 import { useCreatorApi, useInstanz } from '../api';
-import { useAblageDrive, waehleDriveOrdner } from './drive';
 import { ABLAGE_VORLAGE, HAUPTORDNER, PASSWORTMANAGER, PASSWORT_SCHRITTE, schrittText, type AblageOrdner, type PasswortmanagerStand } from './typen';
 import '../kalender/kalender.css';
 
 export function DriveEinrichtung() {
-  const api = useCreatorApi(); const drive = useAblageDrive(); const { getToken } = useAuth();
-  const [ordner, setOrdner] = useState<AblageOrdner[]>([]);
+  const api = useCreatorApi();
+  const [ordner, setOrdner] = useState<AblageOrdner[]>([]); const [konto, setKonto] = useState('');
   const [laedt, setLaedt] = useState(true); const [busy, setBusy] = useState(false);
-  const [fehler, setFehler] = useState<unknown>(null); const [status, setStatus] = useState('');
+  const [fehler, setFehler] = useState<unknown>(null); const [status, setStatus] = useState(''); const [link, setLink] = useState('');
   const laden = useCallback(async () => {
-    try { const d = await api.get<{ ordner: AblageOrdner[] }>('/c/ablage'); setOrdner(d.ordner); }
+    try { const [d, k] = await Promise.all([api.get<{ ordner: AblageOrdner[] }>('/c/ablage'), api.get<{ konto: string }>('/c/ablage/explorer/konto')]); setOrdner(d.ordner); setKonto(k.konto); }
     catch (e) { setFehler(e); } finally { setLaedt(false); }
   }, [api]);
   useEffect(() => { void laden(); }, [laden]);
-  async function verbinden(schluessel: string) {
-    setBusy(true); setFehler(null); setStatus('');
-    try { const id = await waehleDriveOrdner(await getToken()); if (id) { await drive.verknuepfen(schluessel, id); await laden(); setStatus('Ordner verknüpft.'); } }
-    catch (e) { setFehler(e); } finally { setBusy(false); }
-  }
-  async function anlegen() {
-    setBusy(true); setFehler(null);
-    try { await drive.vorlageAnlegen(name => setStatus(`Ordner wird vorbereitet: ${name}`)); setStatus('Ablagestruktur ist eingerichtet. Bestehende Ordner wurden wiederverwendet.'); }
-    catch (e) { setFehler(e); setStatus('Die Einrichtung wurde unterbrochen. Erneut starten setzt sie ohne doppelte Ordner fort.'); }
-    finally { await laden(); setBusy(false); }
+  async function einrichten(body: Record<string, unknown>, text: string) {
+    setBusy(true); setFehler(null); setStatus(body.struktur ? 'Ordner werden angelegt …' : '');
+    try { setOrdner((await api.post<{ ordner: AblageOrdner[] }>('/c/ablage/explorer/einrichten', body)).ordner); setStatus(text); setLink(''); }
+    catch (e) { setFehler(e); setStatus(''); } finally { setBusy(false); }
   }
   const haupt = ordner.find(o => o.schluessel === HAUPTORDNER);
-  return <Card title="Ablage in Google Drive"><p>Wähle einen Hauptordner. Der Hub legt darin die gemeinsame Struktur an. Bestehende Ordner für Rohmaterial oder Schnitt kannst du stattdessen direkt verknüpfen.</p><p className="muted">Der Zugriff gilt für die mit dem Hub angelegten oder ausgewählten Dateien. Die Freigaben für das Team verwaltest du in Google Drive.</p><FormError error={fehler} />{status && <p role="status">{status}</p>}{laedt ? <Loading /> : <><div className="kalender-nav">{haupt && <a href={haupt.url} target="_blank" rel="noreferrer">{haupt.name}</a>}<button className="button" disabled={busy} onClick={() => void verbinden(HAUPTORDNER)}>{haupt ? 'Hauptordner auswählen' : 'Hauptordner verbinden'}</button><button className="button primary" disabled={busy || !haupt} onClick={() => void anlegen()}>{busy ? 'Bitte warten …' : 'Ordnerstruktur anlegen'}</button></div><ul className="liste-schlicht">{ABLAGE_VORLAGE.map(v => { const o = ordner.find(x => x.schluessel === v.schluessel); return <li key={v.schluessel}><div><strong>{v.name}</strong><p className="muted">{v.beschreibung}</p>{o?.bereit ? <a href={o.url} target="_blank" rel="noreferrer">Ordner öffnen</a> : <span className="muted">{o ? 'Anlage noch nicht abgeschlossen' : 'Noch nicht eingerichtet'}</span>}</div><button className="button small" disabled={busy || !haupt} onClick={() => void verbinden(v.schluessel)}>Bestehenden Ordner wählen</button></li>; })}</ul></>}</Card>;
+  return <Card title="Ablage in Google Drive"><p>Die Ablage liegt in eurer eigenen Google Drive. Der Hub greift über ein technisches Konto darauf zu, das nur den geteilten Ordner sieht. Dateien liegen nie bei Velonify.</p><ol><li>In Google Drive den Hauptordner anlegen oder wählen, zum Beispiel „Matsu Ablage“.</li><li>Ordner teilen mit {konto ? <code>{konto}</code> : 'dem technischen Konto des Hubs'} als <strong>Bearbeiter</strong> (Benachrichtigung kann aus bleiben).</li><li>Link des Ordners kopieren und hier einfügen.</li></ol><FormError error={fehler} />{status && <p role="status">{status}</p>}{laedt ? <Loading /> : <><div className="kalender-nav">{haupt && <a href={haupt.url} target="_blank" rel="noreferrer">{haupt.name}</a>}<Field label={haupt ? 'Anderen Hauptordner verbinden' : 'Link des Hauptordners'}><input value={link} placeholder="https://drive.google.com/drive/folders/…" onChange={e => setLink(e.target.value)} /></Field><button className="button" disabled={busy || !link.trim()} onClick={() => void einrichten({ link }, 'Hauptordner verbunden.')}>Verbinden</button><button className="button primary" disabled={busy || !haupt} onClick={() => void einrichten({ struktur: true }, 'Ablagestruktur ist eingerichtet. Bestehende Ordner wurden wiederverwendet.')}>{busy ? 'Bitte warten …' : 'Ordnerstruktur anlegen'}</button></div><ul className="liste-schlicht">{ABLAGE_VORLAGE.map(v => { const o = ordner.find(x => x.schluessel === v.schluessel); return <li key={v.schluessel}><div><strong>{v.name}</strong><p className="muted">{v.beschreibung}</p>{o?.bereit ? <a href={o.url} target="_blank" rel="noreferrer">Ordner öffnen</a> : <span className="muted">Noch nicht eingerichtet</span>}</div></li>; })}</ul></>}</Card>;
 }
 
 export function PasswortmanagerEinrichtung() {

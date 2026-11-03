@@ -43,3 +43,4 @@
 .recherche-text p { margin:0 0 .6em; }
 .recherche-text blockquote { margin:.6em 0; padding-left:12px; border-left:3px solid var(--line, rgba(127,127,127,.4)); color:var(--muted, inherit); }
 .recherche-text a { color:var(--accent, inherit); text-decoration:underline; }
+.content-anhaenge { grid-column:1 / -1; display:grid; gap:8px; }

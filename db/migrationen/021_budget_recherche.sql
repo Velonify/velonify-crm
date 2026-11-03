@@ -35,3 +35,28 @@ CREATE TABLE recherche_dokumente (
 
 -- Content → Notiz: angehängte Dokumente aus Google Drive (Name, Adresse, Drive-Id), nie die Dateien selbst.
 ALTER TABLE inhalte ADD COLUMN dokumente jsonb NOT NULL DEFAULT '[]';
+
+-- Kalender: eine verbundene Google-Kalender-Person je Instanz (Tokens im Secret Manager, Secret kanal-google-kalender).
+CREATE TABLE google_kalender (
+  id integer PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  email text NOT NULL,
+  kalender_id text NOT NULL DEFAULT 'primary',
+  verbunden_von text,
+  verbunden_am timestamptz NOT NULL DEFAULT now(),
+  abgeglichen_am timestamptz,
+  fehler text
+);
+CREATE TABLE google_kalender_oauth (
+  state text PRIMARY KEY,
+  email text NOT NULL,
+  person text,
+  erstellt_am timestamptz NOT NULL DEFAULT now(),
+  verbraucht_am timestamptz
+);
+-- Welche Frist als welcher Google-Termin steht; stand ist ein Hash des zuletzt geschriebenen Termins.
+CREATE TABLE google_kalender_termine (
+  frist_id text PRIMARY KEY,
+  event_id text NOT NULL,
+  stand text NOT NULL,
+  abgeglichen_am timestamptz NOT NULL DEFAULT now()
+);
