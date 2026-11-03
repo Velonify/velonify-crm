@@ -11,7 +11,7 @@ import { fehler, istObjekt, ok, type CreatorKontext, type OeffentlichKontext, ty
  * Google-Kalender-Anbindung (Noels Feedback 11/2026): Eine Person (bei Matsu Noel) verbindet einmal ihren Google-Kalender.
  * Die Fristen des Hubs stehen dann als Termine darin, die Zuständigen als Gäste, damit sie auch in deren Kalendern landen;
  * die übrigen Termine des Google-Kalenders zeigt der Hub-Kalender an. OAuth-Client der Instanz (GOOGLE_KALENDER_CLIENT_ID,
- * sonst der YouTube-Client desselben Projekts), Tokens im Secret Manager der Instanz, Scope calendar.events.
+ * sonst der Login-Client GOOGLE_CLIENT_ID; Secret GOOGLE_KALENDER_CLIENT_SECRET), Tokens im Secret Manager der Instanz, Scope calendar.events.
  */
 
 const AUTH = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -52,8 +52,10 @@ class KalenderProblem extends Error {
 }
 
 function konfig(u: Umgebung) {
-  const clientId = u.wert('GOOGLE_KALENDER_CLIENT_ID') ?? u.wert('YOUTUBE_CLIENT_ID');
-  const clientSecret = u.wert('GOOGLE_KALENDER_CLIENT_SECRET') ?? u.wert('YOUTUBE_CLIENT_SECRET');
+  // Without an own client the login client of the instance (GOOGLE_CLIENT_ID) is used; its secret comes as GOOGLE_KALENDER_CLIENT_SECRET.
+  const eigener = u.wert('GOOGLE_KALENDER_CLIENT_ID');
+  const clientId = eigener ?? u.wert('GOOGLE_CLIENT_ID');
+  const clientSecret = u.wert('GOOGLE_KALENDER_CLIENT_SECRET');
   return clientId && clientSecret && u.apiUrl && u.hubUrl ? { clientId, clientSecret } : null;
 }
 const rueckruf = (u: Umgebung) => `${u.apiUrl.replace(/\/$/, '')}/oeffentlich/kalender/google`;

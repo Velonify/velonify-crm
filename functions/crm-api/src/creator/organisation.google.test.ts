@@ -12,7 +12,7 @@ import { testKi } from './ki';
 
 const SUPPORT = ['lukas@velonify.de'];
 const JETZT = new Date('2026-11-10T09:00:00Z');
-const UMGEBUNG: Record<string, string> = { YOUTUBE_CLIENT_ID: 'client', YOUTUBE_CLIENT_SECRET: 'geheim' };
+const UMGEBUNG: Record<string, string> = { GOOGLE_CLIENT_ID: 'client', GOOGLE_KALENDER_CLIENT_SECRET: 'geheim' };
 
 async function aufbau() {
   const { pool } = await testDb();
