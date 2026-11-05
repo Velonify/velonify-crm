@@ -6,7 +6,7 @@ import { GesperrtError } from '../../../src/data/errors';
 import { verbinde, type Verbindung } from '../../../db/verbindung';
 import { timingSafeEqual } from 'node:crypto';
 import { behandle, behandleAdmin, behandleDaten } from './routen';
-import { behandleMandant, behandlePlattformAdmin, pruefeKi, type MandantKontext } from './plattform';
+import { behandleMandant, behandlePlattformAdmin, mandantenAblage, pruefeKi, pruefeWhiteboard, type MandantKontext } from './plattform';
 import { PlattformStore } from '../../../src/data/postgres/plattformStore';
 import { aktiveWerkzeuge } from '../../../src/data/plattform';
 import { nimmAnfrage } from './extern/eingang';
@@ -433,6 +433,20 @@ async function mandantenAnfrage(
       console.log(JSON.stringify({ mandant: mandant.id, email, pfad, status: antwort.status, dauer_ms: Date.now() - start }));
       res.status(antwort.status).type('application/json').send(await antwort.text());
       return;
+    }
+
+    if (pfad.startsWith('/whiteboard/')) {
+      const gesperrt = pruefeWhiteboard(req.method, { plattform, mandant });
+      if (gesperrt) return void res.status(gesperrt.status).json(gesperrt.daten);
+      const wb = await behandleWhiteboard(req.method, pfad, req.body, { pool, ablage: mandantenAblage(whiteboardAblage, mandant.id), email, roh: req.rawBody, typ: req.get('content-type') });
+      if (wb && 'inhalt' in wb) {
+        res.set('Cache-Control', 'private, max-age=31536000, immutable');
+        return void res.status(200).type(wb.typ).send(wb.inhalt);
+      }
+      if (wb) {
+        if (req.method !== 'GET') console.log(JSON.stringify({ mandant: mandant.id, email, pfad, status: wb.status, dauer_ms: Date.now() - start }));
+        return void res.status(wb.status).json(wb.daten);
+      }
     }
 
     const ctx: MandantKontext = { plattform, zugang, mandant, pool, store: new PostgresStore(pool, () => email), melde: meldePlattform };

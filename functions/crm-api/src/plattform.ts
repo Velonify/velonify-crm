@@ -1,7 +1,8 @@
 import { PlattformFehler, type PlattformStore } from '../../../src/data/postgres/plattformStore';
 import type { DbPool, PostgresStore } from '../../../src/data/postgres/postgresStore';
-import { FEEDBACK_FRAGEN, PAKETE, zugriff, type FeedbackAnlass, type Mandant, type Paket, type Zugang } from '../../../src/data/plattform';
+import { FEEDBACK_FRAGEN, PAKETE, werkzeugAn, zugriff, type FeedbackAnlass, type Mandant, type Paket, type Zugang } from '../../../src/data/plattform';
 import { behandle, behandleDaten, type Antwort } from './routen';
+import type { Ablage } from '../../gemeinsam/ablage';
 import { behandleInstanzen, steuerDiensteAusUmgebung, type SteuerDienste } from './creator/steuerung/instanzen';
 
 const istObjekt = (wert: unknown): wert is Record<string, unknown> => typeof wert === 'object' && wert !== null && !Array.isArray(wert);
@@ -109,6 +110,27 @@ export async function behandleMandant(methode: string, pfad: string, body: unkno
     if (err instanceof PlattformFehler) return fehler(err.status, err.message);
     throw err;
   }
+}
+
+/**
+ * Whiteboard routes of a tenant (/whiteboard/…, drawing and images): only with the tool on, writing only with full
+ * access. null means go ahead.
+ */
+export function pruefeWhiteboard(methode: string, ctx: Pick<MandantKontext, 'plattform' | 'mandant'>): Antwort | null {
+  const stand = zugriff(ctx.mandant, ctx.plattform.heute());
+  if (stand === 'gesperrt') return fehler(403, 'Euer Zugang ist gesperrt. Meldet euch bei Velonify, um ihn wieder freizuschalten.');
+  if (!werkzeugAn(ctx.mandant, 'whiteboard')) return fehler(403, 'Das Whiteboard ist für euch nicht freigeschaltet.');
+  if (methode !== 'GET' && stand !== 'voll') return fehler(403, 'Der Testzeitraum ist abgelaufen: Ihr könnt alles ansehen, aber nichts mehr ändern, bis ihr ein Paket bucht.');
+  return null;
+}
+
+/** The tenant's whiteboard images live under mandanten/<id>/ in the shared bucket, apart from Velonify's and each other's. */
+export function mandantenAblage(ablage: Ablage, mandantId: string): Ablage {
+  const praefix = `mandanten/${mandantId}/`;
+  return {
+    schreibe: (pfad, typ, inhalt) => ablage.schreibe(praefix + pfad, typ, inhalt),
+    lies: (pfad) => ablage.lies(praefix + pfad),
+  };
 }
 
 /** Every active login's first name is in the tenant's team list, so assignments and @-mentions work from day one. */
