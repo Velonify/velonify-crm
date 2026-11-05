@@ -273,7 +273,8 @@ body {
   box-shadow: var(--karten-schatten);
   background-color: var(--raised);
 }
-.soft :is(.board, .kalender-woche, .kunden-karten, .social-inhalte, .link-list) { overflow: hidden; }
+/* Not .board: the pipeline is wider than the page and scrolls sideways (overflow-x in styles.css). */
+.soft :is(.kalender-woche, .kunden-karten, .social-inhalte, .link-list) { overflow: hidden; }
 .soft .page > .card + .card { margin-top: var(--abstand); }
 .soft .card { padding: 22px; }
 .soft .card-header h2 { font-size: 15px; font-weight: 700; }
